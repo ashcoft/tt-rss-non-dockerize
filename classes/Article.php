@@ -303,10 +303,10 @@ class Article extends Handler_Protected {
 
 	/**
 	 * @param int $id article id
-	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>}
+	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>, 'preview_entries': array<int, array<string, mixed>>}
 	 */
 	static function _format_enclosures(int $id, bool $always_display_enclosures, string $article_content, bool $hide_images = false): array {
-		$enclosures = self::_get_enclosures($id);
+		$enclosures = self::_get_enclosures($id, with_original_url: true);
 		$enclosures_formatted = "";
 
 		/*foreach ($enclosures as &$enc) {
@@ -334,7 +334,8 @@ class Article extends Handler_Protected {
 		if (!empty($enclosures_formatted)) {
 			return [
 					'formatted' => $enclosures_formatted,
-					'entries' => []
+					'entries' => [],
+					'preview_entries' => []
 			];
 		}
 
@@ -365,17 +366,78 @@ class Article extends Handler_Protected {
 			if ($rendered_enc) {
 				$rv['formatted'] .= $rendered_enc;
 			} else {
+				// A hook may return a rebuilt entry without the internal key; keep the
+				// pre-hook source URL so the poster filter can still identify it.
+				$source_url = $enc['original_url'] ?? $enc['content_url'];
 				PluginHost::getInstance()->chain_hooks_callback(PluginHost::HOOK_ENCLOSURE_ENTRY,
 					function ($result) use (&$enc) {
 						$enc = $result;
 					},
 					$enc, $id, $rv);
 
+				$enc['original_url'] = $source_url;
+
 				$rv['entries'][] = $enc;
 			}
 		}
 
+		// A video's media:thumbnail is its player's poster; once af_youtube_embed
+		// inlines the video as an iframe the thumbnail would show the same frame
+		// twice. preview_entries keeps the unfiltered list, since the poster is
+		// still the image the headline preview wants.
+		$rv['preview_entries'] = $rv['entries'];
+		$rv['entries'] = self::dropPlayerPosters($rv['entries'], $rv['formatted']);
+
+		// original_url is an internal matching aid only. Both lists are handed to
+		// the client as `hl.enclosures`, and a source URL can carry tokens.
+		foreach (['entries', 'preview_entries'] as $key) {
+			$rv[$key] = array_map(function (array $enc): array {
+				unset($enc['original_url']);
+
+				return $enc;
+			}, $rv[$key]);
+		}
+
 		return $rv;
+	}
+
+	/**
+	 * Remove the poster enclosure of every video that was inlined as a player.
+	 *
+	 * The thumbnail is matched on `original_url`, because DiskCache rewrites
+	 * `content_url` to a redirect that no longer contains the video id.
+	 *
+	 * @param array<int, array<string, mixed>> $entries
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function dropPlayerPosters(array $entries, string $formatted): array {
+		if (preg_match_all('/<iframe[^>]+src=["\']([^"\']+)/i', $formatted, $matches) === 0) {
+			return $entries;
+		}
+
+		$video_ids = [];
+
+		foreach ($matches[1] as $src) {
+			$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($src));
+
+			if ($video_id !== false) {
+				$video_ids[] = $video_id;
+			}
+		}
+
+		if ($video_ids === []) {
+			return $entries;
+		}
+
+		// Only an image can be the player's poster: a PDF or audio file that
+		// happens to carry the id in its URL is a real attachment. Match the URL
+		// path only, so an unrelated image carrying the id in a query string or
+		// host is left alone.
+		return array_values(array_filter($entries,
+			fn (array $enc): bool => str_starts_with(mb_strtolower((string)($enc['content_type'] ?? '')), 'image/') === false
+				|| array_filter($video_ids,
+					fn (string $video_id): bool => str_contains(
+						(string)parse_url((string)($enc['original_url'] ?? ''), PHP_URL_PATH), $video_id)) === []));
 	}
 
 	/**
@@ -444,10 +506,14 @@ class Article extends Handler_Protected {
 		}
 	}
 
+	// Name and visibility match the other underscore-prefixed helpers in this
+	// class and its callers across the codebase; kept as upstream has them.
 	/**
+	 * @param bool $with_original_url also return each enclosure's pre-cache URL
+	 *     as `original_url`; for internal callers only
 	 * @return array<int, array<string, mixed>>
 	 */
-	static function _get_enclosures(int $id): array {
+	static function _get_enclosures(int $id, bool $with_original_url = false): array { // NOSONAR
 		$encs = ORM::for_table('ttrss_enclosures')
 			->where('post_id', $id)
 			->find_many();
@@ -459,6 +525,14 @@ class Article extends Handler_Protected {
 		foreach ($encs as $enc) {
 			$cache_key = sha1($enc->content_url);
 
+			// DiskCache rewrites content_url to a redirect, so callers that have
+			// to identify an enclosure by its source URL ask for the pre-cache
+			// value. It stays off by default: this result is published through
+			// the API as `attachments` and the URL can carry credentials.
+			if ($with_original_url === true) {
+				$enc->original_url = $enc->content_url;
+			}
+
 			if ($cache->exists($cache_key)) {
 				$enc->content_url = $cache->get_url($cache_key);
 			}
@@ -467,7 +541,6 @@ class Article extends Handler_Protected {
 		}
 
 		return $rv;
-
 	}
 
 	static function _purge_orphans(): void {

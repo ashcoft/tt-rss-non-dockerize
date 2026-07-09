@@ -1,17 +1,23 @@
-# CodeQL configuration for tt-rss-non-dockerize
-# Exclude vendor/ from security scanning since it's managed via Composer
+# CodeQL configuration for tt-rss-non-dockerize.
+#
+# CodeQL analyses this repository in three languages: actions,
+# javascript-typescript and python. A `paths` allowlist must therefore keep at
+# least one file for every one of them; the previous allowlist (js/, plugins/,
+# lib/, themes/) left `actions` and `python` with no code at all, which makes the
+# analysis fail with "CodeQL detected code written in X, but not any written in
+# Y". Only exclude vendored/third-party code here, never allowlist paths.
+#
+# This file is used by CodeQL advanced setup, and by default setup when the
+# `github-codeql-config-file` repository property points at it.
 
 paths-ignore:
-  - 'vendor/**'  # Dependencies managed via Composer - do not scan
-  - 'node_modules/**'  # Dependencies managed via npm
-  - 'cache/**'  # Runtime cache
-  - 'lock/**'  # Lock files
-  - 'tests/**'  # Test files (optional exclusion)
-  - 'tests_functional/**'
-  - 'tests_integration/**'
-
-paths:
-  - 'js/**'
-  - 'plugins/**'
-  - 'lib/**'
-  - 'themes/**'
+  # Dependencies, caches and generated files
+  - vendor/**
+  - node_modules/**
+  - cache/**
+  - lock/**
+  # Vendored Dojo Toolkit; the layer is rebuilt from lib/dojo-src when needed
+  - lib/dojo/**
+  - lib/dijit/**
+  - lib/dojox/**
+  - lib/dojo-src/**

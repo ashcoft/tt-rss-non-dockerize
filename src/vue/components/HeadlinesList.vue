@@ -1,233 +1,186 @@
 <template>
-  <div class="headlines-list">
-    <el-table
-      :data="headlines"
-      v-loading="loading"
-      @row-click="handleRowClick"
-      @selection-change="handleSelectionChange"
-      :row-class-name="getRowClass"
-      highlight-current-row
-      stripe
-      style="width: 100%"
-    >
-      <el-table-column type="selection" width="40" />
+  <div ref="listRef" class="headlines-list">
+    <div v-if="loading" class="headlines-loading">
+      <v-progress-circular indeterminate color="primary" />
+      <span>Loading headlines...</span>
+    </div>
 
-      <el-table-column label="Feed" width="120">
-        <template #default="{ row }">
-          <span class="feed-name">{{ row.feed_title || 'Unknown' }}</span>
+    <div v-else-if="headlines.length === 0" class="headlines-empty">
+      <v-icon size="64" color="grey">mdi-newspaper-variant-outline</v-icon>
+      <p>No headlines to display</p>
+    </div>
+
+    <v-list v-else class="headlines-list-content" lines="three">
+      <v-list-item
+        v-for="headline in headlines"
+        :key="headline.id"
+        :class="{
+          'headline-read': headline.is_read,
+          'headline-active': headline.id === activeId,
+        }"
+        @click="emit('select', headline)"
+      >
+        <template #prepend>
+          <v-checkbox
+            :model-value="headline.is_read"
+            hide-details
+            density="compact"
+            @click.stop
+            @update:model-value="toggleRead(headline)"
+          />
         </template>
-      </el-table-column>
 
-      <el-table-column label="Title" min-width="300">
-        <template #default="{ row }">
-          <div class="headline-content">
-            <span class="headline-title" :class="{ unread: !row.is_read }">
-              {{ row.title }}
-            </span>
-            <div class="headline-meta">
-              <span class="author" v-if="row.author">{{ row.author }}</span>
-              <span class="date">{{ formatDate(row.updated) }}</span>
-              <span class="comments" v-if="row.comments_count > 0">
-                <el-icon><ChatLineSquare /></el-icon>
-                {{ row.comments_count }}
-              </span>
-            </div>
+        <v-list-item-title class="headline-title">
+          {{ headline.title }}
+        </v-list-item-title>
+
+        <v-list-item-subtitle class="headline-meta">
+          <span v-if="headline.author" class="headline-author">
+            {{ headline.author }}
+          </span>
+          <span v-if="headline.updated" class="headline-date">
+            {{ formatDate(headline.updated) }}
+          </span>
+        </v-list-item-subtitle>
+
+        <template #append>
+          <div class="headline-actions">
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              :color="headline.is_marked ? 'amber' : 'grey'"
+              @click.stop="emit('action', headline, 'toggle_star')"
+            >
+              <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+            </v-btn>
+
+                        <v-btn
+              icon
+              variant="text"
+              size="small"
+              :color="headline.is_published ? 'blue' : 'grey'"
+              @click.stop="emit('action', headline, 'toggle_publish')"
+            >
+              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
+            </v-btn>
+
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              color="grey"
+              @click.stop="emit('action', headline, 'label')"
+              title="Assign labels"
+            >
+              <v-icon>mdi-label</v-icon>
+            </v-btn>
           </div>
         </template>
-      </el-table-column>
+      </v-list-item>
+        </v-list>
 
-      <el-table-column label="Labels" width="150">
-        <template #default="{ row }">
-          <el-tag
-            v-for="label in row.labels"
-            :key="label.id"
-            size="small"
-            class="label-tag"
-          >
-            {{ label.caption }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="Actions" width="120" align="right">
-        <template #default="{ row }">
-          <el-button-group size="small">
-            <el-button
-              :icon="Star"
-              :type="row.is_marked ? 'warning' : ''"
-              @click.stop="$emit('action', row, 'toggle_star')"
-              :title="row.is_marked ? 'Unstar' : 'Star'"
-            />
-            <el-button
-              :icon="Document"
-              @click.stop="$emit('action', row, 'mark_read')"
-              title="Mark as read"
-            />
-            <el-button
-              :icon="More"
-              @click.stop="showActions(row)"
-              title="More actions"
-            />
-          </el-button-group>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-empty
-      v-if="!loading && headlines.length === 0"
-      description="No articles found"
-    />
-
-    <!-- Actions Dropdown -->
-    <el-dropdown ref="actionsDropdown" trigger="click" @command="handleCommand">
-      <span ref="actionsTarget" style="display: none;"></span>
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item command="mark_read">Mark as read</el-dropdown-item>
-          <el-dropdown-item command="mark_unread">Mark as unread</el-dropdown-item>
-          <el-dropdown-item command="toggle_star" divided>
-            {{ currentHeadline?.is_marked ? 'Remove star' : 'Add star' }}
-          </el-dropdown-item>
-          <el-dropdown-item command="toggle_publish">
-            {{ currentHeadline?.is_published ? 'Unpublish' : 'Publish' }}
-          </el-dropdown-item>
-          <el-dropdown-item command="open_article" divided>
-            Open article
-          </el-dropdown-item>
-          <el-dropdown-item command="open_feed">Open feed</el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
+    <div v-if="hasMore && !loading" class="load-more">
+      <v-btn
+        color="primary"
+        variant="flat"
+        :loading="loadingMore"
+        @click="emit('load-more')"
+      >
+        Load more
+      </v-btn>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Star, Document, More, ChatLineSquare } from '@element-plus/icons-vue';
+import { ref, computed, onMounted } from 'vue';
 import type { Headline } from '@/types';
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
 
-interface Props {
+const props = defineProps<{
   headlines: Headline[];
-  loading?: boolean;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  loading: false
-});
-
-const emit = defineEmits<{
-  (e: 'select', headline: Headline): void;
-  (e: 'action', headline: Headline, action: string): void;
+  loading: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  /** Id of the headline under the keyboard cursor, highlighted in the list. */
+  activeId?: number | null;
 }>();
 
-// State
-const currentHeadline = ref<Headline | null>(null);
-const actionsDropdown = ref();
-const actionsTarget = ref<HTMLElement>();
+const emit = defineEmits<{
+  select: [headline: Headline];
+  action: [headline: Headline, action: string];
+  'load-more': [];
+}>();
 
-// Methods
-const handleRowClick = (row: Headline) => {
-  emit('select', row);
+// Infinite scroll wiring (Phase 5)
+const listRef = ref<HTMLElement | null>(null);
+const { setupScrollListener } = useInfiniteScroll({
+  enabled: computed(() => Boolean(props.hasMore) && !props.loading && !props.loadingMore),
+  onLoadMore: () => {
+    emit('load-more');
+  },
+});
+
+onMounted(() => {
+  if (listRef.value) setupScrollListener(listRef.value);
+});
+
+
+const toggleRead = (headline: Headline) => {
+  emit('action', headline, 'toggle_read');
 };
 
-const handleSelectionChange = (selection: Headline[]) => {
-  console.log('Selected:', selection);
-};
-
-const getRowClass = ({ row }: { row: Headline }) => {
-  const classes = [];
-  if (!row.is_read) classes.push('unread-row');
-  if (row.is_marked) classes.push('starred-row');
-  return classes.join(' ');
-};
-
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-
-  // Less than 24 hours
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000);
-    if (hours < 1) {
-      const minutes = Math.floor(diff / 60000);
-      return `${minutes}m ago`;
-    }
-    return `${hours}h ago`;
-  }
-
-  // Less than 7 days
-  if (diff < 604800000) {
-    const days = Math.floor(diff / 86400000);
-    return `${days}d ago`;
-  }
-
-  // Format as date
-  return date.toLocaleDateString();
-};
-
-const showActions = (row: Headline) => {
-  currentHeadline.value = row;
-  // Actions dropdown logic would go here
-};
-
-const handleCommand = (command: string) => {
-  if (currentHeadline.value) {
-    emit('action', currentHeadline.value, command);
-  }
-};
+// Feeds/view returns pre-localised date strings ("14:05", "Mar 03, 9:12",
+// "Never"), not Unix timestamps, so they are rendered as-is.
+const formatDate = (updated: string): string => updated;
 </script>
 
 <style scoped>
 .headlines-list {
-  flex: 1;
-  overflow: auto;
+  height: 100%;
+  overflow-y: auto;
 }
 
-.headline-content {
+.headlines-loading,
+.headlines-empty {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 1rem;
+  color: grey;
+}
+
+.headlines-list-content {
+  padding: 0;
+}
+
+.headline-read {
+  opacity: 0.6;
+}
+
+/* Keyboard cursor highlight; matches the legacy .hl.active treatment. */
+.headline-active {
+  background: rgba(37, 122, 167, 0.12);
 }
 
 .headline-title {
-  font-size: 0.9375rem;
-  color: #333;
-}
-
-.headline-title.unread {
-  font-weight: 600;
-  color: #000;
+  font-weight: 500;
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .headline-meta {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   font-size: 0.75rem;
-  color: #666;
+  color: grey;
 }
 
-.feed-name {
-  font-size: 0.8125rem;
-  color: #1976d2;
-}
-
-.label-tag {
-  margin-right: 0.25rem;
-  margin-bottom: 0.125rem;
-}
-
-.comments {
+.headline-actions {
   display: flex;
-  align-items: center;
   gap: 0.25rem;
-}
-
-:deep(.unread-row) {
-  background-color: var(--ttrss-unread-bg, #e3f2fd) !important;
-}
-
-:deep(.starred-row) {
-  background-color: var(--ttrss-starred-bg, #fff8e1) !important;
 }
 </style>

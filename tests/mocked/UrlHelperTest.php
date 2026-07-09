@@ -375,6 +375,16 @@ final class UrlHelperTest extends TestCase {
 		$this->assertEquals('https://example.com/page', $result);
 	}
 
+	// ===== canonicalizeIpv4Literal() Tests =====
+
+	public function testCanonicalizeIpv4LiteralNormalizesHexOctalAndDecimalForms(): void {
+		$this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0177.0.0.1'));
+		$this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0x7f.0.0.1'));
+		$this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('127.0.0.1'));
+		$this->assertNull(UrlHelper::canonicalizeIpv4Literal('0xgg.0.0.1'));
+		$this->assertNull(UrlHelper::canonicalizeIpv4Literal('1.2.3.4.5'));
+	}
+
 	// ===== has_disallowed_ip() Tests =====
 
 	public function testIsDisallowedIpDetectsLocalhost(): void {
@@ -398,6 +408,16 @@ final class UrlHelperTest extends TestCase {
 		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[0:0:0:0:0:0:0:1]:443/'));
 	}
 
+	public function testIsDisallowedIpAllowsUniqueLocalIPv6OnStandardPorts(): void {
+		$this->assertFalse(UrlHelper::has_disallowed_ip('http://[fc00::1]/'));
+		$this->assertFalse(UrlHelper::has_disallowed_ip('https://[fd00::1]:443/'));
+	}
+
+	public function testIsDisallowedIpBlocksUniqueLocalIPv6OnNonStandardPorts(): void {
+		$this->assertTrue(UrlHelper::has_disallowed_ip('http://[fc00::1]:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[fd00::1]:8443/'));
+	}
+
 	public function testIsDisallowedIpAllowsExternalHosts(): void {
 		$this->assertFalse(UrlHelper::has_disallowed_ip('http://example.com/'));
 		$this->assertFalse(UrlHelper::has_disallowed_ip('https://example.org:8080/'));
@@ -407,6 +427,27 @@ final class UrlHelperTest extends TestCase {
 	public function testIsDisallowedIpReturnsFalseForInvalidUrl(): void {
 		$this->assertFalse(UrlHelper::has_disallowed_ip('not-a-url'));
 		$this->assertFalse(UrlHelper::has_disallowed_ip(''));
+	}
+
+	public function testIsDisallowedIpRejectsUnresolvableHostnamesWhenResolutionRequired(): void {
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://does-not-resolve.invalid/', true));
+	}
+
+	public function testIsDisallowedIpRejectsTrailingDotIpv4Literal(): void {
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254./'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254.:443/'));
+	}
+
+	public function testIsDisallowedIpRejectsEmptyHostnameAfterTrimming(): void {
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://./'));
+	}
+
+	public function testIsDisallowedIpRejectsCanonicalizedLoopbackAndMappedIPv6Variants(): void {
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://0177.0.0.1:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://0x7f.0.0.1:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:127.0.0.1]:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]:8080/'));
+		$this->assertFalse(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]/'));
 	}
 
 	// ===== has_disallowed_ip() - Link-Local / Cloud Metadata Tests =====
@@ -577,5 +618,45 @@ final class UrlHelperTest extends TestCase {
 		// Regex should still extract video ID even with query params
 		$result = UrlHelper::url_to_youtube_vid($url);
 		$this->assertEquals('dQw4w9WgXcQ', $result);
+	}
+
+	// ===== curl_handler_supported() Tests =====
+
+	/** Skip the curl-handler tests when this PHP build lacks the curl constants. */
+	private function requireCurlConstants(): void {
+		foreach (['CURL_VERSION_SSL', 'CURL_SSLVERSION_TLSv1_2', 'CURLMOPT_MAX_HOST_CONNECTIONS', 'CURLMOPT_MAX_TOTAL_CONNECTIONS'] as $const) {
+			if (defined($const) === false) {
+				$this->markTestSkipped("$const is not available in this PHP build");
+			}
+		}
+	}
+
+	/** Guzzle selects its curl handler for a current libcurl built with SSL. */
+	public function testCurlHandlerSupportedWithCurrentLibcurlAndSsl(): void {
+		$this->requireCurlConstants();
+		$this->assertTrue(UrlHelper::curl_handler_supported(['version' => '8.5.0', 'features' => \CURL_VERSION_SSL]));
+	}
+
+	/** 7.34.0 is the minimum libcurl Guzzle accepts. */
+	public function testCurlHandlerSupportedAtMinimumVersion(): void {
+		$this->requireCurlConstants();
+		$this->assertTrue(UrlHelper::curl_handler_supported(['version' => '7.34.0', 'features' => \CURL_VERSION_SSL]));
+	}
+
+	/** An older libcurl, such as CentOS 7's 7.29.0, is not used by Guzzle. */
+	public function testCurlHandlerNotSupportedWithOldLibcurl(): void {
+		$this->requireCurlConstants();
+		$this->assertFalse(UrlHelper::curl_handler_supported(['version' => '7.29.0', 'features' => \CURL_VERSION_SSL]));
+	}
+
+	/** A libcurl without SSL support is not used by Guzzle. */
+	public function testCurlHandlerNotSupportedWithoutSsl(): void {
+		$this->requireCurlConstants();
+		$this->assertFalse(UrlHelper::curl_handler_supported(['version' => '8.5.0', 'features' => 0]));
+	}
+
+	/** curl_version() returning false means the curl handler is unusable. */
+	public function testCurlHandlerNotSupportedWithoutVersionInfo(): void {
+		$this->assertFalse(UrlHelper::curl_handler_supported(false));
 	}
 }

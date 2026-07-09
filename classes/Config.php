@@ -553,13 +553,69 @@ class Config {
 		} else {
 			$proto = self::is_server_https() ? 'https' : 'http';
 
-			$self_url_path = $proto . '://' . $_SERVER["HTTP_HOST"] . parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+			$self_url_path = $proto . '://' . $_SERVER["HTTP_HOST"] . parse_url($_SERVER["REQUEST_URI"] ?? '', PHP_URL_PATH);
 			$self_url_path = preg_replace("/(\/api\/{1,})?(\w+\.php)?(\?.*$)?$/", "", $self_url_path);
 			$self_url_path = preg_replace("/(\/plugins(.local)?)\/.{1,}$/", "", $self_url_path);
 		}
 
 		return rtrim($self_url_path, '/');
 	}
+
+	/**
+	 * @return bool true if the provided URL has the same origin (scheme+host+port) and path prefix as tt-rss's self URL, otherwise false
+	 */
+	public static function matchesSelfUrl(string $url_to_check, bool $always_detect_self_url = false): bool {
+		$check_url_parts = parse_url($url_to_check);
+
+		// check the basics first
+		if (!$check_url_parts || !isset($check_url_parts['scheme'], $check_url_parts['host'])) {
+			return false;
+		}
+
+		$self_url_parts  = parse_url(self::get_self_url($always_detect_self_url));
+
+		// normalize stuff
+		$check_url_scheme = strtolower($check_url_parts['scheme']);
+		$self_url_scheme = strtolower($self_url_parts['scheme']);
+
+		$check_url_host = idn_to_ascii($check_url_parts['host'], IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+		$self_url_host  = idn_to_ascii($self_url_parts['host'], IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+
+		$default_port = function(string $scheme): int {
+			if ($scheme === 'https') {
+				return 443;
+			}
+			if ($scheme === 'http') {
+				return 80;
+			}
+			return 0;
+		};
+
+		$check_url_port = $check_url_parts['port'] ?? $default_port($check_url_scheme);
+		$self_url_port  = $self_url_parts['port']  ?? $default_port($self_url_scheme);
+
+		// check origin things
+		if (
+			$check_url_scheme !== $self_url_scheme
+			|| $check_url_host === false
+			|| $self_url_host === false
+			|| $check_url_host !== $self_url_host
+			|| $check_url_port !== $self_url_port
+		) {
+			return false;
+		}
+
+		// if tt-rss has a non-root path (e.g. the default '/tt-rss') check for either an exact match or a matching prefix
+		$self_url_path = isset($self_url_parts['path']) && $self_url_parts['path'] !== '/' ? $self_url_parts['path'] : '';
+
+		if ($self_url_path !== '') {
+			$check_url_path = isset($check_url_parts['path']) ? rtrim($check_url_parts['path'], '/') : '';
+			return $check_url_path === $self_url_path || str_starts_with($check_url_path, $self_url_path . '/');
+		}
+
+		return true;
+	}
+
 	/* sanity check stuff */
 
 	static function sanity_check(): void {
@@ -573,6 +629,16 @@ class Config {
 		$pdo = Db::pdo();
 
 		$errors = [];
+
+		/* An incompatible psr/http-message copy (a stale vendor tree, or a
+			distribution package on include_path) makes PHP abort the first time
+			a GuzzleHttp\Psr7 class is loaded, with a message that names neither
+			the file nor a remedy. Report it here instead. */
+		$psr7_problem = Psr7Compat::check();
+
+		if ($psr7_problem !== null) {
+			$errors[] = $psr7_problem;
+		}
 
 		if (!str_contains(self::get(Config::PLUGINS), "auth_")) {
 			$errors[] = 'Please enable at least one authentication module via PLUGINS';

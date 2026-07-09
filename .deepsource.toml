@@ -1,0 +1,85 @@
+version = 1
+
+test_patterns = [
+  "**/tests/**/*.php",
+  "**/tests_functional/**/*.php",
+  "**/tests_integration/**/*.php",
+  "**/tests/integration/selenium_test.py"
+]
+
+exclude_patterns = [
+  "**/node_modules/**",
+  "**/vendor/**",
+  "**/__pycache__/**",
+  "**/.pytest_cache/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/dist/**",
+  "**/build/**"
+]
+
+# JavaScript / Vue (fork's Vite toolchain). Style/legacy rules that clash with
+# the inherited upstream tt-rss sources are explicitly disabled in
+# eslint.config.js, which DeepSource respects.
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+  [analyzers.meta]
+  environment = ["browser", "nodejs"]
+  cyclomatic_complexity_threshold = "medium"
+
+# PHP (tt-rss core). `bootstrap_files` loads the project's autoloader so the
+# analyzer can resolve the classes and constants declared across classes/.
+# Without it, DeepSource reports thousands of false positives such as
+# "PluginHost::run_hooks() is called but not defined" and
+# "Access to undefined constant Config::SINGLE_USER_MODE".
+#
+# include/autoload.php is the only entry needed. It loads vendor/autoload.php,
+# whose files-autoload already pulls in include/functions.php, which is what
+# defines LABEL_BASE_INDEX and the other globals. Listing functions.php as well
+# makes DeepSource require it a second time, and because it declares plain
+# functions that is a fatal "Cannot redeclare get_pref()". The bootstrap then
+# aborts part-way, leaving every class and constant unresolved, which produces
+# exactly the false positives this stanza exists to prevent.
+#
+# Verified by requiring the entry from a working directory that is not the
+# project root, the way the analyzer does: Config, PluginHost, LABEL_BASE_INDEX
+# and get_pref all resolve.
+[[analyzers]]
+name = "php"
+enabled = true
+
+  [analyzers.meta]
+  bootstrap_files = ["include/autoload.php"]
+  cyclomatic_complexity_threshold = "medium"
+
+[[analyzers]]
+name = "python"
+enabled = true
+
+  [analyzers.meta]
+  type_checker = "mypy"
+  max_line_length = 100
+  runtime_version = "3.x.x"
+  cyclomatic_complexity_threshold = "medium"
+
+[[analyzers]]
+name = "shell"
+enabled = true
+
+  [analyzers.meta]
+  dialect = "sh"
+
+[[analyzers]]
+name = "sql"
+enabled = true
+
+  [analyzers.meta]
+  comma_style = "trailing"
+  indent_unit = "space"
+  allow_scalar = true
+  tab_space_size = 4
+  max_line_length = 80
+  capitalisation_policy = "consistent"
+  single_table_references = "consistent"

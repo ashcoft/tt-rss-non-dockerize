@@ -93,8 +93,10 @@ const Headlines = {
 	}),
 	syncModified: function (modified) {
 		const ops = {
-			tmark: [],
-			tpub: [],
+			marked: [],
+			unmarked: [],
+			published: [],
+			unpublished: [],
 			read: [],
 			unread: [],
 			select: [],
@@ -106,10 +108,10 @@ const Headlines = {
 
 		modified.forEach(function (m) {
 			if (m.old.marked !== m.new.marked)
-				ops.tmark.push(m.id);
+				m.new.marked ? ops.marked.push(m.id) : ops.unmarked.push(m.id);
 
 			if (m.old.published !== m.new.published)
-				ops.tpub.push(m.id);
+				m.new.published ? ops.published.push(m.id) : ops.unpublished.push(m.id);
 
 			if (m.old.unread !== m.new.unread)
 				m.new.unread ? ops.unread.push(m.id) : ops.read.push(m.id);
@@ -157,14 +159,21 @@ const Headlines = {
 		});
 
 		const promises = [];
-
-		if (ops.tmark.length !== 0)
+		if (ops.unmarked.length !== 0)
 			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "markSelected", "ids[]": ops.tmark, cmode: 2}));
+				{op: "RPC", method: "markSelected", "ids[]": ops.unmarked, cmode: 0}));
 
-		if (ops.tpub.length !== 0)
+		if (ops.marked.length !== 0)
 			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "publishSelected", "ids[]": ops.tpub, cmode: 2}));
+				{op: "RPC", method: "markSelected", "ids[]": ops.marked, cmode: 1}));
+
+		if (ops.unpublished.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.unpublished, cmode: 0}));
+
+		if (ops.published.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.published, cmode: 1}));
 
 		if (ops.read.length !== 0)
 			promises.push(xhr.post("backend.php",
@@ -329,7 +338,7 @@ const Headlines = {
 		}
 	},
 	unpackVisible: function(container) {
-		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-content].cdm');
+		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-is-packed="1"].cdm');
 
 		for (let i = 0; i < rows.length; i++) {
 			if (App.Scrollable.isChildVisible(rows[i], container)) {
@@ -398,7 +407,11 @@ const Headlines = {
 		container.setAttribute("data-enable-grid", App.getInitParam("cdm_enable_grid") ? "true" : "false");
 		container.setAttribute("data-headlines-count", parseInt(headlines_count));
 		container.setAttribute("data-is-cdm", App.isCombinedMode() ? "true" : "false");
-		container.setAttribute("data-is-cdm-expanded", App.getInitParam("cdm_expanded"));
+		// The grid CSS only matches the literal "true", so normalize to a real boolean:
+		// getAttribute() hands back the string "false", which is truthy and would otherwise
+		// turn the grid on for "expand selected article only".
+		container.setAttribute("data-is-cdm-expanded",
+			App.getInitParam("cdm_expanded") ? "true" : "false");
 
 		// for floating title because it's placed outside of headlines-frame
 		document.getElementById('main').classList.remove('expandable', 'expanded');
@@ -427,6 +440,7 @@ const Headlines = {
 				if (hl.active) {
 					new_row.classList.add('active');
 					Article.unpack(new_row);
+					Article.syncImagePreview(new_row);
 
 					if (App.isCombinedMode())
 						Article.cdmMoveToId(id, {noscroll: true});
@@ -503,14 +517,20 @@ const Headlines = {
 
 			const comments = Article.formatComments(hl);
 
+			// The thumbnail repeats the image the body already shows, so it belongs to a
+			// collapsed row only. Core themes hide it with CSS, but a theme installed
+			// under themes.local carries no such rules, so the expanded state is set here
+			// and Article.syncImagePreview() maintains it from then on.
+			const imagePreview = hl.image_preview
+				? `<img class="cdm-image-preview" src="${App.escapeHtml(hl.image_preview)}" alt="" loading="lazy"${App.getInitParam("cdm_expanded") ? ' style="display : none"' : ''} onclick="Headlines.click(event, ${hl.id})">`
+				: '';
+
 			row = `<div class="cdm ${row_class} ${Article.getScoreClass(hl.score)}"
 						id="RROW-${hl.id}"
 						data-article-id="${hl.id}"
 						data-orig-feed-id="${hl.feed_id}"
 						data-orig-feed-title="${App.escapeHtml(hl.feed_title)}"
 						data-is-packed="1"
-						data-content="${App.escapeHtml(hl.content)}"
-						data-rendered-enclosures="${App.escapeHtml(Article.renderEnclosures(hl.enclosures))}"
 						data-score="${hl.score}"
 						data-article-title="${App.escapeHtml(hl.title)}"
 						onmouseover="Article.mouseIn(${hl.id})"
@@ -518,7 +538,7 @@ const Headlines = {
 						<div class="header-sticky-guard"></div>
 						<div class="header">
 							<div class="left">
-								<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this)" class='rchk'>
+								<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this, arguments[0])" class='rchk'>
 								<i class="marked-pic marked-${hl.id} material-icons" onclick="Headlines.toggleMark(${hl.id})">star</i>
 								<i class="pub-pic pub-${hl.id} material-icons" onclick="Headlines.togglePub(${hl.id})">rss_feed</i>
 							</div>
@@ -547,6 +567,8 @@ const Headlines = {
 							</div>
 
 						</div>
+
+						${imagePreview}
 
 						<div class="content" onclick="return Headlines.click(event, ${hl.id}, true);">
 							${Article.renderNote(hl.id, hl.note)}
@@ -589,7 +611,7 @@ const Headlines = {
 				onmouseover="Article.mouseIn(${hl.id})"
 				onmouseout="Article.mouseOut(${hl.id})">
 			<div class="left">
-				<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this)" class='rchk'>
+				<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this, arguments[0])" class='rchk'>
 					<i class="marked-pic marked-${hl.id} material-icons" onclick="Headlines.toggleMark(${hl.id})">star</i>
 					<i class="pub-pic pub-${hl.id} material-icons" onclick="Headlines.togglePub(${hl.id})">rss_feed</i>
 			</div>
@@ -1214,8 +1236,19 @@ const Headlines = {
 
 		return rv;
 	},
-	onRowChecked: function (elem) {
+	onRowChecked: function (elem, event) {
 		const row = elem.domNode.closest("div[id*=RROW]");
+		const id = parseInt(row.getAttribute('data-article-id'));
+		const last_id = this._last_checked_id;
+
+		this._last_checked_id = id;
+
+		if (event?.shiftKey && last_id && document.getElementById(`RROW-${last_id}`)) {
+			const mode = row.classList.contains('active') || elem.attr('checked') ? 'all' : 'none';
+
+			Headlines.getRange(last_id, id).forEach((range_id) => Headlines.select(mode, range_id));
+			return;
+		}
 
 		// do not allow unchecking active article checkbox
 		if (row.classList.contains('active')) {

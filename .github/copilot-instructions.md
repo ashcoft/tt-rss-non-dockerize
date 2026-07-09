@@ -216,6 +216,12 @@ utils/rebase-translations.sh  # Extracts strings from PHP/JS files
 # Rebuild customized Dojo layer (requires Java runtime)
 cd lib/dojo-src
 ./rebuild-dojo.sh  # Downloads Dojo 1.17.3 source and builds custom layer
+# Note: lib/dojo/package.json intentionally carries no scripts/devDependencies
+# and no package-lock.json. The Dojo release also ships the manifest of Dojo's
+# own intern-based test harness, which tt-rss never installs or runs; its pinned
+# 2014-era devDependencies have no patch path and made Dependabot security
+# update jobs fail with `security_update_not_possible`. rebuild-dojo.sh strips
+# them again after copying the build output - keep it that way.
 ```
 
 ### Plugin Development

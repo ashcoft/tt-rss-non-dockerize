@@ -295,6 +295,12 @@ const App = {
 	get_seq: function() {
 		return this._rpc_seq;
 	},
+	set_seq: function(seq) {
+		// adopt server sequence numbers monotonically so out-of-order
+		// responses can be detected as stale instead of breaking sync
+		if (seq > this._rpc_seq)
+			this._rpc_seq = seq;
+	},
 	setLoadingProgress: function(p) {
 		this._loading_progress += p;
 
@@ -414,7 +420,7 @@ const App = {
 			i.parentNode ? i.parentNode.removeChild(i) : true;
 		});
    },
-   // htmlspecialchars()-alike for headlines data-content attribute
+   // htmlspecialchars()-alike for HTML attribute values
    escapeHtml: function(p) {
       if (typeof p !== 'string')
          return p;
@@ -509,9 +515,18 @@ const App = {
             return false;
          }
 
-         if (seq && this.get_seq() !== seq) {
-            console.warn("handleRpcJson: sequence mismatch: ", seq, '!=', this.get_seq());
-            return false;
+         // replies carrying a seq we've already moved past are stale
+         // (e.g. overlapping getAllCounters requests answered out of
+         // order): drop them quietly instead of failing the promise
+         if (seq) {
+            if (seq < this.get_seq()) {
+               console.info("handleRpcJson: dropping stale reply, seq:", seq, "<", this.get_seq());
+               return true;
+            }
+
+            // reply is current or ahead: adopt it so client and server
+            // sequence numbers stay in sync
+            this.set_seq(seq);
          }
 
          // not in preferences
@@ -779,6 +794,10 @@ const App = {
    updateRuntimeInfo: function() {
       xhr.json("backend.php", {op: "RPC", method: "getruntimeinfo"}, () => {
          // handled by xhr.json()
+      }).catch((e) => {
+         // a periodic background poll: a timeout or transient failure here is
+         // reported by the net-alert indicator, not as an uncaught rejection
+         console.warn("updateRuntimeInfo:", e);
       });
    },
    initSecondStage: function() {
@@ -813,12 +832,12 @@ const App = {
                }
             }
          } else {
-            let tab = localStorage.getItem("ttrss:prefs-tab");
+            const saved_tab_id = localStorage.getItem("ttrss:prefs-tab");
 
-            if (tab) {
-               tab = dijit.byId(tab);
-               if (tab) {
-                  dijit.byId("pref-tabs").selectChild(tab);
+            if (saved_tab_id) {
+               const saved_tab = dijit.byId(saved_tab_id);
+               if (saved_tab) {
+                  dijit.byId("pref-tabs").selectChild(saved_tab);
                }
             }
          }
@@ -951,17 +970,43 @@ const App = {
             // existed) from dismissing it the instant the finger lifts. The click
             // handler covers non-touch input (on touch the preventDefault above
             // suppresses it, so it does not double-fire).
+            //
+            // The gesture that OPENS a menu can still reach that click handler:
+            // a toolbar dropdown (dijit.form.Select and every other
+            // _HasDropDown opener) opens its popup on the press itself
+            // (pointerdown), which parks this backdrop under the still-down
+            // finger, and the browser hit-tests the tap's synthesised
+            // compatibility click against the *current* DOM -- the backdrop --
+            // instantly dismissing the menu it just opened. (dijit Buttons,
+            // e.g. the toolbar Actions menu, are immune: a11yclick sets
+            // dojoClick on them, so dojo/touch swallows the tap's
+            // compatibility events and re-dispatches a click at the press
+            // target instead.) Such a ghost click has no matching press on the
+            // backdrop -- its pointerdown landed on the opener before the
+            // backdrop existed -- so only honour clicks preceded by a
+            // pointerdown that actually hit the backdrop; the flag re-arms
+            // every time a popup opens.
+            let backdrop_pressed = false;
+            backdrop.addEventListener("pointerdown", () => {
+               backdrop_pressed = true;
+            });
             backdrop.addEventListener("touchstart", (ev) => {
                ev.preventDefault();
                dijit.popup.close();
             }, {passive: false});
-            backdrop.addEventListener("click", () => dijit.popup.close());
+            backdrop.addEventListener("click", () => {
+               if (backdrop_pressed) {
+                  backdrop_pressed = false;
+                  dijit.popup.close();
+               }
+            });
             document.body.appendChild(backdrop);
 
             const popup = dijit.popup;
             const orig_open = popup.open;
             popup.open = function() {
                const ret = orig_open.apply(this, arguments);
+               backdrop_pressed = false;
                App._syncPopupBackdrop();
                App.reconcileOverlayHistory();
                return ret;
@@ -986,7 +1031,9 @@ const App = {
          PluginHost.run(PluginHost.HOOK_INIT_COMPLETE, null);
       }
 
-      if (!this.getInitParam("bw_limit"))
+      // the main UI gets runtime info piggybacked on its periodic counters
+      // request (see Feeds.requestCounters), prefs has no such poll
+      if (this.is_prefs && !this.getInitParam("bw_limit"))
          window.setInterval(() => {
             App.updateRuntimeInfo();
          }, 60 * 1000)
@@ -1015,6 +1062,11 @@ const App = {
 					plugin_icon_a.show()
 				else
 					plugin_icon_a.hide();
+			})
+			.catch((e) => {
+				// hourly background poll: the same transient failure that trips the
+				// net-alert indicator must not surface as an uncaught rejection
+				console.warn("checkForUpdates:", e);
 			});
 	},
    updateTitle: function() {

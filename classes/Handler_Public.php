@@ -256,17 +256,20 @@ class Handler_Public extends Handler {
 		}
 	}
 
-	function getUnread(): void {
+	public function getUnread(): void {
 		$login = clean($_REQUEST["login"]);
 		$fresh = clean($_REQUEST["fresh"] ?? "0") == "1";
 
 		$uid = UserHelper::find_user_by_login($login);
 
-		if ($uid) {
-			print Feeds::_get_global_unread($uid);
+		if ($uid !== null) {
+			$unread_count = Feeds::_get_global_unread($uid);
+			print htmlspecialchars((string) $unread_count, ENT_QUOTES, 'UTF-8');
 
-			if ($fresh)
-				print ';' . Feeds::_get_counters(Feeds::FEED_FRESH, false, true, $uid);
+			if ($fresh) {
+				$counters = Feeds::_get_counters(Feeds::FEED_FRESH, false, true, $uid);
+				print ';' . htmlspecialchars((string) $counters, ENT_QUOTES, 'UTF-8');
+			}
 		} else {
 			print '-1;User not found';
 		}
@@ -345,7 +348,7 @@ class Handler_Public extends Handler {
 		if ($key) {
 			$access_key = ORM::for_table('ttrss_access_keys')
 				->select('owner_uid')
-				->where(['access_key' => $key, 'feed_id' => $feed])
+				->where(['access_key' => $key, 'feed_id' => $feed, 'is_cat' => $is_cat])
 				->find_one();
 
 			if ($access_key) {
@@ -401,7 +404,7 @@ class Handler_Public extends Handler {
 
 			$return = clean($_REQUEST['return'] ?? '');
 
-			if ($return && mb_strpos($return, Config::get_self_url()) === 0) {
+			                   if ($return && Config::matchesSelfUrl($return)) {
 				header("Location: $return");
 			} else {
 				header("Location: " . Config::get_self_url());
@@ -628,10 +631,18 @@ class Handler_Public extends Handler {
 	function dbupdate(): void {
 		startup_gettext();
 
-		if (!Config::get(Config::SINGLE_USER_MODE) && ($_SESSION["access_level"] ?? 0) < 10) {
-			$_SESSION["login_error_msg"] = __("Your access level is insufficient to run this script.");
-			static::_render_login_form();
-			exit;
+		if (!Config::get(Config::SINGLE_USER_MODE)) {
+			if (!empty($_SESSION['uid']) && !Sessions::validate_session()) {
+				// $_SESSION['login_error_msg'] gets set in 'Sessions::validate_session()'
+				static::_render_login_form();
+				exit;
+			}
+
+			if (($_SESSION['access_level'] ?? 0) < 10) {
+				$_SESSION['login_error_msg'] = __('Your access level is insufficient to run this script.');
+				static::_render_login_form();
+				exit;
+			}
 		}
 
 		?>
@@ -839,7 +850,13 @@ class Handler_Public extends Handler {
 	}
 
 	static function _render_login_form(string $return_to = ""): void {
-		header('Cache-Control: public');
+		// The form is session-specific: include/login_form.php renders
+		// $_SESSION['login_error_msg'] (and then clears it), plus auth_remote's
+		// prefilled $_SESSION['fake_login'].  'public' let a shared cache store
+		// one visitor's copy and replay it to others, disclosing that login name
+		// and the reason their session failed, and re-showing an error the server
+		// had already cleared.
+		header('Cache-Control: private, no-cache');
 
 		if ($return_to)
 			$_REQUEST['return'] = $return_to;

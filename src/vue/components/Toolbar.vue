@@ -1,26 +1,43 @@
 <template>
   <div class="toolbar">
     <div class="toolbar-left">
-      <el-button-group>
-        <el-button
-          :icon="Refresh"
-          @click="$emit('action', 'refresh')"
+      <v-btn-toggle>
+        <v-btn
+          icon="mdi-refresh"
+          @click="handleAction('refresh')"
           title="Refresh"
         />
-        <el-button
-          :icon="Check"
-          @click="$emit('action', 'catchup')"
+        <v-btn
+          icon="mdi-check-all"
+          @click="handleAction('catchup')"
           title="Mark all as read"
         />
-      </el-button-group>
+      </v-btn-toggle>
 
-      <el-input
+      <v-text-field
         v-model="searchQuery"
         placeholder="Search articles..."
-        prefix-icon="Search"
-        clearable
+        prepend-inner-icon="mdi-magnify"
+        variant="outlined"
+        density="compact"
+        hide-details
         class="search-input"
-        @keyup.enter="$emit('action', 'search', searchQuery)"
+        @keyup.enter="handleAction('search', searchQuery)"
+      />
+
+      <!-- Word stemming language. Required by the backend: an empty value
+           makes PostgreSQL reject the query and matches nothing. -->
+      <v-select
+        v-if="searchLanguages.length > 1"
+        v-model="searchLanguage"
+        :items="searchLanguages"
+        label="Language"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="search-language"
+        title="Used for word stemming"
+        @update:model-value="onLanguageChange"
       />
     </div>
 
@@ -29,103 +46,156 @@
     </div>
 
     <div class="toolbar-right">
-      <el-button-group>
-        <el-button
-          :icon="ViewList"
-          :type="viewMode === 'list' ? 'primary' : ''"
-          @click="setViewMode('list')"
-          title="List view"
-        />
-        <el-button
-          :icon="Grid"
-          :type="viewMode === 'grid' ? 'primary' : ''"
-          @click="setViewMode('grid')"
-          title="Grid view"
-        />
-        <el-button
-          :icon="Expand"
-          :type="viewMode === 'expanded' ? 'primary' : ''"
-          @click="setViewMode('expanded')"
-          title="Expanded view"
-        />
-      </el-button-group>
+      <!-- Values must match the backend's accepted view_mode set. -->
+      <v-select
+        v-model="viewMode"
+        :items="viewModeOptions"
+        label="Show"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="view-mode"
+        @update:model-value="setViewMode"
+      />
 
-      <el-dropdown @command="handleSort">
-        <el-button>
-          Sort: {{ sortLabel }}
-          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="date">Date</el-dropdown-item>
-            <el-dropdown-item command="feed">Feed</el-dropdown-item>
-            <el-dropdown-item command="title">Title</el-dropdown-item>
-          </el-dropdown-menu>
+      <v-menu>
+        <template #activator="{ props }">
+          <v-btn v-bind="props">
+            Sort: {{ sortLabel }}
+            <v-icon end>mdi-chevron-down</v-icon>
+          </v-btn>
         </template>
-      </el-dropdown>
+        <v-list>
+          <v-list-item
+            v-for="item in sortOptions"
+            :key="item.value"
+            :value="item.value"
+            @click="handleSort(item.value)"
+          >
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
 
-      <el-dropdown @command="handleAction">
-        <el-button :icon="More" />
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="select-all">Select All</el-dropdown-item>
-            <el-dropdown-item command="select-unread">Select Unread</el-dropdown-item>
-            <el-dropdown-item command="select-starred">Select Starred</el-dropdown-item>
-            <el-dropdown-item divided command="preferences">Preferences</el-dropdown-item>
-          </el-dropdown-menu>
+      <v-menu>
+        <template #activator="{ props }">
+          <v-btn icon="mdi-dots-vertical" v-bind="props" />
         </template>
-      </el-dropdown>
+        <v-list>
+          <v-list-item
+            v-for="item in actionOptions"
+            :key="item.value"
+            :value="item.value"
+            @click="handleAction(item.value)"
+          >
+            <template #prepend>
+              <v-icon>{{ item.icon }}</v-icon>
+            </template>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import {
-  Refresh, Check, Search, ViewList, Grid, Expand,
-  ArrowDown, More
-} from '@element-plus/icons-vue';
-import type { Feed } from '@/types';
+import type { Feed } from '../types';
 
 interface Props {
   feedInfo: Feed | null;
+  searchLanguages?: string[];
+  modelSearchLanguage?: string;
+  modelViewMode?: string;
+  modelOrderBy?: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  searchLanguages: () => [],
+  modelSearchLanguage: 'english',
+  modelViewMode: 'adaptive',
+  modelOrderBy: 'default',
+});
 
 const emit = defineEmits<{
-  (e: 'action', action: string, payload?: string | number): void;
+  (e: 'action', action: string, payload?: string | number | object): void;
 }>();
 
 // State
 const searchQuery = ref('');
-const viewMode = ref<'list' | 'grid' | 'expanded'>('list');
-const sortBy = ref('date');
-const sortOrder = ref<'asc' | 'desc'>('desc');
+const searchLanguage = ref(props.modelSearchLanguage);
+// These mirror the <select> values in index.php and the strings Feeds/view
+// understands; arbitrary values are silently ignored by the backend.
+const viewMode = ref(props.modelViewMode);
+const sortBy = ref(props.modelOrderBy);
+
+const viewModeOptions = [
+  { title: 'Adaptive', value: 'adaptive' },
+  { title: 'All Articles', value: 'all_articles' },
+  { title: 'Starred', value: 'marked' },
+  { title: 'Published', value: 'published' },
+  { title: 'Unread', value: 'unread' },
+  { title: 'With Note', value: 'has_note' },
+];
+
+const sortOptions = [
+  { title: 'Default', value: 'default' },
+  { title: 'Newest first', value: 'feed_dates' },
+  { title: 'Oldest first', value: 'date_reverse' },
+  { title: 'Title', value: 'title' },
+];
+
+const actionOptions = [
+  { title: 'Edit Feed', value: 'edit', icon: 'mdi-pencil' },
+  { title: 'Delete Feed', value: 'delete', icon: 'mdi-delete' },
+  { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' }
+];
 
 // Computed
 const sortLabel = computed(() => {
-  const labels: Record<string, string> = {
-    date: 'Date',
-    feed: 'Feed',
-    title: 'Title'
-  };
-  return labels[sortBy.value] || 'Date';
+  return sortOptions.find(o => o.value === sortBy.value)?.title ?? 'Default';
 });
 
 // Methods
-const setViewMode = (mode: 'list' | 'grid' | 'expanded') => {
+/**
+ * Sets the view mode and emits an action event.
+ * @param mode - The view mode to set ('list', 'grid', or 'expanded').
+ */
+const setViewMode = (mode: string) => {
   viewMode.value = mode;
   emit('action', 'viewMode', mode);
 };
 
+/**
+ * Handles sorting by updating sortBy and emitting a sort action.
+ * @param command - The command indicating the sort criterion.
+ */
 const handleSort = (command: string) => {
   sortBy.value = command;
-  emit('action', 'sort', { by: command, order: sortOrder.value });
+  emit('action', 'orderBy', command);
 };
 
-const handleAction = (command: string) => {
-  emit('action', command);
+/**
+ * Handles a generic action by emitting an action event.
+ * @param command - The action command to emit.
+ */
+const handleAction = (command: string, payload?: string | number | object) => {
+  // Searches must carry the stemming language, so pass it alongside the term.
+  if (command === 'search') {
+    emit('action', 'search', { query: payload, language: searchLanguage.value });
+    return;
+  }
+  emit('action', command, payload);
+};
+
+/**
+ * Notifies the parent when the stemming language changes so it can be stored.
+ * @param language - The newly selected language.
+ */
+const onLanguageChange = (language: string) => {
+  searchLanguage.value = language;
+  emit('action', 'searchLanguage', language);
 };
 </script>
 
@@ -158,6 +228,6 @@ const handleAction = (command: string) => {
 }
 
 .search-input {
-  width: 200px;
+  max-width: 200px;
 }
 </style>

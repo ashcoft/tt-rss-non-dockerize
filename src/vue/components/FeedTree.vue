@@ -1,95 +1,171 @@
 <template>
   <div class="feed-tree">
-    <el-input
+    <v-text-field
       v-model="searchQuery"
       placeholder="Search feeds..."
-      prefix-icon="Search"
-      clearable
+      prepend-inner-icon="mdi-magnify"
+      variant="outlined"
+      density="compact"
+      hide-details
       class="search-input"
     />
 
-    <el-menu
-      :default-active="activeFeedId"
-      class="feed-menu"
-      @select="handleSelect"
-    >
+    <v-list nav density="compact" class="feed-list">
       <!-- Special Feeds -->
-      <el-sub-menu index="special">
-        <template #title>
-          <span class="menu-title">Special</span>
+      <v-list-group value="special">
+        <template #activator="{ props }">
+          <v-list-item v-bind="props" title="Special">
+            <template #prepend>
+              <v-icon>mdi-star</v-icon>
+            </template>
+          </v-list-item>
         </template>
-        <el-menu-item
+
+        <v-list-item
           v-for="special in specialFeeds"
           :key="special.id"
-          :index="String(special.id)"
+          :title="special.name"
+          :value="String(special.id)"
+          @click="handleSelect(String(special.id))"
         >
-          <el-icon><component :is="special.icon" /></el-icon>
-          <span class="feed-name">{{ special.name }}</span>
-          <span class="unread-count" v-if="special.unread > 0">{{ special.unread }}</span>
-        </el-menu-item>
-      </el-sub-menu>
+          <template #prepend>
+            <v-icon>{{ special.icon }}</v-icon>
+          </template>
+          <template #append>
+            <v-chip
+              v-if="special.unread > 0"
+              size="x-small"
+              color="primary"
+              variant="flat"
+            >
+              {{ special.unread }}
+            </v-chip>
+          </template>
+        </v-list-item>
+      </v-list-group>
 
       <!-- Labels -->
-      <el-sub-menu index="labels" v-if="labels.length > 0">
-        <template #title>
-          <span class="menu-title">Labels</span>
+      <v-list-group value="labels" v-if="filteredLabels.length > 0">
+        <template #activator="{ props }">
+          <v-list-item v-bind="props" title="Labels">
+            <template #prepend>
+              <v-icon>mdi-label</v-icon>
+            </template>
+          </v-list-item>
         </template>
-        <el-menu-item
+
+        <v-list-item
           v-for="label in filteredLabels"
           :key="'label-' + label.id"
-          :index="'label-' + label.id"
+          :title="label.caption"
+          :value="'label-' + label.id"
+          @click="handleSelect('label-' + label.id)"
         >
-          <span class="label-indicator" :style="{ backgroundColor: label.bg_color || '#1976d2' }"></span>
-          <span class="feed-name">{{ label.caption }}</span>
-          <span class="unread-count" v-if="label.unread > 0">{{ label.unread }}</span>
-        </el-menu-item>
-      </el-sub-menu>
+          <template #prepend>
+            <div
+              class="label-indicator"
+              :style="{ backgroundColor: label.bg_color || '#1976d2' }"
+            ></div>
+          </template>
+          <template #append>
+            <v-chip
+              v-if="label.unread > 0"
+              size="x-small"
+              color="primary"
+              variant="flat"
+            >
+              {{ label.unread }}
+            </v-chip>
+          </template>
+        </v-list-item>
+      </v-list-group>
 
       <!-- Categories -->
-      <el-sub-menu
+      <v-list-group
         v-for="category in categories"
         :key="'cat-' + category.id"
-        :index="'cat-' + category.id"
+        :value="'cat-' + category.id"
       >
-        <template #title>
-          <span class="menu-title">
-            <el-icon><Folder /></el-icon>
-            {{ category.name }}
-          </span>
-          <span class="unread-count" v-if="category.unread > 0">{{ category.unread }}</span>
+        <template #activator="{ props }">
+          <!-- Clicking the category row selects it (is_cat=1); the group toggle
+               is handled by v-list-group's own activator binding. -->
+          <v-list-item
+            v-bind="props"
+            :title="category.title"
+            @click="handleSelect('cat-' + category.id)"
+          >
+            <template #prepend>
+              <v-icon>mdi-folder</v-icon>
+            </template>
+            <template #append>
+              <v-chip
+                v-if="category.unread > 0"
+                size="x-small"
+                color="primary"
+                variant="flat"
+              >
+                {{ category.unread }}
+              </v-chip>
+            </template>
+          </v-list-item>
         </template>
-        <el-menu-item
+
+        <v-list-item
           v-for="feed in getFeedsByCategory(category.id)"
           :key="feed.id"
-          :index="String(feed.id)"
+          :title="feed.title"
+          :value="String(feed.id)"
+          @click="handleSelect(String(feed.id))"
         >
-          <span class="feed-name">{{ feed.title }}</span>
-          <span class="unread-count" v-if="feed.unread > 0">{{ feed.unread }}</span>
-        </el-menu-item>
-      </el-sub-menu>
+          <template #append>
+            <v-chip
+              v-if="feed.unread > 0"
+              size="x-small"
+              color="primary"
+              variant="flat"
+            >
+              {{ feed.unread }}
+            </v-chip>
+          </template>
+        </v-list-item>
+      </v-list-group>
 
       <!-- Uncategorized Feeds -->
-      <el-sub-menu index="uncategorized" v-if="uncategorizedFeeds.length > 0">
-        <template #title>
-          <span class="menu-title">Feeds</span>
+      <v-list-group value="uncategorized" v-if="filteredUncategorizedFeeds.length > 0">
+        <template #activator="{ props }">
+          <v-list-item v-bind="props" title="Feeds">
+            <template #prepend>
+              <v-icon>mdi-rss</v-icon>
+            </template>
+          </v-list-item>
         </template>
-        <el-menu-item
+
+        <v-list-item
           v-for="feed in filteredUncategorizedFeeds"
           :key="feed.id"
-          :index="String(feed.id)"
+          :title="feed.title"
+          :value="String(feed.id)"
+          @click="handleSelect(String(feed.id))"
         >
-          <span class="feed-name">{{ feed.title }}</span>
-          <span class="unread-count" v-if="feed.unread > 0">{{ feed.unread }}</span>
-        </el-menu-item>
-      </el-sub-menu>
-    </el-menu>
+          <template #append>
+            <v-chip
+              v-if="feed.unread > 0"
+              size="x-small"
+              color="primary"
+              variant="flat"
+            >
+              {{ feed.unread }}
+            </v-chip>
+          </template>
+        </v-list-item>
+      </v-list-group>
+    </v-list>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Search, Folder, Star, Bookmark, Clock, Check, Globe } from '@element-plus/icons-vue';
-import type { Feed, Category, Label } from '@/types';
+import type { Feed, Category, Label } from '../types';
 
 interface Props {
   feeds: Feed[];
@@ -103,23 +179,28 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'select', feedId: number | string, isCat: boolean): void;
+  (e: 'feed-action', action: string, feedId: number): void;
 }>();
 
 // State
 const searchQuery = ref('');
-const activeFeedId = ref('0');
 
-// Special feeds (built-in)
+// Special feeds (built-in). IDs mirror the Feeds::FEED_* constants in
+// classes/Feeds.php and must not be renumbered.
 const specialFeeds = [
-  { id: -1, name: 'All Articles', icon: 'Document', unread: 0 },
-  { id: -2, name: 'Fresh Articles', icon: 'Sunny', unread: 0 },
-  { id: -3, name: 'Starred', icon: Star, unread: 0 },
-  { id: -4, name: 'Published', icon: Bookmark, unread: 0 },
-  { id: -5, name: 'Recently Read', icon: Clock, unread: 0 },
-  { id: -6, name: 'Archived', icon: Check, unread: 0 },
+  { id: -4, name: 'All Articles', icon: 'mdi-newspaper', unread: 0 },
+  { id: -3, name: 'Fresh Articles', icon: 'mdi-weather-sunny', unread: 0 },
+  { id: -1, name: 'Starred', icon: 'mdi-star', unread: 0 },
+  { id: -2, name: 'Published', icon: 'mdi-publish', unread: 0 },
+  { id: -6, name: 'Recently Read', icon: 'mdi-history', unread: 0 },
+  { id: 0, name: 'Archived', icon: 'mdi-archive', unread: 0 },
 ];
 
 // Computed
+/**
+ * Computes the list of labels filtered by the current search query.
+ * @returns The filtered array of labels.
+ */
 const filteredLabels = computed(() => {
   if (!searchQuery.value) return props.labels;
   const query = searchQuery.value.toLowerCase();
@@ -128,6 +209,10 @@ const filteredLabels = computed(() => {
   );
 });
 
+/**
+ * Computes the list of uncategorized feeds filtered by the current search query.
+ * @returns The filtered array of uncategorized feeds.
+ */
 const filteredUncategorizedFeeds = computed(() => {
   const feeds = props.feeds.filter(f => !f.cat_id);
   if (!searchQuery.value) return feeds;
@@ -135,6 +220,11 @@ const filteredUncategorizedFeeds = computed(() => {
   return feeds.filter(feed => feed.title.toLowerCase().includes(query));
 });
 
+/**
+ * Filters feeds by the given category ID and current search query.
+ * @param {number} categoryId - The ID of the category to filter feeds by.
+ * @returns The filtered array of feeds belonging to the specified category.
+ */
 const getFeedsByCategory = (categoryId: number) => {
   const feeds = props.feeds.filter(f => f.cat_id === categoryId);
   if (!searchQuery.value) return feeds;
@@ -143,18 +233,22 @@ const getFeedsByCategory = (categoryId: number) => {
 };
 
 // Handlers
+/**
+ * Handles selection events from the feed tree.
+ * @param {string} index - The index string indicating the selected item (label-, cat-, or feed ID).
+ */
 const handleSelect = (index: string) => {
   const isLabel = index.startsWith('label-');
   const isCategory = index.startsWith('cat-');
 
   if (isLabel) {
-    const labelId = parseInt(index.replace('label-', ''));
+    const labelId = Number.parseInt(index.replace('label-', ''));
     emit('select', labelId, false);
   } else if (isCategory) {
-    const catId = parseInt(index.replace('cat-', ''));
+    const catId = Number.parseInt(index.replace('cat-', ''));
     emit('select', catId, true);
   } else {
-    const feedId = parseInt(index);
+    const feedId = Number.parseInt(index);
     emit('select', feedId, false);
   }
 };
@@ -171,32 +265,9 @@ const handleSelect = (index: string) => {
   padding: 0.5rem;
 }
 
-.feed-menu {
+.feed-list {
   flex: 1;
   overflow-y: auto;
-  border-right: none;
-}
-
-.menu-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.feed-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.unread-count {
-  padding: 0 0.5rem;
-  background: var(--ttrss-unread-bg, #e3f2fd);
-  border-radius: 10px;
-  font-size: 0.75rem;
-  color: var(--ttrss-unread-color, #1976d2);
 }
 
 .label-indicator {

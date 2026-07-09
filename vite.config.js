@@ -3,19 +3,20 @@
  * 
  * This configuration enables Vite to work alongside the existing Dojo build system.
  * It provides:
- * - AMD module support via pre-bundling
+ * - Vue dependency optimization (legacy Dojo retains its AMD loader)
  * - Dev server with HMR for faster development
  * - Proxy to PHP backend for API calls
  * - Asset handling for CSS, fonts, and images
- * - Vue 3 + Element Plus support for new UI components
+ * - Vue 3 + Vuetify support for new UI components
  * 
  * The old build system remains functional as a fallback.
  */
 
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import vuetify from 'vite-plugin-vuetify';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,20 +31,34 @@ export default defineConfig({
   // Plugins
   plugins: [
     vue(),
+    vuetify({ autoImport: true }),
   ],
   
   // Build configuration
   build: {
     // Output directory for production builds
     outDir: 'dist',
+
+    // Transpile target: Vuetify 4 emits destructuring that esbuild's default
+    // target cannot rewrite, so target a modern baseline
+    target: 'es2022',
     
     // Empty outDir before build
     emptyOutDir: true,
-    
+
+    // Emit .vite/manifest.json so PHP can resolve the hashed entry names
+    // without hardcoding them (see include/vue_assets.php).
+    manifest: true,
+
     // Rollup options for better AMD handling
     rollupOptions: {
-      // Keep the existing directory structure for compatibility
-      preserveEntrySignatures: 'allow-empty',
+      // Entry point for the application
+      input: path.resolve(__dirname, 'src/vue/index.html'),
+      
+      // Keep the existing directory structure for compatibility.
+      // Entries without exports are allowed; rolldown (Vite 8) only accepts
+      // 'exports-only' | 'strict' | 'allow-extension' | false.
+      preserveEntrySignatures: false,
       
       // External dependencies that should not be bundled
       external: [],
@@ -56,16 +71,10 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash][extname]',
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-      }
+      },
     },
-    
-    // Target browsers for transpilation
-    target: 'es2015',
-    
-    // Generate source maps for debugging
-    sourcemap: true,
   },
-  
+
   // Resolve configuration for module aliases
   resolve: {
     alias: {
@@ -88,122 +97,11 @@ export default defineConfig({
     extensions: ['.js', '.ts', '.vue', '.json', '.html', '.htm'],
   },
   
-  // Pre-bundling configuration for AMD modules
-  // This converts Dojo AMD modules to ESM for Vite's dependency pre-bundling
+  // Only optimize the Vue module graph. Vite does not convert Dojo AMD to ESM.
   optimizeDeps: {
-    // Entries to pre-bundle
-    entries: [
-      // Main application entry point
-      'js/tt-rss.js',
-      // Common utilities
-      'js/common.js',
-      // Vue app entry
-      'src/vue/main.ts',
-    ],
-    
-    // Force inclusion of Dojo modules for pre-bundling
-    // Note: Only modules that actually exist will be pre-bundled
-    // These are defined in lib/dojo/*.js files
-    include: [
-      // Core Dojo modules (from lib/dojo/)
-      'dojo/_base/kernel',
-      'dojo/_base/declare',
-      'dojo/_base/lang',
-      'dojo/_base/array',
-      'dojo/_base/connect',
-      'dojo/_base/html',
-      'dojo/_base/url',
-      'dojo/_base/config',
-      'dojo/_base/loader',
-      'dojo/_base/browser',
-      'dojo/_base/window',
-      'dojo/ready',
-      'dojo/parser',
-      'dojo/sniff',
-      'dojo/dom',
-      'dojo/dom-construct',
-      'dojo/dom-class',
-      'dojo/dom-attr',
-      'dojo/dom-style',
-      'dojo/dom-prop',
-      'dojo/dom-form',
-      'dojo/dom-geometry',
-      'dojo/query',
-      'dojo/json',
-      'dojo/string',
-      'dojo/hash',
-      'dojo/cookie',
-      'dojo/window',
-      'dojo/on',
-      'dojo/topic',
-      'dojo/when',
-      'dojo/Deferred',
-      'dojo/promise/Promise',
-      'dojo/Stateful',
-      'dojo/text',
-      'dojo/cache',
-      'dojo/i18n',
-      'dojo/request',
-      'dojo/keys',
-      'dojo/mouse',
-      'dojo/touch',
-      'dojo/uacss',
-      'dojo/hccss',
-      'dojo/html',
-      'dojo/node',
-      'dojo/has',
-      'dojo/fx',
-      'dojo/colors',
-      'dojo/number',
-      'dojo/currency',
-      'dojo/date/stamp',
-      'dojo/date/locale',
-      'dojo/io-query',
-      'dojo/json5',
-      'dojo/back',
-      'dojo/aspect',
-      'dojo/AdapterRegistry',
-      'dojo/Evented',
-      'dojo/DeferredList',
-      'dojo/NodeList',
-      'dojo/NodeList-dom',
-      'dojo/NodeList-data',
-      'dojo/NodeList-manipulate',
-      'dojo/NodeList-traverse',
-      'dojo/NodeList-html',
-      'dojo/NodeList-fx',
-      'dojo/router',
-      'dojo/behavior',
-      'dojo/debounce',
-      'dojo/throttle',
-      'dojo/regexp',
-      'dojo/global',
-      'dojo/request/default',
-      'dojo/request/xhr',
-      'dojo/data/ItemFileWriteStore',
-      'dojo/data/ItemFileReadStore',
-      'dojo/store/Memory',
-      'dojo/store/api/Store',
-      'dojo/store/util/QueryResults',
-      'dojo/store/util/SimpleQueryEngine',
-      'dojo/dnd/Moveable',
-      'dojo/dnd/Mover',
-      'dojo/dnd/TimedMoveable',
-      'dojo/dnd/move',
-      'dojo/dnd/common',
-      'dojo/dnd/Selector',
-      'dojo/dnd/Source',
-      'dojo/dnd/autoscroll',
-      'dojo/dnd/Avatar',
-      'dojo/dnd/Manager',
-      'dojo/store/Observable',
-      
-      // Element Plus
-      'element-plus',
-    ],
-    
-    // Exclude patterns - Dojo should be pre-bundled, not excluded
-    exclude: [],
+    entries: ['src/vue/main.ts'],
+    include: ['vue', 'pinia', 'vuetify'],
+    esbuildOptions: { target: 'es2022' },
   },
   
   // Dev server configuration
@@ -220,6 +118,18 @@ export default defineConfig({
     
     // Proxy configuration for PHP backend
     proxy: {
+      // The PHP shell (index.php/prefs.php) is where the Vue client reads the
+      // session CSRF token from, so it must be forwarded too.
+      '/index.php': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      '/prefs.php': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
       // Proxy API calls to backend.php
       '/backend.php': {
         target: 'http://localhost:8080',
@@ -296,11 +206,11 @@ export default defineConfig({
   // Assets configuration
   assetsInclude: [
     // Support various template and data formats
-    '**/*.html',
-    '**/*.htm',
+    // (HTML is intentionally not listed: the Vue app entry must be
+    // processed by Vite's HTML pipeline, not treated as a static asset.)
     '**/*.txt',
     '**/*.json',
-    
+
     // Font files
     '**/*.eot',
     '**/*.woff',
@@ -330,7 +240,7 @@ export default defineConfig({
   // Legacy Vite options for compatibility
   esbuild: {
     // Target for JS transpilation
-    target: 'es2015',
+    target: 'es2022',
     
     // Supported browserslist
     supported: {

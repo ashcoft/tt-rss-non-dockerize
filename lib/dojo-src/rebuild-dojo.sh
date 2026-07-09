@@ -37,9 +37,22 @@ if [ -d util/buildscripts/ ]; then
 
     find dojo -name '*uncompressed*' -exec rm -- {} \;
     find dijit -name '*uncompressed*' -exec rm -- {} \;
+
+    # The release archive also ships package.json/package-lock.json for Dojo's
+    # own intern-based test harness. tt-rss never installs or runs those tests,
+    # and their obsolete devDependencies cannot be patched, so Dependabot
+    # security update jobs for lib/dojo failed with
+    # `security_update_not_possible`. Keep only the runtime metadata.
+    rm -f dojo/package-lock.json
+    if command -v node >/dev/null 2>&1; then
+      node -e 'const fs = require("fs"); const p = "dojo/package.json"; const manifest = JSON.parse(fs.readFileSync(p, "utf8")); delete manifest.scripts; delete manifest.devDependencies; fs.writeFileSync(p, JSON.stringify(manifest, null, "\t") + "\n");'
+    else
+      echo "$0: ERROR: node is required to strip the Dojo test-harness manifest." >&2
+      exit 1
+    fi
   else
-    echo $0: ERROR: Dojo build seems to have failed.
+    echo "$0: ERROR: Dojo build seems to have failed."
   fi
 else
-  echo $0: ERROR: Please unpack Dojo source release into current directory.
+  echo "$0: ERROR: Please unpack Dojo source release into current directory."
 fi

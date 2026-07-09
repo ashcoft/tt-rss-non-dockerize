@@ -163,7 +163,7 @@ const	Feeds = {
 		this._search_query = null;
 		this.reloadCurrent();
 	},
-	// null = get all data, [] would give empty response for specific type
+	// null = get all data (also returns runtime info), [] would give empty response for specific type
 	requestCounters: function(feed_ids = null, label_ids = null) {
 		xhr.json("backend.php", {op: "RPC",
 							method: "getAllCounters",
@@ -171,7 +171,8 @@ const	Feeds = {
 							"feed_id_count": feed_ids ? feed_ids.length : -1,
 							"label_ids[]": label_ids,
 							"label_id_count": label_ids ? label_ids.length : -1,
-							seq: App.next_seq()});
+							seq: App.next_seq()})
+			.catch((e) => console.warn("Feeds.requestCounters:", e));
 	},
 	reload: function() {
 		try {

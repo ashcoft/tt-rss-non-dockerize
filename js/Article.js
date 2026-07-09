@@ -86,11 +86,25 @@ const Article = {
 			this.cdmMoveToId(id);
 		}
 	},
+	//
+	// A combined-view row shows a thumbnail between its header and body. The body
+	// already carries that image (or, for a video, the player whose poster it is),
+	// so the thumbnail belongs to collapsed rows only. Core themes hide it with
+	// CSS, but a theme installed under themes.local ships no such rules, so the
+	// state is driven here and does not depend on the stylesheet.
+	//
+	syncImagePreview: function (row) {
+		const preview = row.querySelector('.cdm-image-preview');
+
+		if (preview)
+			preview.style.display = row.classList.contains('expandable') && !row.classList.contains('active') ? '' : 'none';
+	},
 	cdmUnsetActive: function (event) {
 		const row = document.getElementById(`RROW-${Article.getActive()}`);
 
 		if (row) {
 			row.classList.remove('active');
+			Article.syncImagePreview(row);
 
 			// Reconcile the Back-gesture history entry now that nothing is active.
 			App.reconcileOverlayHistory();
@@ -252,21 +266,23 @@ const Article = {
 	},
 	unpack: function(row) {
 		if (row.getAttribute("data-is-packed") === "1") {
+			// article content lives in the Headlines cache (a row attribute copy
+			// would retain a second, escaped copy of every loaded article)
+			const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
+
+			// the row outlived the headlines cache (feed transition)
+			if (!hl)
+				return;
+
 			const container = row.querySelector(".content-inner");
 
-			const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
-			const packedEnclosures = (typeof row._packedEnclosuresHtml === "string" ? row._packedEnclosuresHtml : "");
-			container.innerHTML = packedContent + packedEnclosures;
+			container.innerHTML = (hl.content || "").trim() + Article.renderEnclosures(hl.enclosures).trim();
 
 			dojo.parser.parse(container);
 
 			// blank content element might screw up onclick selection and keyboard moving
 			if (container.textContent.length === 0)
 				container.innerHTML += "&nbsp;";
-
-			// in expandable mode, save content for later, so that we can pack unfocused rows back
-			if (App.isCombinedMode() && document.getElementById('main').classList.contains('expandable'))
-				row.setAttribute("data-content-original", row.getAttribute("data-content"));
 
 			row.setAttribute("data-is-packed", "0");
 
@@ -278,9 +294,6 @@ const Article = {
 			row.setAttribute("data-is-packed", "1");
 
 			const content_inner = row.querySelector(".content-inner");
-
-			row._packedContentHtml = row.getAttribute("data-content") || "";
-			row._packedEnclosuresHtml = row.getAttribute("data-rendered-enclosures") || "";
 
 			// missing in unexpanded mode
 			if (content_inner)
@@ -437,6 +450,8 @@ const Article = {
 
 				if (App.isCombinedMode() && !App.getInitParam("cdm_expanded"))
 					Article.pack(row);
+
+				Article.syncImagePreview(row);
 			});
 
 			const row = document.getElementById(`RROW-${id}`);
@@ -446,6 +461,8 @@ const Article = {
 
 				row.classList.remove('Unread');
 				row.classList.add('active');
+
+				Article.syncImagePreview(row);
 
 				PluginHost.run(PluginHost.HOOK_ARTICLE_SET_ACTIVE, parseInt(row.getAttribute('data-article-id')));
 			}

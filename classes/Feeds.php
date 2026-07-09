@@ -325,6 +325,42 @@ class Feeds extends Handler_Protected {
 					$line["enclosures"] = [ 'formatted' => '', 'entries' => [] ];
 				}
 
+				// Extract article image for preview. Use the unfiltered list:
+				// 'entries' drops the media:thumbnail when a player is inlined,
+				// but that thumbnail is exactly the image this preview wants.
+				//
+				// The client renders this as a plain <img>, so it has to honor the same
+				// restrictions as the article body: "Do not embed media" (global and per
+				// feed) and bandwidth saving mode. Otherwise a reader who disabled media
+				$image_preview_allowed = empty($_SESSION["bw_limit"]) &&
+					!Prefs::get(Prefs::STRIP_IMAGES, $_SESSION['uid'], $profile) &&
+					!sql_bool_to_bool($line["hide_images"]);
+
+				if ($image_preview_allowed) {
+					[$article_image] = Article::_get_image(
+						$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
+						$line["content"],
+						$line["site_url"] ?? '',
+						$line
+					);
+
+					// A private target is refused on every port, so a hostile feed cannot
+					// use the preview to probe the reader's local network. _get_image() may
+					// already have replaced a remote image with one of our own cache URLs,
+					// and those legitimately carry the installation's own address; the
+					// browser is already talking to that host, so same-installation URLs
+					// are trusted.
+					if ($article_image &&
+							!str_starts_with($article_image, Config::get_self_url() . '/') &&
+					 		UrlHelper::has_disallowed_ip($article_image, false, false)) {
+						$article_image = '';
+					}
+				} else {
+					$article_image = '';
+				}
+
+				$line["image_preview"] = $article_image ?: '';
+
 				$line["updated_long"] = TimeHelper::make_local_datetime($line["updated"]);
 				$line["updated"] = TimeHelper::make_local_datetime($line["updated"], eta_min: true);
 
@@ -933,7 +969,7 @@ class Feeds extends Handler_Protected {
 			$sth = $pdo->prepare("SELECT COUNT(post_int_id) AS unread
 				FROM ttrss_tags,ttrss_user_entries,ttrss_entries
 				WHERE tag_name = ? AND post_int_id = int_id AND ref_id = ttrss_entries.id
-				AND $unread_qpart AND ttrss_tags.owner_uid = ,");
+				AND $unread_qpart AND ttrss_tags.owner_uid = ?");
 
 			$sth->execute([$feed, $owner_uid]);
 			$row = $sth->fetch();
@@ -948,7 +984,12 @@ class Feeds extends Handler_Protected {
 		$need_auth = isset($_REQUEST['need_auth']);
 		$login = $need_auth ? clean($_REQUEST['login']) : '';
 		$pass = $need_auth ? clean($_REQUEST['pass']) : '';
-		$update_interval = (int) clean($_REQUEST['update_interval'] ?? 0);
+		$update_interval = self::validateUpdateInterval($_REQUEST['update_interval'] ?? 0);
+
+		if ($update_interval === false) {
+			print json_encode(["result" => ['code' => 9, 'parameters' => ['update_interval']]]);
+			return;
+		}
 
 		$rc = Feeds::_subscribe($feed, $cat, $login, $pass, $update_interval);
 
@@ -956,11 +997,12 @@ class Feeds extends Handler_Protected {
 	}
 
 	/**
-	 * @return array{code: int, message?: string}|array{code: int, feeds: array<string>}|array{code: int, feed_id: int}
+	 * @return array{code: int, message?: string}|array{code: int, feeds: array<string>}|array{code: int, feed_id: int}|array{code: int, parameters: array<string>}
 	 * code - status code (see below)
 	 * message - optional error message
 	 * feeds - list of discovered feed URLs
 	 * feed_id - ID of the existing or added feed
+	 * parameters - invalid argument names, for code 9
 	 *
 	 * 0 - OK, Feed already exists
 	 * 1 - OK, Feed added
@@ -973,10 +1015,18 @@ class Feeds extends Handler_Protected {
 	 * 6 - Feed parsing failure (invalid content)
 	 * 7 - Error while creating feed database entry.
 	 * 8 - Permission denied (ACCESS_LEVEL_READONLY).
+	 * 9 - Invalid argument value provided (e.g. update_interval 9000).  URL has a dedicated code (2).
 	 */
 	static function _subscribe(string $url, int $cat_id = 0, string $auth_login = '', string $auth_pass = '', int $update_interval = 0): array {
+		// cat_id is not validated here: ttrss_feeds.cat_id has a foreign key to
+		// ttrss_feed_categories, so an unknown category is rejected on insert.
+		if (!in_array($update_interval, array_keys(self::_get_update_intervals()), true)) {
+			return ['code' => 9, 'parameters' => ['update_interval']];
+		}
 
-		$user = ORM::for_table("ttrss_users")->find_one($_SESSION['uid']);
+		$user = ORM::for_table('ttrss_users')
+			->select_many('id', 'login', 'access_level')
+			->find_one($_SESSION['uid']);
 
 		if ($user && $user->access_level == UserHelper::ACCESS_LEVEL_READONLY) {
 			return ["code" => 8];
@@ -1022,7 +1072,7 @@ class Feeds extends Handler_Protected {
 				Logger::log(E_USER_NOTICE, "An attempt to subscribe to '{$url}' failed due to content being HTML without detected feed URLs (User: '{$user->login}'; ID: {$user->id}).",
 					truncate_string($contents, 500, '…'));
 
-				return ["code" => 3, "message" => truncate_string(clean($contents), 250, '…')];
+				return ['code' => 3, 'message' => $user->access_level >= UserHelper::ACCESS_LEVEL_ADMIN ? truncate_string(clean($contents), 250, '…') : ''];
 			} else if (count($feedUrls) > 1) {
 				return ["code" => 4, "feeds" => $feedUrls];
 			}
@@ -1035,7 +1085,7 @@ class Feeds extends Handler_Protected {
 		if ($fp->error())
 			return ['code' => 6, 'message' => truncate_string(clean($fp->error()), 250, '…')];
 		if ($fp->get_type() === FeedParser::FEED_UNKNOWN)
-			return ['code' => 6, 'message' => truncate_string(clean($contents), 250, '…')];
+			return ['code' => 6, 'message' => $user->access_level >= UserHelper::ACCESS_LEVEL_ADMIN ? truncate_string(clean($contents), 250, '…') : ''];
 
 		$feed = ORM::for_table('ttrss_feeds')
 			->where('feed_url', $url)
@@ -2155,6 +2205,11 @@ class Feeds extends Handler_Protected {
 						$query_keywords[] = "($not (LOWER(author) LIKE " . $pdo->quote("%{$keyword_value_untrimmed}%") . '))';
 						$valid_keyword_processed = true;
 						break;
+					case 'feed':
+						$query_keywords[] = "(ttrss_user_entries.feed_id $not IN (SELECT id FROM ttrss_feeds WHERE LOWER(title) LIKE " .
+							$pdo->quote("%{$keyword_value_untrimmed}%") . '))';
+						$valid_keyword_processed = true;
+						break;
 					case 'note':
 						if ($keyword_value == 'true')
 							$query_keywords[] = "($not (note IS NOT NULL AND note != ''))";
@@ -2257,8 +2312,8 @@ class Feeds extends Handler_Protected {
 					 * yesterday, last monday, 2 days ago, etc. See "Relative Formats" of
 					 *   https://www.php.net/manual/en/datetime.formats.php
 					 */
+					$query_date = trim(substr($k, 1));
 					try {
-						$query_date = trim(substr($k, 1));
 						// If $query_date is invalid, an exception is launched.
 						$dt = new DateTime($query_date, $tz);
 						// Obtain the first and last UTC seconds of the queried date.
@@ -2407,5 +2462,63 @@ class Feeds extends Handler_Protected {
 		return $auth_pass;
 	}
 
+	/**
+	 * Validate a requested feed update interval.
+	 *
+	 * filter_var() returns false for malformed input such as "abc"; under a
+	 * loose comparison that value matches the 0 (default interval) key, which
+	 * would silently subscribe at the default interval instead of reporting the
+	 * bad argument. Membership is therefore tested strictly.
+	 *
+	 * @return int|false the validated interval, or false when it is not allowed
+	 */
+	public static function validateUpdateInterval(mixed $raw): int|false {
+		$interval = filter_var($raw, FILTER_VALIDATE_INT);
+
+		if ($interval === false || !in_array($interval, array_keys(self::_get_update_intervals()), true)) {
+			return false;
+		}
+
+		return $interval;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	public static function _get_purge_intervals(): array {
+		return [
+			0 => __('Use default'),
+			-1 => __('Never purge'),
+			7 => __('1 week old'),
+			14 => __('2 weeks old'),
+			31 => __('1 month old'),
+			60 => __('2 months old'),
+			90 => __('3 months old'),
+			180 => __('6 months old'),
+			365 => __('1 year old'),
+		];
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	public static function _get_update_intervals(bool $with_default = true): array {
+		$x = [
+			-1 => __('Disable updates'),
+			0 => __('Default interval'),
+			15 => __('15 minutes'),
+			30 => __('30 minutes'),
+			60 => __('Hourly'),
+			240 => __('4 hours'),
+			720 => __('12 hours'),
+			1440 => __('Daily'),
+			10080 => __('Weekly'),
+		];
+
+		if (!$with_default)
+			unset($x[0]);
+
+		return $x;
+	}
 }
 
