@@ -32,7 +32,7 @@
     "@mdi/font": "^7.4.47",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.4.12",
-    "pinia": "^3.0.0",
+    "pinia": "^4.0.2",
     "vue": "^3.5.40",
     "vuetify": "^3.7.0"
   },
