@@ -33,7 +33,7 @@
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.4.11",
     "pinia": "^3.0.0",
-    "vue": "^3.5.0",
+    "vue": "^3.5.40",
     "vuetify": "^3.7.0"
   },
   "devDependencies": {
