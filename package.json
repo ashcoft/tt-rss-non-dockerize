@@ -32,9 +32,9 @@
     "@mdi/font": "^7.4.47",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.4.13",
-    "pinia": "^3.0.0",
-    "vue": "^3.5.0",
-    "vuetify": "^3.7.0"
+    "pinia": "^4.0.2",
+    "vue": "^3.5.40",
+    "vuetify": "^4.1.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
