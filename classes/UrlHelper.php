@@ -238,7 +238,11 @@ class UrlHelper {
 		if ($host === '::1' || $host === '0:0:0:0:0:0:0:1')
 			return true;
 
-		// TODO: Improve IPv6 support (fc00::/7 unique local, fe80::/10 link-local)
+		// Reject IPv6 Unique Local Addresses (fc00::/7) on non-standard ports,
+		// mirroring the IPv4 private-range handling above.
+		if (!$is_standard_port && str_contains($host, ':') && (str_starts_with($host, 'fc') || str_starts_with($host, 'fd'))) {
+			return true;
+		}
 
 		// IPv4 link-local / cloud metadata
 		if (str_starts_with($host, '169.254.'))
@@ -258,8 +262,6 @@ class UrlHelper {
 
 			if (str_starts_with($ip_addr, '127.'))
 				return true;
-
-			// TODO: maybe check for IPv6 loopback (::1) using dns_get_record()
 
 			if (str_starts_with($ip_addr, '169.254.'))
 				return true;
