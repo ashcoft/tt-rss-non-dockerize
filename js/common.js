@@ -343,10 +343,11 @@ const Notify = {
 	KIND_PROGRESS: 3,
 	timeout: 0,
 	default_timeout: 5 * 1000,
+	error_timeout: 3 * 1000,
 	close: function() {
 		this.msg("");
 	},
-	msg: function(msg, keep, kind) {
+	msg: function(msg, keep, kind, custom_timeout) {
 		kind = kind || this.KIND_GENERIC;
 		keep = keep || false;
 
@@ -393,10 +394,12 @@ const Notify = {
 		notify.innerHTML = msgfmt;
 		notify.classList.add('visible');
 
-		if (!keep)
+		if (!keep) {
+			const timeout = custom_timeout || (kind === this.KIND_ERROR ? this.error_timeout : this.default_timeout);
 			this.timeout = window.setTimeout(() => {
 				notify.classList.remove('visible');
-			}, this.default_timeout);
+			}, timeout);
+		}
 
 	},
 	info: function(msg, keep = false) {
@@ -405,7 +408,7 @@ const Notify = {
 	progress: function(msg, keep = true) {
 		this.msg(msg, keep, this.KIND_PROGRESS);
 	},
-	error: function(msg, keep = true) {
+	error: function(msg, keep = false) {
 		this.msg(msg, keep, this.KIND_ERROR);
 	}
 };
