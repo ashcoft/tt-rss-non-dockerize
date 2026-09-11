@@ -256,7 +256,7 @@ class UrlHelper {
 
 		$host = trim(strtolower($tokens['host']), '[].');
 		$port = $tokens['port'] ?? null;
-		$standard_port = (($tokens['scheme'] ?? 'http') === 'https') ? 443 : 80;
+		$standard_port = (strtolower($tokens['scheme'] ?? 'http') === 'https') ? 443 : 80;
 		$is_standard_port = ($port === null || $port === $standard_port);
 
 		if ($host === '' || $host === 'localhost')
@@ -274,23 +274,27 @@ class UrlHelper {
 
 			if (is_array($records)) {
 				foreach ($records as $r) {
-					if (isset($r['ip']))
+					if (isset($r['ip'])) {
 						$ips[] = $r['ip'];
+					}
 
-					if (isset($r['ipv6']))
+					if (isset($r['ipv6'])) {
 						$ips[] = $r['ipv6'];
+					}
 				}
 			}
 
 			// Also include OS resolver results (e.g. '/etc/hosts', local container hostnames)
 			$sys_ips = gethostbynamel($host);
-			if ($sys_ips !== false)
+			if ($sys_ips !== false) {
 				$ips = array_unique([...$ips, ...$sys_ips]);
+			}
 		}
 
 		// Fail if we need to validate IPs but couldn't determine any.
-		if (empty($ips))
+		if (empty($ips)) {
 			return $validate_resolved_ip;
+		}
 
 		foreach ($ips as $ip) {
 			// Canonicalize IPv6 and unwrap IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
@@ -527,7 +531,7 @@ class UrlHelper {
 
 					// For non-response exceptions (e.g., connection errors), check the exception code.
 
-					$errno = $ex->getCode();
+					$errno = $ex->getHandlerContext()['errno'] ?? $ex->getCode();
 
 					if (($errno === \CURLE_WRITE_ERROR || $errno === \CURLE_BAD_CONTENT_ENCODING) &&
 						$ex->getRequest()->getHeaderLine('accept-encoding') !== 'none') {
