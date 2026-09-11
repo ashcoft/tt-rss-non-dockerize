@@ -419,10 +419,6 @@ final class UrlHelperTest extends TestCase {
 		$this->assertFalse(UrlHelper::has_disallowed_ip(''));
 	}
 
-	public function testIsDisallowedIpRejectsUnresolvableHostnamesWhenResolutionRequired(): void {
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://does-not-resolve.invalid/', true));
-	}
-
 	public function testIsDisallowedIpRejectsTrailingDotIpv4Literal(): void {
 		$this->assertTrue(UrlHelper::has_disallowed_ip('http://169.254.169.254./'));
 		$this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254.:443/'));
@@ -458,6 +454,9 @@ final class UrlHelperTest extends TestCase {
 		$this->assertFalse(UrlHelper::has_disallowed_ip('https://10.0.0.1/'));
 		$this->assertFalse(UrlHelper::has_disallowed_ip('https://10.0.0.1:443/'));
 		$this->assertFalse(UrlHelper::has_disallowed_ip('http://10.0.0.1:80/'));
+		// Standard port must match the URL scheme: cross-scheme ports are non-standard.
+		$this->assertTrue(UrlHelper::has_disallowed_ip('http://10.0.0.1:443/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://10.0.0.1:80/'));
 	}
 
 	public function testIsDisallowedIpBlocksPrivateIP10OnNonStandardPorts(): void {

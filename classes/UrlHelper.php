@@ -256,7 +256,8 @@ class UrlHelper {
 
 		$host = trim(strtolower($tokens['host']), '[].');
 		$port = $tokens['port'] ?? null;
-		$is_standard_port = ($port === null || $port === 80 || $port === 443);
+		$standard_port = (($tokens['scheme'] ?? 'http') === 'https') ? 443 : 80;
+		$is_standard_port = ($port === null || $port === $standard_port);
 
 		if ($host === '' || $host === 'localhost')
 			return true;
@@ -438,8 +439,7 @@ class UrlHelper {
 				'on_redirect' => function(RequestInterface $request, ResponseInterface $response, UriInterface $uri) {
 					if (!self::validate($uri, true)) {
 						self::$fetch_effective_url = (string) $uri;
-						throw new GuzzleHttp\Exception\ResponseException('URL received during redirection failed extended validation.',
-							$request, $response);
+						throw GuzzleHttp\Exception\RequestException::create($request, $response);
 					}
 				},
 			];
@@ -503,7 +503,7 @@ class UrlHelper {
 		} catch (GuzzleHttp\Exception\GuzzleException $ex) {
 			self::$fetch_last_error = $ex->getMessage();
 
-			if ($ex instanceof GuzzleHttp\Exception\ResponseException) {
+			if ($ex instanceof GuzzleHttp\Exception\RequestException) {
 				if ($ex instanceof GuzzleHttp\Exception\BadResponseException) {
 					// 4xx or 5xx
 					self::$fetch_last_error_code = $ex->getResponse()->getStatusCode();
@@ -519,12 +519,18 @@ class UrlHelper {
 
 					if ($type && !str_contains(self::$fetch_last_content_type, "$type"))
 						self::$fetch_last_error_content = (string) $ex->getResponse()->getBody();
-				} elseif ($ex instanceof GuzzleHttp\Exception\ResponseTransferException) {
+				} else {
 					// By default, all supported encoding types are sent via `Accept-Encoding` and decoding of
 					// responses with `Content-Encoding` is automatically attempted.  If this fails, we do a
 					// single retry with `Accept-Encoding: none` (intentionally invalid) to try and force an
 					// unencoded response.
-					if ($ex->getRequest()->getHeaderLine('accept-encoding') !== 'none') {
+
+					// For non-response exceptions (e.g., connection errors), check the exception code.
+
+					$errno = $ex->getCode();
+
+					if (($errno === \CURLE_WRITE_ERROR || $errno === \CURLE_BAD_CONTENT_ENCODING) &&
+						$ex->getRequest()->getHeaderLine('accept-encoding') !== 'none') {
 						$options['encoding'] = 'none';
 						return self::fetch($options);
 					}
