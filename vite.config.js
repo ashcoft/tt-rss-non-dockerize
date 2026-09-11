@@ -48,7 +48,7 @@ export default defineConfig({
       input: path.resolve(__dirname, 'js/index.html'),
       
       // Keep the existing directory structure for compatibility
-      preserveEntrySignatures: 'allow-empty',
+      preserveEntrySignatures: false,
       
       // External dependencies that should not be bundled
       external: [],
