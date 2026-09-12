@@ -25,7 +25,7 @@
 	// the session cookie that token is bound to in the cookie store regardless.
 	header('Cache-Control: private, no-cache');
 
-	// Buffered so send_conditional_html() at the end can hash it into a
+	// Buffered so sendConditionalHtml() at the end can hash it into a
 	// validator; unauthenticated requests never reach here, login_sequence()
 	// renders the login form and exits.
 	ob_start();
@@ -346,4 +346,4 @@
 
 </body>
 </html>
-<?php send_conditional_html((string) ob_get_clean());
+<?php sendConditionalHtml((string) ob_get_clean());

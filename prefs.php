@@ -189,4 +189,4 @@
 
 </body>
 </html>
-<?php send_conditional_html((string) ob_get_clean());
+<?php sendConditionalHtml((string) ob_get_clean());

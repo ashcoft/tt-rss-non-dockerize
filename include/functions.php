@@ -515,8 +515,8 @@
 	 * page, the CSRF token included, feeds the hash, so a 304 can only ever be
 	 * served to a client that already holds this exact session's copy.
 	 */
-	function send_conditional_html(string $body): void {
-		$etag = '"' . md5($body) . '"';
+	function sendConditionalHtml(string $body): void {
+		$etag = '"' . hash('sha256', $body) . '"';
 
 		header("ETag: $etag");
 
