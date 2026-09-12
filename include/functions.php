@@ -527,7 +527,7 @@
 			fn(string $tag) => preg_replace('/^W\//', '', trim($tag)),
 			explode(',', $_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
 
-		if (in_array($etag, $tags, true)) {
+		if (in_array($etag, $tags, true) === true) {
 			http_response_code(304);
 		} else {
 			echo $body;
