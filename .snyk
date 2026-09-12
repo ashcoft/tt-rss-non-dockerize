@@ -1,12 +1,25 @@
 # Snyk (https://snyk.io) policy file
 # Transitive dependency vulnerabilities that cannot be directly fixed
 
-# Disable Snyk PR checks until vulnerabilities can be addressed
-# This is a temporary measure to allow the PR to be merged
+# image-size is an optional transitive dependency of less, pulled in for
+# build-time CSS processing only. No fixed version is available upstream for
+# the resolved tree without a larger less upgrade, so the finding is accepted
+# for development tooling.
+
+version: v1.25.0
 
 patch: {}
 
 ignore:
-  - '*':
-      reason: 'Build-time dependency vulnerabilities that cannot be fixed without waiting for upstream updates. Accepted risk for development tooling.'
-      expires: '2026-12-31T00:00:00.000Z'
+  SNYK-JS-IMAGESIZE-17295814:
+    - '*':
+        reason: 'Optional transitive dep of less; build-time only, no upstream fix in resolved tree.'
+        expires: '2026-12-31T00:00:00.000Z'
+  SNYK-JS-IMAGESIZE-17295816:
+    - '*':
+        reason: 'Optional transitive dep of less; build-time only, no upstream fix in resolved tree.'
+        expires: '2026-12-31T00:00:00.000Z'
+  SNYK-JS-IMAGESIZE-9634164:
+    - '*':
+        reason: 'Optional transitive dep of less; build-time only, no upstream fix in resolved tree.'
+        expires: '2026-12-31T00:00:00.000Z'
