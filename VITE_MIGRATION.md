@@ -69,7 +69,7 @@ This implementation maintains two build systems:
    - Serves original `index.php`
 
 2. **Vite Build** (development)
-   - Uses `js/index.html` as entry point
+   - Uses `src/vue/index.html` as entry point
    - Provides HMR and fast refresh
    - Proxies to PHP backend for API calls
 
@@ -125,7 +125,7 @@ The dev server proxies the following paths to the PHP backend:
 | `src/vue/components/Toolbar.vue` | Toolbar component (Vuetify buttons) |
 | `src/vue/components/HeadlinesList.vue` | Headlines list (Vuetify v-list) |
 | `src/vue/components/ArticleView.vue` | Article view component |
-| `js/index.html` | Vue app HTML entry point |
+| `src/vue/index.html` | Vue app HTML entry point |
 | `src/shim/amd-shim.js` | AMD compatibility shim for Dojo |
 
 ### Modified Files

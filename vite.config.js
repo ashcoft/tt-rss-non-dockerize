@@ -38,6 +38,10 @@ export default defineConfig({
   build: {
     // Output directory for production builds
     outDir: 'dist',
+
+    // Transpile target: Vuetify 4 emits destructuring that esbuild's default
+    // target cannot rewrite, so target a modern baseline
+    target: 'es2022',
     
     // Empty outDir before build
     emptyOutDir: true,
@@ -45,7 +49,7 @@ export default defineConfig({
     // Rollup options for better AMD handling
     rollupOptions: {
       // Entry point for the application
-      input: path.resolve(__dirname, 'js/index.html'),
+      input: path.resolve(__dirname, 'src/vue/index.html'),
       
       // Keep the existing directory structure for compatibility
       preserveEntrySignatures: 'allow-empty',
@@ -295,11 +299,11 @@ export default defineConfig({
   // Assets configuration
   assetsInclude: [
     // Support various template and data formats
-    '**/*.html',
-    '**/*.htm',
+    // (HTML is intentionally not listed: the Vue app entry must be
+    // processed by Vite's HTML pipeline, not treated as a static asset.)
     '**/*.txt',
     '**/*.json',
-    
+
     // Font files
     '**/*.eot',
     '**/*.woff',
@@ -329,7 +333,7 @@ export default defineConfig({
   // Legacy Vite options for compatibility
   esbuild: {
     // Target for JS transpilation
-    target: 'es2015',
+    target: 'es2022',
     
     // Supported browserslist
     supported: {
