@@ -24,6 +24,15 @@ class UrlHelper {
 	static string $fetch_effective_ip_addr;
 
 	public static ?GuzzleHttp\ClientInterface $client = null;
+	private static ?bool $uses_curl = null;
+
+	/**
+	 * Basic check for whether Guzzle will use a curl handler (indicating we can add curl options as needed).
+	 * This doesn't fully mirror Guzzle's logic, but should hopefully be close enough.
+	 */
+	private static function usesCurlHandler(): bool {
+		return self::$uses_curl ??= function_exists('curl_exec') || function_exists('curl_multi_exec');
+	}
 
 	private static function get_client(): GuzzleHttp\ClientInterface {
 		if (self::$client == null) {
@@ -410,7 +419,7 @@ class UrlHelper {
 
 		if ($encoding)
 			$req_options[GuzzleHttp\RequestOptions::HEADERS]['Accept-Encoding'] = $encoding;
-		else
+		elseif (self::usesCurlHandler())
 			$req_options['curl'][\CURLOPT_ENCODING] = '';
 
 		if  ($http_referrer)
@@ -419,7 +428,7 @@ class UrlHelper {
 		if ($login && $pass && in_array($auth_type, ['basic', 'digest', 'ntlm'])) {
 			// Let Guzzle handle the details for auth types it supports
 			$req_options[GuzzleHttp\RequestOptions::AUTH] = [$login, $pass, $auth_type];
-		} elseif ($auth_type === 'any') {
+		} elseif ($auth_type === 'any' && self::usesCurlHandler()) {
 			// https://docs.guzzlephp.org/en/stable/faq.html#how-can-i-add-custom-curl-options
 			$req_options['curl'][\CURLOPT_HTTPAUTH] = \CURLAUTH_ANY;
 			if ($login && $pass)
