@@ -310,7 +310,7 @@ final class SanitizerUnitTest extends TestCase {
 		$words = ['tëst'];
 		$result = Sanitizer::highlight_words_str($str, $words);
 
-		$expected = (LIBXML_VERSION >= 21200) ? 'tëst' : 't&euml;st';
+		$expected = (LIBXML_VERSION >= 21500) ? 'tëst' : 't&euml;st';
 
 		$this->assertStringContainsString('class="highlight"', $result);
 		$this->assertStringContainsString($expected, $result);
