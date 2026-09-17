@@ -1,5 +1,42 @@
 # Vite + Vue 3 + Vuetify Migration Guide for Tiny Tiny RSS
 
+## Verified status (2026-09-17)
+
+**Not ready for a production cutover.** The Vue frontend compiles, but the
+current client mixes legacy `backend.php` handlers with the external JSON API.
+Earlier completion claims must not be treated as end-to-end verification.
+Keep the existing PHP/Dojo UI as the production entry point.
+
+Validated locally:
+- `npm run build` builds the Vue bundle.
+- `npm run type-check` checks TypeScript files (not full Vue template typing).
+- `npm run lint:vue` checks Vue/TypeScript sources.
+- `npm run test:vue` runs six Node/Vue custom-renderer regression tests:
+  dialog update events, scroll loading guards, and listener cleanup.
+- These tests stub UI components; they do not exercise PHP or a browser.
+
+Backend integration blockers discovered by static inspection:
+- `backend.php` dispatches handler classes/methods, not `login`/`logout` API
+  operations. The external `/api/` endpoint uses JSON and explicit `sid`.
+- Legacy CSRF validation reads the real session token from POST; literal
+  `auto` and a GET query token are not valid substitutes.
+- Legacy responses are not uniformly `{status, content}`. Some are plain
+  JSON objects, text, or empty bodies; errors use an `error` object.
+- `Pref_Feeds/getfeedtree` returns nested `items`, not flat feeds/categories.
+- `Feeds/view` reads `query` for search and returns `headlines.content`, not
+  the client’s assumed flat response. Dates and empty states also differ.
+- Article retrieval, notes, labels, feed CRUD, and preference/filter calls
+  need endpoint-by-endpoint adaptation; several client method names do not
+  exist in their selected handler classes.
+
+Next production gate: implement a narrowly scoped, authenticated legacy
+adapter with explicit CSRF injection and response validation, then run the
+existing PHP/PostgreSQL integration suite plus browser tests for login,
+feeds, search, pagination and mutations. Do not weaken authentication or
+CSRF checks to make the frontend work. No PHP executable, database service,
+local configuration or backend on port 8080 was available in this session.
+
+
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
 
 ## Overview
@@ -95,7 +132,9 @@ The following aliases are configured in `vite.config.js`:
 
 ### AMD Compatibility
 
-The existing Dojo AMD modules are pre-bundled using Vite's `optimizeDeps` feature. This converts AMD-style modules to ESM for Vite's dependency pre-bundling while maintaining the original module structure.
+Vite optimizes only the Vue/Pinia/Vuetify module graph with an ES2022 target.
+It does not convert Dojo AMD modules to ESM. The legacy PHP pages continue to
+load Dojo through the existing AMD loader.
 
 ### Proxy Configuration
 

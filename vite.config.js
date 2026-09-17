@@ -3,7 +3,7 @@
  * 
  * This configuration enables Vite to work alongside the existing Dojo build system.
  * It provides:
- * - AMD module support via pre-bundling
+ * - Vue dependency optimization (legacy Dojo retains its AMD loader)
  * - Dev server with HMR for faster development
  * - Proxy to PHP backend for API calls
  * - Asset handling for CSS, fonts, and images
@@ -91,122 +91,11 @@ export default defineConfig({
     extensions: ['.js', '.ts', '.vue', '.json', '.html', '.htm'],
   },
   
-  // Pre-bundling configuration for AMD modules
-  // This converts Dojo AMD modules to ESM for Vite's dependency pre-bundling
+  // Only optimize the Vue module graph. Vite does not convert Dojo AMD to ESM.
   optimizeDeps: {
-    // Entries to pre-bundle
-    entries: [
-      // Main application entry point
-      'js/tt-rss.js',
-      // Common utilities
-      'js/common.js',
-      // Vue app entry
-      'src/vue/main.ts',
-    ],
-    
-    // Force inclusion of Dojo modules for pre-bundling
-    // Note: Only modules that actually exist will be pre-bundled
-    // These are defined in lib/dojo/*.js files
-    include: [
-      // Core Dojo modules (from lib/dojo/)
-      'dojo/_base/kernel',
-      'dojo/_base/declare',
-      'dojo/_base/lang',
-      'dojo/_base/array',
-      'dojo/_base/connect',
-      'dojo/_base/html',
-      'dojo/_base/url',
-      'dojo/_base/config',
-      'dojo/_base/loader',
-      'dojo/_base/browser',
-      'dojo/_base/window',
-      'dojo/ready',
-      'dojo/parser',
-      'dojo/sniff',
-      'dojo/dom',
-      'dojo/dom-construct',
-      'dojo/dom-class',
-      'dojo/dom-attr',
-      'dojo/dom-style',
-      'dojo/dom-prop',
-      'dojo/dom-form',
-      'dojo/dom-geometry',
-      'dojo/query',
-      'dojo/json',
-      'dojo/string',
-      'dojo/hash',
-      'dojo/cookie',
-      'dojo/window',
-      'dojo/on',
-      'dojo/topic',
-      'dojo/when',
-      'dojo/Deferred',
-      'dojo/promise/Promise',
-      'dojo/Stateful',
-      'dojo/text',
-      'dojo/cache',
-      'dojo/i18n',
-      'dojo/request',
-      'dojo/keys',
-      'dojo/mouse',
-      'dojo/touch',
-      'dojo/uacss',
-      'dojo/hccss',
-      'dojo/html',
-      'dojo/node',
-      'dojo/has',
-      'dojo/fx',
-      'dojo/colors',
-      'dojo/number',
-      'dojo/currency',
-      'dojo/date/stamp',
-      'dojo/date/locale',
-      'dojo/io-query',
-      'dojo/json5',
-      'dojo/back',
-      'dojo/aspect',
-      'dojo/AdapterRegistry',
-      'dojo/Evented',
-      'dojo/DeferredList',
-      'dojo/NodeList',
-      'dojo/NodeList-dom',
-      'dojo/NodeList-data',
-      'dojo/NodeList-manipulate',
-      'dojo/NodeList-traverse',
-      'dojo/NodeList-html',
-      'dojo/NodeList-fx',
-      'dojo/router',
-      'dojo/behavior',
-      'dojo/debounce',
-      'dojo/throttle',
-      'dojo/regexp',
-      'dojo/global',
-      'dojo/request/default',
-      'dojo/request/xhr',
-      'dojo/data/ItemFileWriteStore',
-      'dojo/data/ItemFileReadStore',
-      'dojo/store/Memory',
-      'dojo/store/api/Store',
-      'dojo/store/util/QueryResults',
-      'dojo/store/util/SimpleQueryEngine',
-      'dojo/dnd/Moveable',
-      'dojo/dnd/Mover',
-      'dojo/dnd/TimedMoveable',
-      'dojo/dnd/move',
-      'dojo/dnd/common',
-      'dojo/dnd/Selector',
-      'dojo/dnd/Source',
-      'dojo/dnd/autoscroll',
-      'dojo/dnd/Avatar',
-      'dojo/dnd/Manager',
-      'dojo/store/Observable',
-      
-      // Vuetify
-      'vuetify',
-    ],
-    
-    // Exclude patterns - Dojo should be pre-bundled, not excluded
-    exclude: [],
+    entries: ['src/vue/main.ts'],
+    include: ['vue', 'pinia', 'vuetify'],
+    esbuildOptions: { target: 'es2022' },
   },
   
   // Dev server configuration
