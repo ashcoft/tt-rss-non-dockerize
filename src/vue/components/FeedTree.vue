@@ -87,7 +87,7 @@
         :value="'cat-' + category.id"
       >
         <template #activator="{ props }">
-          <v-list-item v-bind="props" :title="category.name">
+                    <v-list-item v-bind="props" :title="category.title">
             <template #prepend>
               <v-icon>mdi-folder</v-icon>
             </template>
@@ -171,7 +171,10 @@ const props = withDefaults(defineProps<Props>(), {
   labels: () => []
 });
 
-const emit = defineEmits<(e: 'select', feedId: number | string, isCat: boolean) => void>();
+const emit = defineEmits<{
+  (e: 'select', feedId: number | string, isCat: boolean): void;
+  (e: 'feed-action', action: string, feedId: number): void;
+}>();
 
 // State
 const searchQuery = ref('');

@@ -357,6 +357,18 @@ class ApiClient {
     }, 'POST');
   }
 
+  /**
+   * Mark all articles in a feed/category as read.
+   */
+  async catchupFeed(feedId: number | string, isCat: boolean = false): Promise<ApiResponse<boolean>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'catchupFeed',
+      feed_id: feedId,
+      is_cat: isCat ? '1' : '0',
+    }, 'POST');
+  }
+
   // ============================================
   // Labels
   // ============================================
@@ -450,6 +462,146 @@ class ApiClient {
       search_mode: searchMode,
       limit: limit,
     });
+  }
+  // ============================================
+  // Preferences
+  // ============================================
+
+  async getPref(prefName: string): Promise<ApiResponse<{ Value: string }>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'getPref',
+      pref_name: prefName,
+    });
+  }
+
+  async setPref(prefName: string, value: string): Promise<ApiResponse<boolean>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'setPref',
+      pref_name: prefName,
+      value: value,
+    }, 'POST');
+  }
+
+  async getRuntimeInfo(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'getDefaultViewSettings',
+    });
+  }
+
+  async getProfiles(): Promise<ApiResponse<Array<{ id: number; title: string; active: boolean }>>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'getProfiles',
+    });
+  }
+
+  async setProfile(profileId: number): Promise<ApiResponse<boolean>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'setProfile',
+      profile_id: profileId,
+    }, 'POST');
+  }
+
+  // ============================================
+  // Filters
+  // ============================================
+
+  async getFilters(): Promise<ApiResponse<{ content: unknown }>> {
+    return this.request('Pref_Filters', {
+      op: 'Pref_Filters',
+      method: 'getfilters',
+    });
+  }
+
+  async deleteFilter(filterId: number): Promise<ApiResponse<boolean>> {
+    return this.request('Pref_Filters', {
+      op: 'Pref_Filters',
+      method: 'remove',
+      ids: filterId,
+    }, 'POST');
+  }
+
+  async enableFilter(filterId: number, enabled: boolean): Promise<ApiResponse<boolean>> {
+    return this.request('Pref_Filters', {
+      op: 'Pref_Filters',
+      method: 'enablefilter',
+      ids: filterId,
+      enable: enabled ? 'true' : 'false',
+    }, 'POST');
+  }
+
+  // ============================================
+  // Labels (management + assignment)
+  // ============================================
+
+  async removeLabel(labelId: number): Promise<ApiResponse<boolean>> {
+    return this.request('Pref_Labels', {
+      op: 'Pref_Labels',
+      method: 'removeLabel',
+      lid: labelId,
+    }, 'POST');
+  }
+
+  async saveLabel(
+    labelId: number,
+    caption: string,
+    fgColor: string,
+    bgColor: string
+  ): Promise<ApiResponse<boolean>> {
+    return this.request('Pref_Labels', {
+      op: 'Pref_Labels',
+      method: 'save',
+      id: labelId,
+      caption: caption,
+      fg_color: fgColor,
+      bg_color: bgColor,
+    }, 'POST');
+  }
+
+  /**
+   * Assign or unassign a label to articles.
+   * @param assign 1 to assign, 0 to unassign
+   */
+  async setLabelForArticles(
+    labelId: number,
+    articleIds: number[],
+    assign: 0 | 1
+  ): Promise<ApiResponse<boolean>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'setlabel',
+      lid: labelId,
+      ids: articleIds,
+      assign: assign,
+    }, 'POST');
+  }
+
+  /**
+   * Return label assignments for a set of articles.
+   */
+  async getLabelsForArticles(articleIds: number[]): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request('RPC', {
+      op: 'RPC',
+      method: 'getlabels',
+      ids: articleIds,
+    });
+  }
+
+  // ============================================
+  // Categories (rename/reorder)
+  // ============================================
+
+  async renameCategory(categoryId: number, title: string): Promise<ApiResponse<boolean>> {
+    return this.request('Pref_Feeds', {
+      op: 'Pref_Feeds',
+      method: 'renamecat',
+      cid: categoryId,
+      title: title,
+    }, 'POST');
   }
 }
 

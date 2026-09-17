@@ -1,5 +1,5 @@
 <template>
-  <div class="headlines-list">
+  <div ref="listRef" class="headlines-list">
     <div v-if="loading" class="headlines-loading">
       <v-progress-circular indeterminate color="primary" />
       <span>Loading headlines...</span>
@@ -15,7 +15,7 @@
         v-for="headline in headlines"
         :key="headline.id"
         :class="{ 'headline-read': headline.is_read }"
-        @click="$emit('select', headline)"
+        @click="emit('select', headline)"
       >
         <template #prepend>
           <v-checkbox
@@ -47,39 +47,80 @@
               variant="text"
               size="small"
               :color="headline.is_marked ? 'amber' : 'grey'"
-              @click.stop="$emit('action', headline, 'toggle_star')"
+              @click.stop="emit('action', headline, 'toggle_star')"
             >
               <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+            </v-btn>
+
+                        <v-btn
+              icon
+              variant="text"
+              size="small"
+              :color="headline.is_published ? 'blue' : 'grey'"
+              @click.stop="emit('action', headline, 'toggle_publish')"
+            >
+              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
             </v-btn>
 
             <v-btn
               icon
               variant="text"
               size="small"
-              :color="headline.is_published ? 'blue' : 'grey'"
-              @click.stop="$emit('action', headline, 'toggle_publish')"
+              color="grey"
+              @click.stop="emit('action', headline, 'label')"
+              title="Assign labels"
             >
-              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
+              <v-icon>mdi-label</v-icon>
             </v-btn>
           </div>
         </template>
       </v-list-item>
-    </v-list>
+        </v-list>
+
+    <div v-if="hasMore && !loading" class="load-more">
+      <v-btn
+        color="primary"
+        variant="flat"
+        :loading="loadingMore"
+        @click="emit('load-more')"
+      >
+        Load more
+      </v-btn>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
 import type { Headline } from '@/types';
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
 
-defineProps<{
+const props = defineProps<{
   headlines: Headline[];
   loading: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [headline: Headline];
   action: [headline: Headline, action: string];
+  'load-more': [];
 }>();
+
+// Infinite scroll wiring (Phase 5)
+const listRef = ref<HTMLElement | null>(null);
+const { setupScrollListener } = useInfiniteScroll({
+  enabled: computed(() => Boolean(props.hasMore) && !props.loading && !props.loadingMore),
+  onLoadMore: () => {
+    emit('load-more');
+  },
+});
+
+onMounted(() => {
+  if (listRef.value) setupScrollListener(listRef.value);
+});
+
 
 const toggleRead = (headline: Headline) => {
   emit('action', headline, 'toggle_read');
