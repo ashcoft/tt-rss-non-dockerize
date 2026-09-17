@@ -4,12 +4,12 @@
       <v-btn-toggle>
         <v-btn
           icon="mdi-refresh"
-          @click="$emit('action', 'refresh')"
+          @click="handleAction('refresh')"
           title="Refresh"
         />
         <v-btn
           icon="mdi-check-all"
-          @click="$emit('action', 'catchup')"
+          @click="handleAction('catchup')"
           title="Mark all as read"
         />
       </v-btn-toggle>
@@ -22,7 +22,7 @@
         density="compact"
         hide-details
         class="search-input"
-        @keyup.enter="$emit('action', 'search', searchQuery)"
+        @keyup.enter="handleAction('search', searchQuery)"
       />
     </div>
 
@@ -158,8 +158,8 @@ const handleSort = (command: string) => {
  * Handles a generic action by emitting an action event.
  * @param command - The action command to emit.
  */
-const handleAction = (command: string) => {
-  emit('action', command);
+const handleAction = (command: string, payload?: string | number | object) => {
+  emit('action', command, payload);
 };
 </script>
 

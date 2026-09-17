@@ -1,17 +1,28 @@
 <template>
   <v-app>
-    <div class="ttrss-app">
+    <!-- Login gate (Phase 3) -->
+    <LoginForm v-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
+
+    <div v-else class="ttrss-app">
       <header class="app-header">
+        <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
         <h1>Tiny Tiny RSS</h1>
-        <p class="subtitle">Vue 3 + Vuetify Migration</p>
+        <v-spacer />
+        <span class="subtitle">{{ authStore.username }}</span>
+        <v-btn icon="mdi-theme-light-dark" variant="text" @click="toggleTheme" title="Toggle light/dark theme" />
+        <v-btn icon="mdi-cog" variant="text" @click="prefsOpen = true" title="Preferences" />
+        <v-btn icon="mdi-plus-box" variant="text" @click="feedsDialogOpen = true" title="Manage feeds" />
+        <v-btn icon="mdi-logout" variant="text" @click="onLogout" title="Log out" />
       </header>
 
       <main class="app-main">
-        <aside class="sidebar">
+                <aside class="sidebar" :class="{ open: sidebarOpen }">
           <FeedTree
             :feeds="feedsStore.feeds"
             :categories="feedsStore.categories"
+            :labels="labelsStore.labels"
             @select="handleFeedSelect"
+            @feed-action="handleFeedAction"
           />
         </aside>
 
@@ -21,12 +32,27 @@
             @action="handleToolbarAction"
           />
 
-          <HeadlinesList
+          <v-alert
+            v-if="headlinesStore.error || feedsStore.error"
+            type="error"
+            variant="tonal"
+            density="compact"
+            closable
+            class="mx-2"
+            @click:close="clearErrors"
+          >
+            {{ headlinesStore.error || feedsStore.error }}
+          </v-alert>
+
+                              <HeadlinesList
             :headlines="headlinesStore.headlines"
             :loading="headlinesStore.loading"
+            :loading-more="headlinesStore.loadingMore"
+            :has-more="headlinesStore.hasMore"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
-          />
+            @load-more="handleLoadMore"
+                    />
         </section>
 
         <aside class="article-panel" v-if="headlinesStore.selectedArticle">
@@ -39,8 +65,17 @@
 
       <footer class="app-footer">
         <span class="status">{{ statusMessage }}</span>
+        <v-spacer />
+        <span v-if="pollingActive" class="status">
+          <v-icon size="14" icon="mdi-sync" class="mr-1" />Auto-refresh on
+        </span>
       </footer>
     </div>
+
+    <!-- Dialogs (Phase 3/4) -->
+    <ManageFeedsDialog v-model="feedsDialogOpen" />
+    <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
+    <PreferencesDialog v-model="prefsOpen" />
 
     <v-snackbar
       v-model="snackbar"
@@ -49,65 +84,162 @@
     >
       {{ snackbarText }}
       <template #actions>
-        <v-btn
-          variant="text"
-          @click="snackbar = false"
-        >
-          Close
-        </v-btn>
+        <v-btn variant="text" @click="snackbar = false">Close</v-btn>
       </template>
     </v-snackbar>
   </v-app>
 </template>
 
+
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useFeedsStore, useHeadlinesStore, type Headline } from './stores';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useTheme } from 'vuetify';
+import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
 import FeedTree from './components/FeedTree.vue';
 import Toolbar from './components/Toolbar.vue';
 import HeadlinesList from './components/HeadlinesList.vue';
 import ArticleView from './components/ArticleView.vue';
+import LoginForm from './components/LoginForm.vue';
+import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
+import LabelsDialog from './components/dialogs/LabelsDialog.vue';
+import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
 
-// Stores
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
+const authStore = useAuthStore();
+const labelsStore = useLabelsStore();
+const theme = useTheme();
 
 // UI State
 const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
+const sidebarOpen = ref(false);
+const feedsDialogOpen = ref(false);
+const labelsDialogOpen = ref(false);
+const prefsOpen = ref(false);
+const labelArticleId = ref<number | null>(null);
 
-// Computed
+// Auto-refresh polling (Phase 5)
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+const pollingActive = computed(() => pollTimer !== null);
+
 const statusMessage = computed(() => {
   return `${headlinesStore.headlines.length} articles, ${headlinesStore.unreadCount} unread`;
 });
 
-// Helper function to show messages
 const showMessage = (text: string, color: 'success' | 'error' | 'info' | 'warning' = 'info') => {
   snackbarText.value = text;
   snackbarColor.value = color;
   snackbar.value = true;
 };
 
+const clearErrors = () => {
+  headlinesStore.error = null;
+  feedsStore.error = null;
+};
+
+// Theme toggle (Phase 5: light/dark support)
+const toggleTheme = () => {
+  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark';
+};
+
+// Polling (Phase 5: real-time updates)
+const startPolling = () => {
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    if (!feedsStore.currentFeedId) return;
+    await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
+    await feedsStore.loadFeeds();
+  }, POLL_INTERVAL_MS);
+};
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
+// Auth flow (Phase 3)
+const onLoggedIn = async () => {
+  showMessage('Welcome back!', 'success');
+  await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels()]);
+  startPolling();
+};
+
+const onLogout = async () => {
+  stopPolling();
+  headlinesStore.reset();
+  feedsStore.reset();
+  labelsStore.reset();
+  await authStore.logout();
+};
+
+/**
+ * Feed tree context actions (Phase 3).
+ * Special feed ids: -1 all, -2 fresh, -3 starred, -4 published.
+ */
+const handleFeedAction = async (action: string, feedId: number) => {
+  if (action === 'mark_read') {
+    if (feedId === -1 || feedId === -2) {
+      await headlinesStore.catchupAll();
+      showMessage('All headlines marked as read', 'success');
+    } else if (feedId === -3 || feedId === -4) {
+      // Starred/published special views use the normal mark-read path
+      const ids = headlinesStore.headlines.map(h => h.id);
+      await headlinesStore.markAsRead(ids);
+    }
+  } else if (action === 'edit') {
+    feedsDialogOpen.value = true;
+  } else if (action === 'delete') {
+    feedsDialogOpen.value = true;
+  }
+};
+
 // Handlers
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
+  sidebarOpen.value = false;
   feedsStore.selectFeed(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
 };
 
-const handleToolbarAction = (action: string) => {
+const handleToolbarAction = async (action: string, payload?: string | number | object) => {
+  const feedId = feedsStore.currentFeedId;
+  const isCat = feedsStore.currentIsCat;
+
   switch (action) {
     case 'refresh':
-      void headlinesStore.loadHeadlines(
-        feedsStore.currentFeedId,
-        feedsStore.currentIsCat
-      );
+      await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
       break;
     case 'catchup':
-      showMessage('Marking all as read...', 'info');
+      showMessage('Marking feed as read...', 'info');
+      if (await feedsStore.catchupFeed(feedId, isCat)) {
+        await headlinesStore.loadHeadlines(feedId, isCat);
+        showMessage('Feed marked as read', 'success');
+      } else {
+        showMessage('Failed to mark feed as read', 'error');
+      }
       break;
     case 'search':
-      showMessage('Search functionality coming soon', 'info');
+      if (typeof payload === 'string' && payload.trim()) {
+        await headlinesStore.search(payload.trim(), feedId, isCat);
+        showMessage(`Searching for "${payload}"`, 'info');
+      } else {
+        headlinesStore.setSearchQuery('');
+        await headlinesStore.loadHeadlines(feedId, isCat);
+      }
+      break;
+    case 'viewMode':
+      if (typeof payload === 'string') {
+        headlinesStore.setViewMode(payload as 'adaptive' | 'all_articles' | 'unread');
+        await headlinesStore.loadHeadlines(feedId, isCat);
+      }
+      break;
+    case 'edit':
+    case 'delete':
+      feedsDialogOpen.value = true;
       break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
@@ -116,28 +248,46 @@ const handleToolbarAction = (action: string) => {
 
 const handleHeadlineSelect = async (headline: Headline) => {
   await headlinesStore.loadArticle(headline.id);
+  if (!headline.is_read) {
+    await headlinesStore.markAsRead([headline.id]);
+    feedsStore.updateFeedUnread(headline.feed_id, -1);
+  }
 };
 
-const handleHeadlineAction = (headline: Headline, action: string) => {
+const handleHeadlineAction = async (headline: Headline, action: string) => {
   switch (action) {
+    case 'toggle_read':
+      if (headline.is_read) {
+        await headlinesStore.markAsUnread([headline.id]);
+        feedsStore.updateFeedUnread(headline.feed_id, 1);
+      } else {
+        await headlinesStore.markAsRead([headline.id]);
+        feedsStore.updateFeedUnread(headline.feed_id, -1);
+      }
+      break;
     case 'mark_read':
-      void headlinesStore.markAsRead([headline.id]);
+      await headlinesStore.markAsRead([headline.id]);
       break;
     case 'mark_unread':
-      void headlinesStore.markAsUnread([headline.id]);
+      await headlinesStore.markAsUnread([headline.id]);
       break;
     case 'toggle_star':
-      void headlinesStore.toggleStar(headline.id);
+      await headlinesStore.toggleStar(headline.id);
       break;
     case 'toggle_publish':
-      void headlinesStore.togglePublish(headline.id);
+      await headlinesStore.togglePublish(headline.id);
+      break;
+    case 'label':
+      labelArticleId.value = headline.id;
+      labelsDialogOpen.value = true;
       break;
     case 'delete':
-      headlinesStore.deleteArticle(headline.id).then(() => {
+      try {
+        await headlinesStore.deleteArticle(headline.id);
         showMessage('Article deleted', 'success');
-      }).catch(() => {
+      } catch {
         showMessage('Failed to delete article', 'error');
-      });
+      }
       break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
@@ -148,10 +298,21 @@ const handleArticleClose = () => {
   headlinesStore.clearSelection();
 };
 
+const handleLoadMore = async () => {
+  const feedId = feedsStore.currentFeedId;
+  const isCat = feedsStore.currentIsCat;
+  await headlinesStore.loadMore(feedId, isCat);
+};
+
 // Lifecycle
 onMounted(async () => {
-  await feedsStore.loadFeeds();
+  if (authStore.loggedIn) {
+    await feedsStore.loadFeeds();
+    startPolling();
+  }
 });
+
+onUnmounted(stopPolling);
 </script>
 
 <style scoped>

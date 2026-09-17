@@ -143,9 +143,32 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     try {
       const response = await api.getArticle(articleId);
 
-      if (response.status === 0) {
-        // Type narrowing - content exists when status is 0
-        selectedArticle.value = response.content as NonNullable<typeof response.content>;
+                  if (response.status === 0) {
+        // Map API's article shape onto the store Article type.
+        // Backend returns `is_starred`; the store uses `is_marked`.
+        const data = response.content as unknown as {
+          id: number;
+          guid: string;
+          title: string;
+          link: string;
+          content: string;
+          excerpt: string;
+          updated: number;
+          is_marked: boolean;
+          is_read: boolean;
+          is_published: boolean;
+          tags: string[];
+          feed_id: number;
+          feed_title: string;
+          comments_count: number;
+          author: string;
+          note: string;
+          score?: number;
+        };
+        selectedArticle.value = {
+          ...data,
+                    is_marked: data.is_marked ?? false,
+        };
         
         // Mark as read on backend when an unread headline is opened
         const headline = headlines.value.find(h => h.id === articleId);
@@ -318,6 +341,42 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     selectedArticle.value = null;
   }
 
+  /**
+   * Mark every loaded headline as read (Phase 3).
+   */
+  async function catchupAll(): Promise<void> {
+    const ids = headlines.value.filter(h => !h.is_read).map(h => h.id);
+    if (ids.length === 0) return;
+    try {
+      await api.catchupArticles(ids, 1);
+      for (const h of headlines.value) h.is_read = true;
+      if (selectedArticle.value) selectedArticle.value.is_read = true;
+    } catch (err) {
+      console.error('Failed to catch up all:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Execute a search against the currently selected feed (Phase 3).
+   */
+  async function search(query: string, feedId: number | string, isCat: boolean = false): Promise<void> {
+    searchQuery.value = query;
+    await loadHeadlines(feedId, isCat);
+  }
+
+  /**
+   * Assign or unassign a label to an article (Phase 3).
+   */
+  async function assignLabel(labelId: number, articleId: number, assign: 0 | 1): Promise<void> {
+    try {
+      await api.setLabelForArticles(labelId, [articleId], assign);
+    } catch (err) {
+      console.error('Failed to assign label:', err);
+      throw err;
+    }
+  }
+
   function reset() {
     headlines.value = [];
     selectedArticle.value = null;
@@ -355,6 +414,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     setViewMode,
     setSearchQuery,
     clearSelection,
+    catchupAll,
+    search,
+    assignLabel,
     reset,
   };
 });
