@@ -252,6 +252,14 @@ const Article = {
 	},
 	unpack: function(row) {
 		if (row.getAttribute("data-is-packed") === "1") {
+			// article content lives in the Headlines cache (a row attribute copy
+			// would retain a second, escaped copy of every loaded article)
+			const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
+
+			// the row outlived the headlines cache (feed transition)
+			if (!hl)
+				return;
+
 			const container = row.querySelector(".content-inner");
 
 			const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
@@ -263,10 +271,6 @@ const Article = {
 			// blank content element might screw up onclick selection and keyboard moving
 			if (container.textContent.length === 0)
 				container.innerHTML += "&nbsp;";
-
-			// in expandable mode, save content for later, so that we can pack unfocused rows back
-			if (App.isCombinedMode() && document.getElementById('main').classList.contains('expandable'))
-				row.setAttribute("data-content-original", row.getAttribute("data-content"));
 
 			row.setAttribute("data-is-packed", "0");
 

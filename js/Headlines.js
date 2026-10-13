@@ -93,8 +93,10 @@ const Headlines = {
 	}),
 	syncModified: function (modified) {
 		const ops = {
-			tmark: [],
-			tpub: [],
+			marked: [],
+			unmarked: [],
+			published: [],
+			unpublished: [],
 			read: [],
 			unread: [],
 			select: [],
@@ -106,10 +108,10 @@ const Headlines = {
 
 		modified.forEach(function (m) {
 			if (m.old.marked !== m.new.marked)
-				ops.tmark.push(m.id);
+				m.new.marked ? ops.marked.push(m.id) : ops.unmarked.push(m.id);
 
 			if (m.old.published !== m.new.published)
-				ops.tpub.push(m.id);
+				m.new.published ? ops.published.push(m.id) : ops.unpublished.push(m.id);
 
 			if (m.old.unread !== m.new.unread)
 				m.new.unread ? ops.unread.push(m.id) : ops.read.push(m.id);
@@ -157,14 +159,21 @@ const Headlines = {
 		});
 
 		const promises = [];
-
-		if (ops.tmark.length !== 0)
+		if (ops.unmarked.length !== 0)
 			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "markSelected", "ids[]": ops.tmark, cmode: 2}));
+				{op: "RPC", method: "markSelected", "ids[]": ops.unmarked, cmode: 0}));
 
-		if (ops.tpub.length !== 0)
+		if (ops.marked.length !== 0)
 			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "publishSelected", "ids[]": ops.tpub, cmode: 2}));
+				{op: "RPC", method: "markSelected", "ids[]": ops.marked, cmode: 1}));
+
+		if (ops.unpublished.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.unpublished, cmode: 0}));
+
+		if (ops.published.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.published, cmode: 1}));
 
 		if (ops.read.length !== 0)
 			promises.push(xhr.post("backend.php",
@@ -329,7 +338,7 @@ const Headlines = {
 		}
 	},
 	unpackVisible: function(container) {
-		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-content].cdm');
+		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-is-packed="1"].cdm');
 
 		for (let i = 0; i < rows.length; i++) {
 			if (App.Scrollable.isChildVisible(rows[i], container)) {
