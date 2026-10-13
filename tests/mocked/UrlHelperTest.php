@@ -430,24 +430,24 @@ final class UrlHelperTest extends TestCase {
 	}
 
 	public function testIsDisallowedIpRejectsUnresolvableHostnamesWhenResolutionRequired(): void {
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://does-not-resolve.invalid/', true));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://does-not-resolve.invalid/', true));
 	}
 
 	public function testIsDisallowedIpRejectsTrailingDotIpv4Literal(): void {
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://169.254.169.254./'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254./'));
 		$this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254.:443/'));
 	}
 
 	public function testIsDisallowedIpRejectsEmptyHostnameAfterTrimming(): void {
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://./'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://./'));
 	}
 
 	public function testIsDisallowedIpRejectsCanonicalizedLoopbackAndMappedIPv6Variants(): void {
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://0177.0.0.1:8080/'));
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://0x7f.0.0.1:8080/'));
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://[::ffff:127.0.0.1]:8080/'));
-		$this->assertTrue(UrlHelper::has_disallowed_ip('http://[::ffff:10.0.0.1]:8080/'));
-		$this->assertFalse(UrlHelper::has_disallowed_ip('http://[::ffff:10.0.0.1]/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://0177.0.0.1:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://0x7f.0.0.1:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:127.0.0.1]:8080/'));
+		$this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]:8080/'));
+		$this->assertFalse(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]/'));
 	}
 
 	// ===== has_disallowed_ip() - Link-Local / Cloud Metadata Tests =====

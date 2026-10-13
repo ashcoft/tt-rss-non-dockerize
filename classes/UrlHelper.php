@@ -220,7 +220,7 @@ class UrlHelper {
 	 * @param string $host hostname or IPv4 literal to normalize
 	 * @return ?string canonical dotted-quad IPv4 string, or null if the input is not a valid dotted IPv4 literal
 	 */
-	static function canonicalize_ipv4_literal(string $host): ?string {
+	public static function canonicalize_ipv4_literal(string $host): ?string {
 		// Match 1 to 4 dot-separated octal, hex, or decimal integers
 		if (!preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/i', $host))
 			return null;
