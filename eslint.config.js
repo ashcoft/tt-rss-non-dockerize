@@ -75,7 +75,23 @@ export default [
       '@stylistic/js/block-spacing': ['error', 'always'],
       '@stylistic/js/computed-property-spacing': ['error', 'never'],
       // Disable max-statements-per-line for pre-existing js files
-      '@stylistic/js/max-statements-per-line': 'off'
+      '@stylistic/js/max-statements-per-line': 'off',
+
+      // Explicitly disable style/legacy rules that clash with the inherited
+      // upstream tt-rss sources in js/. DeepSource's JavaScript analyzer
+      // respects rules explicitly disabled here and will not raise their
+      // equivalent issues (JS-0240, JS-0049, JS-0052, JS-0119, JS-0099,
+      // JS-0246, JS-0047, JS-0241, JS-C1002, JS-R1005).
+      'dot-notation': 'off',
+      'object-shorthand': 'off',
+      'no-alert': 'off',
+      'init-declarations': 'off',
+      'no-warning-comments': 'off',
+      'prefer-template': 'off',
+      'default-case': 'off',
+      'prefer-arrow-callback': 'off',
+      'id-length': 'off',
+      'complexity': 'off'
     }
   },
 

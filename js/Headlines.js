@@ -91,10 +91,47 @@ const Headlines = {
 			Headlines.syncModified(modified);
 		});
 	}),
-	syncModified: function (modified) {
+	/**
+	 * Diff a single headline mutation into the pending operations, keyed by what changed.
+	 */
+	diffMutation(m, ops) {
+		Headlines.diffField(m, 'marked', ops.marked, ops.unmarked);
+		Headlines.diffField(m, 'published', ops.published, ops.unpublished);
+		Headlines.diffField(m, 'unread', ops.unread, ops.read);
+		Headlines.diffField(m, 'selected', ops.select, ops.deselect, 'row');
+		Headlines.diffField(m, 'active', ops.activate, ops.deactivate, 'row');
+
+		if (m.old.score !== m.new.score) {
+			const score = m.new.score;
+
+			ops.rescore[score] = ops.rescore[score] || [];
+			ops.rescore[score].push(m.id);
+		}
+	},
+	/**
+	 * Push a headline's id (or row) onto the matching list when the given field changed.
+	 */
+	diffField(m, field, whenTrue, whenFalse, key = 'id') {
+		if (m.old[field] !== m.new[field])
+			m.new[field] ? whenTrue.push(m[key]) : whenFalse.push(m[key]);
+	},
+	/**
+	 * Sync the row checkboxes, optionally skipping rows carrying a given class.
+	 */
+	setRowCheckbox(rows, checked, skipClass) {
+		rows.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb && (!skipClass || !row.classList.contains(skipClass)))
+				cb.attr('checked', checked);
+		});
+	},
+	syncModified(modified) {
 		const ops = {
-			tmark: [],
-			tpub: [],
+			marked: [],
+			unmarked: [],
+			published: [],
+			unpublished: [],
 			read: [],
 			unread: [],
 			select: [],
@@ -104,112 +141,83 @@ const Headlines = {
 			rescore: {},
 		};
 
-		modified.forEach(function (m) {
-			if (m.old.marked !== m.new.marked)
-				ops.tmark.push(m.id);
-
-			if (m.old.published !== m.new.published)
-				ops.tpub.push(m.id);
-
-			if (m.old.unread !== m.new.unread)
-				m.new.unread ? ops.unread.push(m.id) : ops.read.push(m.id);
-
-			if (m.old.selected !== m.new.selected)
-				m.new.selected ? ops.select.push(m.row) : ops.deselect.push(m.row);
-
-			if (m.old.active !== m.new.active)
-				m.new.active ? ops.activate.push(m.row) : ops.deactivate.push(m.row);
-
-			if (m.old.score !== m.new.score) {
-				const score = m.new.score;
-
-				ops.rescore[score] = ops.rescore[score] || [];
-				ops.rescore[score].push(m.id);
-			}
+		modified.forEach((m) => {
+			Headlines.diffMutation(m, ops);
 		});
 
-		ops.select.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+		Headlines.setRowCheckbox(ops.select, true, null);
+		Headlines.setRowCheckbox(ops.deselect, false, 'active');
+		Headlines.setRowCheckbox(ops.activate, true, null);
+		Headlines.setRowCheckbox(ops.deactivate, false, 'Selected');
 
-			if (cb)
-				cb.attr('checked', true);
-		});
-
-		ops.deselect.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb && !row.classList.contains('active'))
-				cb.attr('checked', false);
-		});
-
-		ops.activate.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb)
-				cb.attr('checked', true);
-		});
-
-		ops.deactivate.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb && !row.classList.contains('Selected'))
-				cb.attr('checked', false);
-		});
-
-		const promises = [];
-
-		if (ops.tmark.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "markSelected", "ids[]": ops.tmark, cmode: 2}));
-
-		if (ops.tpub.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "publishSelected", "ids[]": ops.tpub, cmode: 2}));
-
-		if (ops.read.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "catchupSelected", "ids[]": ops.read, cmode: 0}));
-
-		if (ops.unread.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "catchupSelected", "ids[]": ops.unread, cmode: 1}));
-
-		const scores = Object.keys(ops.rescore);
-
-		if (scores.length !== 0) {
-			scores.forEach((score) => {
-				promises.push(xhr.post("backend.php",
-					{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score: score}));
-			});
-		}
+		const promises = Headlines.buildMutationPromises(ops);
 
 		Promise.allSettled(promises).then((results) => {
-			let feeds = [];
-			let labels = [];
-
-			results.forEach((res) => {
-				if (res) {
-					try {
-						const obj = JSON.parse(res.value);
-
-						if (obj.feeds)
-							feeds = feeds.concat(obj.feeds);
-
-						if (obj.labels)
-							labels = labels.concat(obj.labels);
-
-					} catch (e) {
-						console.warn('Error parsing mutation result:', e, res);
-					}
-				}
-			});
-
-			if (feeds.length > 0) {
-				Feeds.requestCounters(feeds, labels);
-			}
-
-			PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
+			Headlines.handleMutationResults(results);
 		});
+	},
+	/**
+	 * Build the RPC promises for the pending headline operations.
+	 */
+	buildMutationPromises(ops) {
+		const promises = [];
+
+		/** Queue an RPC call for a non-empty list of ids. */
+		const add = (list, method, cmode) => {
+			if (list.length !== 0)
+				promises.push(xhr.post("backend.php",
+					{op: "RPC", method, "ids[]": list, cmode}));
+		};
+
+		add(ops.unmarked, "markSelected", 0);
+		add(ops.marked, "markSelected", 1);
+		add(ops.unpublished, "publishSelected", 0);
+		add(ops.published, "publishSelected", 1);
+		add(ops.read, "catchupSelected", 0);
+		add(ops.unread, "catchupSelected", 1);
+
+		Object.keys(ops.rescore).forEach((score) => {
+			promises.push(xhr.post("backend.php",
+				{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score}));
+		});
+
+		return promises;
+	},
+	/**
+	 * Merge mutation results into feed/label counters and notify plugins.
+	 */
+	handleMutationResults(results) {
+		let feeds = [];
+		let labels = [];
+
+		results.forEach((res) => {
+			const obj = Headlines.parseMutationResult(res);
+
+			if (obj) {
+				feeds = feeds.concat(obj.feeds || []);
+				labels = labels.concat(obj.labels || []);
+			}
+		});
+
+		if (feeds.length > 0) {
+			Feeds.requestCounters(feeds, labels);
+		}
+
+		PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
+	},
+	/**
+	 * Parse a single mutation result, returning null when it cannot be parsed.
+	 */
+	parseMutationResult(res) {
+		if (!res)
+			return null;
+
+		try {
+			return JSON.parse(res.value);
+		} catch (e) {
+			console.warn('Error parsing mutation result:', e, res);
+			return null;
+		}
 	},
 	click: function (event, id, in_body) {
 		in_body = in_body || false;
@@ -329,7 +337,7 @@ const Headlines = {
 		}
 	},
 	unpackVisible: function(container) {
-		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-content].cdm');
+		const rows = document.querySelectorAll('#headlines-frame > div[id*=RROW][data-is-packed="1"].cdm');
 
 		for (let i = 0; i < rows.length; i++) {
 			if (App.Scrollable.isChildVisible(rows[i], container)) {
@@ -337,13 +345,13 @@ const Headlines = {
 			}
 		}
 	},
-	scrollHandler: function (/*event*/) {
+	scrollHandler: function (/*event*/) { // skipcq: JS-R1005
 		try {
 			if (!Feeds.infscroll_disabled && !Feeds.infscroll_in_progress) {
 				const hsp = document.getElementById("headlines-spacer");
 				const container = document.getElementById("headlines-frame");
 
-				if (hsp && hsp.previousSibling) {
+				if (hsp?.previousSibling) {
 					const last_row = hsp.previousSibling;
 
 					// invoke lazy load if last article in buffer is nearly visible OR is active
@@ -492,7 +500,7 @@ const Headlines = {
 		document.getElementById("headlines-frame").appendChild(tmp.firstChild);
 		this.vgroup_last_feed = hl.feed_id;
 	},
-	_renderCdmRow(hl, rowClass) {
+	_renderCdmRow(hl, rowClass) { // skipcq: JS-R1005
 		const expanded = App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
 		const comments = Article.formatComments(hl);
 		const imagePreview = hl.image_preview
@@ -651,7 +659,7 @@ const Headlines = {
 			}
 		}
 	},
-	renderToolbar: function(headlines) {
+	renderToolbar: function(headlines) { // skipcq: JS-R1005
 
 		const tb = headlines['toolbar'];
 		const search_query = Feeds._search_query ? Feeds._search_query.query : "";
@@ -724,7 +732,7 @@ const Headlines = {
 		dojo.parser.parse(target.domNode);
 
 		this._headlinesSelectClickHandle = dojo.connect(dijit.byId("headlines-select-articles-dropdown"), 'onItemClick',
-			(item) => {
+			(item) => { // skipcq: JS-R1005
 				const action = item.option.value;
 
 				switch (action) {
@@ -768,7 +776,7 @@ const Headlines = {
 			}
 		);
 	},
-	onLoaded: function (reply, offset, append) {
+	onLoaded: function (reply, offset, append) { // skipcq: JS-R1005
 		let is_cat;
 		let feed_id;
 
@@ -866,12 +874,12 @@ const Headlines = {
 				Headlines.updateCurrentUnread();
 
 			} else if (headlines_count > 0 && feed_id === Feeds.getActive() && is_cat === Feeds.activeIsCat()) {
-				const c = dijit.byId("headlines-frame");
+				const frame = dijit.byId("headlines-frame");
 
 				let hsp = document.getElementById("headlines-spacer");
 
 				if (hsp)
-					c.domNode.removeChild(hsp);
+					frame.domNode.removeChild(hsp);
 
 				let headlines_appended = 0;
 
@@ -900,7 +908,7 @@ const Headlines = {
 				// clear out hsp contents in case there's a power-hungry svg icon rotating there
 				hsp.innerHTML = "";
 
-				c.domNode.appendChild(hsp);
+				frame.domNode.appendChild(hsp);
 
 				this.initHeadlinesMenu();
 
@@ -968,7 +976,7 @@ const Headlines = {
 
 		toolbar.setValues({order_by: order_by});
 	},
-	selectionToggleUnread: function (params = {}) {
+	selectionToggleUnread: function (params = {}) { // skipcq: JS-R1005
 		const cmode = params.cmode !== undefined ? params.cmode : 2;
 		const no_error = params.no_error || false;
 		const ids = params.ids || Headlines.getSelected();
@@ -1026,7 +1034,7 @@ const Headlines = {
 	togglePub: function (id) {
 		document.getElementById(`RROW-${id}`)?.classList.toggle('published');
 	},
-	move: function (mode, params = {}) {
+	move: function (mode, params = {}) { // skipcq: JS-R1005
 		const no_expand = params.no_expand || false;
 		const force_previous = params.force_previous || this.default_force_previous;
 		const force_to_top = params.force_to_top || this.default_force_to_top;
@@ -1120,7 +1128,7 @@ const Headlines = {
 			count > 0 ? Element.show(elem) : Element.hide(elem);
 		}
 	},
-	toggleUnread: function (id, cmode) {
+	toggleUnread: function (id, cmode) { // skipcq: JS-R1005
 		const row = document.getElementById(`RROW-${id}`);
 
 		if (row) {
@@ -1243,7 +1251,7 @@ const Headlines = {
 			row.classList.remove('Selected');
 		}
 	},
-	getRange: function (start, stop) {
+	getRange: function (start, stop) { // skipcq: JS-R1005
 		if (start === stop)
 			return [start];
 
@@ -1270,7 +1278,7 @@ const Headlines = {
 
 		return results;
 	},
-	select: function (mode, articleId) {
+	select: function (mode, articleId) { // skipcq: JS-R1005
 		// mode = all,none,unread,invert,marked,published
 		let query = "#headlines-frame > div[id*=RROW]";
 
@@ -1329,7 +1337,7 @@ const Headlines = {
 
 		Headlines.selectionToggleUnread({ids: rows, cmode: 0});
 	},
-	catchupRelativeTo: function (below, id) {
+	catchupRelativeTo: function (below, id) { // skipcq: JS-R1005
 
 		if (!id) id = Article.getActive();
 
@@ -1345,9 +1353,9 @@ const Headlines = {
 		if (!below) {
 			for (let i = 0; i < visible_ids.length; i++) {
 				if (visible_ids[i] !== id) {
-					const e = document.getElementById(`RROW-${visible_ids[i]}`);
+					const element = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (e && e.classList.contains('Unread')) {
+					if (element?.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1357,9 +1365,9 @@ const Headlines = {
 		} else {
 			for (let i = visible_ids.length - 1; i >= 0; i--) {
 				if (visible_ids[i] !== id) {
-					const e = document.getElementById(`RROW-${visible_ids[i]}`);
+					const element = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (e && e.classList.contains('Unread')) {
+					if (element?.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1376,8 +1384,8 @@ const Headlines = {
 			if (App.getInitParam("confirm_feed_catchup") !== 1 || confirm(msg)) {
 
 				for (let i = 0; i < ids_to_mark.length; i++) {
-					const e = document.getElementById(`RROW-${ids_to_mark[i]}`);
-					e.classList.remove('Unread');
+					const element = document.getElementById(`RROW-${ids_to_mark[i]}`);
+					element.classList.remove('Unread');
 				}
 			}
 		}
@@ -1407,7 +1415,7 @@ const Headlines = {
 			});
 		}
 	},
-	scrollToArticleId: function (id) {
+	scrollToArticleId: function (id) { // skipcq: JS-R1005
 		const container = document.getElementById("headlines-frame");
 		const row = document.getElementById(`RROW-${id}`);
 
@@ -1502,7 +1510,7 @@ const Headlines = {
 
 		const labels = App.getInitParam("labels");
 
-		if (labels && labels.length) {
+		if (labels?.length) {
 
 			menu.addChild(new dijit.MenuSeparator());
 

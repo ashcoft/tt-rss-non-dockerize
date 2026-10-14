@@ -183,8 +183,41 @@ final class UrlHelperTest extends TestCase {
     }
 
     // ------------------------------------------------------------------------
+    // canonicalizeIpv4Literal
+    // ------------------------------------------------------------------------
+
+    public function test_canonicalizeIpv4Literal_normalizes_octal_hex_decimal(): void {
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0177.0.0.1'));
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0x7f.0.0.1'));
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('127.0.0.1'));
+        $this->assertNull(UrlHelper::canonicalizeIpv4Literal('0xgg.0.0.1'));
+        $this->assertNull(UrlHelper::canonicalizeIpv4Literal('1.2.3.4.5'));
+    }
+
+    // ------------------------------------------------------------------------
     // has_disallowed_ip
     // ------------------------------------------------------------------------
+
+    public function test_has_disallowed_ip_rejects_canonicalized_loopback_and_mapped_ipv6(): void {
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://0177.0.0.1:8080/'));
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://0x7f.0.0.1:8080/'));
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:127.0.0.1]:8080/'));
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]:8080/'));
+        $this->assertFalse(UrlHelper::has_disallowed_ip('https://[::ffff:10.0.0.1]/'));
+    }
+
+    public function test_has_disallowed_ip_rejects_unresolvable_hostnames_when_resolution_required(): void {
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://does-not-resolve.invalid/', true));
+    }
+
+    public function test_has_disallowed_ip_rejects_trailing_dot_ipv4_literal(): void {
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254./'));
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://169.254.169.254.:443/'));
+    }
+
+    public function test_has_disallowed_ip_rejects_empty_hostname_after_trimming(): void {
+        $this->assertTrue(UrlHelper::has_disallowed_ip('https://./'));
+    }
 
     public function test_has_disallowed_ip_allows_unique_local_ipv6_on_standard_ports(): void {
         $this->assertFalse(UrlHelper::has_disallowed_ip('http://[fc00::1]/'));
@@ -449,7 +482,7 @@ final class UrlHelperTest extends TestCase {
         $mock->append(new Response(301, ['Location' => 'http://127.0.0.1']));
         $result = UrlHelper::fetch(['url' => 'https://example.com', 'followlocation' => true]);
         $this->assertFalse($result);
-        $this->assertMatchesRegularExpression('%301 Moved Permanently%', UrlHelper::$fetch_last_error);
+        $this->assertMatchesRegularExpression('%failed extended validation%', UrlHelper::$fetch_last_error);
         $this->assertEquals('http://127.0.0.1', UrlHelper::$fetch_effective_url);
         $mock->reset();
     }
