@@ -17,6 +17,11 @@ updates:
   groups:
     development-dependencies:
       dependency-type: development
+  ignore:
+    # typescript-eslint only supports TypeScript <6.1; hold TS at 6.x until
+    # it adds support for the TS 7 API.
+    - dependency-name: 'typescript'
+      versions: ['>=7.0.0']
 
 - package-ecosystem: docker
   directories:
