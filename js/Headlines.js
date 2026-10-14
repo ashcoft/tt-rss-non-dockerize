@@ -351,7 +351,7 @@ const Headlines = {
 				const hsp = document.getElementById("headlines-spacer");
 				const container = document.getElementById("headlines-frame");
 
-				if (hsp && hsp.previousSibling) {
+				if (hsp?.previousSibling) {
 					const last_row = hsp.previousSibling;
 
 					// invoke lazy load if last article in buffer is nearly visible OR is active
@@ -874,12 +874,12 @@ const Headlines = {
 				Headlines.updateCurrentUnread();
 
 			} else if (headlines_count > 0 && feed_id === Feeds.getActive() && is_cat === Feeds.activeIsCat()) {
-				const c = dijit.byId("headlines-frame");
+				const frame = dijit.byId("headlines-frame");
 
 				let hsp = document.getElementById("headlines-spacer");
 
 				if (hsp)
-					c.domNode.removeChild(hsp);
+					frame.domNode.removeChild(hsp);
 
 				let headlines_appended = 0;
 
@@ -1353,9 +1353,9 @@ const Headlines = {
 		if (!below) {
 			for (let i = 0; i < visible_ids.length; i++) {
 				if (visible_ids[i] !== id) {
-					const e = document.getElementById(`RROW-${visible_ids[i]}`);
+					const element = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (e && e.classList.contains('Unread')) {
+					if (element?.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1365,9 +1365,9 @@ const Headlines = {
 		} else {
 			for (let i = visible_ids.length - 1; i >= 0; i--) {
 				if (visible_ids[i] !== id) {
-					const e = document.getElementById(`RROW-${visible_ids[i]}`);
+					const element = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (e && e.classList.contains('Unread')) {
+					if (element?.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1384,8 +1384,8 @@ const Headlines = {
 			if (App.getInitParam("confirm_feed_catchup") !== 1 || confirm(msg)) {
 
 				for (let i = 0; i < ids_to_mark.length; i++) {
-					const e = document.getElementById(`RROW-${ids_to_mark[i]}`);
-					e.classList.remove('Unread');
+					const element = document.getElementById(`RROW-${ids_to_mark[i]}`);
+					element.classList.remove('Unread');
 				}
 			}
 		}
@@ -1510,7 +1510,7 @@ const Headlines = {
 
 		const labels = App.getInitParam("labels");
 
-		if (labels && labels.length) {
+		if (labels?.length) {
 
 			menu.addChild(new dijit.MenuSeparator());
 

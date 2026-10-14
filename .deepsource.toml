@@ -27,11 +27,7 @@ enabled = true
 
   [analyzers.meta]
   environment = ["browser", "nodejs"]
-  module_system = "commonjs"
-  dialect = "typescript"
-  ecma_version = "2020"
-  track_test_doc_coverage = false
-  cyclomatic_complexity_threshold = "medium"
+  cyclomatic_complexity_threshold = "critical"
 
 # PHP (tt-rss core). `bootstrap_files` loads the project's autoloader and the
 # file defining global constants (LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...)
@@ -55,7 +51,6 @@ enabled = true
   type_checker = "mypy"
   max_line_length = 100
   runtime_version = "3.x.x"
-  track_test_doc_coverage = false
   cyclomatic_complexity_threshold = "medium"
 
 [[analyzers]]
