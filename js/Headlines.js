@@ -91,7 +91,10 @@ const Headlines = {
 			Headlines.syncModified(modified);
 		});
 	}),
-	diffMutation: function (m, ops) {
+	/**
+	 * Diff a single headline mutation into the pending operations, keyed by what changed.
+	 */
+	diffMutation(m, ops) {
 		Headlines.diffField(m, 'marked', ops.marked, ops.unmarked);
 		Headlines.diffField(m, 'published', ops.published, ops.unpublished);
 		Headlines.diffField(m, 'unread', ops.unread, ops.read);
@@ -105,11 +108,17 @@ const Headlines = {
 			ops.rescore[score].push(m.id);
 		}
 	},
-	diffField: function (m, field, whenTrue, whenFalse, key = 'id') {
+	/**
+	 * Push a headline's id (or row) onto the matching list when the given field changed.
+	 */
+	diffField(m, field, whenTrue, whenFalse, key = 'id') {
 		if (m.old[field] !== m.new[field])
 			m.new[field] ? whenTrue.push(m[key]) : whenFalse.push(m[key]);
 	},
-	setRowCheckbox: function (rows, checked, skipClass) {
+	/**
+	 * Sync the row checkboxes, optionally skipping rows carrying a given class.
+	 */
+	setRowCheckbox(rows, checked, skipClass) {
 		rows.forEach((row) => {
 			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
 
@@ -117,7 +126,7 @@ const Headlines = {
 				cb.attr('checked', checked);
 		});
 	},
-	syncModified: function (modified) {
+	syncModified(modified) {
 		const ops = {
 			marked: [],
 			unmarked: [],
@@ -147,12 +156,17 @@ const Headlines = {
 			Headlines.handleMutationResults(results);
 		});
 	},
-	buildMutationPromises: function (ops) {
+	/**
+	 * Build the RPC promises for the pending headline operations.
+	 */
+	buildMutationPromises(ops) {
 		const promises = [];
+
+		/** Queue an RPC call for a non-empty list of ids. */
 		const add = (list, method, cmode) => {
 			if (list.length !== 0)
 				promises.push(xhr.post("backend.php",
-					{op: "RPC", method: method, "ids[]": list, cmode: cmode}));
+					{op: "RPC", method, "ids[]": list, cmode}));
 		};
 
 		add(ops.unmarked, "markSelected", 0);
@@ -164,12 +178,15 @@ const Headlines = {
 
 		Object.keys(ops.rescore).forEach((score) => {
 			promises.push(xhr.post("backend.php",
-				{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score: score}));
+				{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score}));
 		});
 
 		return promises;
 	},
-	handleMutationResults: function (results) {
+	/**
+	 * Merge mutation results into feed/label counters and notify plugins.
+	 */
+	handleMutationResults(results) {
 		let feeds = [];
 		let labels = [];
 
@@ -188,7 +205,10 @@ const Headlines = {
 
 		PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
 	},
-	parseMutationResult: function (res) {
+	/**
+	 * Parse a single mutation result, returning null when it cannot be parsed.
+	 */
+	parseMutationResult(res) {
 		if (!res)
 			return null;
 

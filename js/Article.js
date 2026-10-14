@@ -250,7 +250,7 @@ const Article = {
 
 		return comments;
 	},
-	unpack: function(row) {
+	unpack(row) {
 		if (row.getAttribute("data-is-packed") !== "1")
 			return;
 
@@ -276,7 +276,10 @@ const Article = {
 
 		PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
 	},
-	getPackedContent: function(row) {
+	/**
+	 * Return the cached content and enclosures HTML for a packed row.
+	 */
+	getPackedContent(row) {
 		const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
 		const packedEnclosures = (typeof row._packedEnclosuresHtml === "string" ? row._packedEnclosuresHtml : "");
 

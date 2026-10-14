@@ -240,11 +240,17 @@ class UrlHelper {
 		return long2ip($val);
 	}
 
+	/**
+	 * Check whether the host looks like a dotted IPv4 literal using octal, hex, or decimal parts.
+	 */
 	private static function isDottedIpv4Literal(string $host): bool {
 		// 1 to 4 dot-separated octal, hexadecimal, or decimal integers
 		return preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/iD', $host) === 1;
 	}
 
+	/**
+	 * Check that a single dotted IPv4 part fits the range allowed for its position.
+	 */
 	private static function isValidIpv4Octet(int $octet, int $index, int $parts_count): bool {
 		// the final (least significant) part allows a larger value as there are fewer octets
 		$max = ($index === $parts_count - 1) ? (1 << (8 * (5 - $parts_count))) - 1 : 255;
@@ -252,6 +258,9 @@ class UrlHelper {
 		return $octet >= 0 && $octet <= $max;
 	}
 
+	/**
+	 * Merge a dotted IPv4 part into the accumulated integer value.
+	 */
 	private static function mergeIpv4Octet(int $value, int $octet, int $index, int $parts_count): int {
 		if ($index === $parts_count - 1)
 			return ($value << (8 * (5 - $parts_count))) | $octet;
@@ -346,6 +355,9 @@ class UrlHelper {
 		return $ips;
 	}
 
+	/**
+	 * Check whether a single (canonicalized) IP address is disallowed for fetching.
+	 */
 	private static function isDisallowedIp(string $ip, bool $is_standard_port): bool {
 		// Canonicalize IPv6 and unwrap IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
 		$bin = inet_pton($ip);
@@ -374,6 +386,9 @@ class UrlHelper {
 		return false;
 	}
 
+	/**
+	 * Check whether a packed address falls in the IPv6 Unique Local Address range (fc00::/7).
+	 */
 	private static function isUniqueLocalIpv6(string|false $bin): bool {
 		return $bin !== false && strlen($bin) === 16 && (ord($bin[0]) & 0xfe) === 0xfc;
 	}
