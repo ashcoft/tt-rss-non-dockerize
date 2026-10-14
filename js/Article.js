@@ -251,31 +251,36 @@ const Article = {
 		return comments;
 	},
 	unpack: function(row) {
-		if (row.getAttribute("data-is-packed") === "1") {
-			// article content lives in the Headlines cache (a row attribute copy
-			// would retain a second, escaped copy of every loaded article)
-			const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
+		if (row.getAttribute("data-is-packed") !== "1")
+			return;
 
-			// the row outlived the headlines cache (feed transition)
-			if (!hl)
-				return;
+		// article content lives in the Headlines cache (a row attribute copy
+		// would retain a second, escaped copy of every loaded article)
+		const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
 
-			const container = row.querySelector(".content-inner");
+		// the row outlived the headlines cache (feed transition)
+		if (!hl)
+			return;
 
-			const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
-			const packedEnclosures = (typeof row._packedEnclosuresHtml === "string" ? row._packedEnclosuresHtml : "");
-			container.innerHTML = packedContent + packedEnclosures;
+		const container = row.querySelector(".content-inner");
 
-			dojo.parser.parse(container);
+		container.innerHTML = Article.getPackedContent(row);
 
-			// blank content element might screw up onclick selection and keyboard moving
-			if (container.textContent.length === 0)
-				container.innerHTML += "&nbsp;";
+		dojo.parser.parse(container);
 
-			row.setAttribute("data-is-packed", "0");
+		// blank content element might screw up onclick selection and keyboard moving
+		if (container.textContent.length === 0)
+			container.innerHTML += "&nbsp;";
 
-			PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
-		}
+		row.setAttribute("data-is-packed", "0");
+
+		PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
+	},
+	getPackedContent: function(row) {
+		const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
+		const packedEnclosures = (typeof row._packedEnclosuresHtml === "string" ? row._packedEnclosuresHtml : "");
+
+		return packedContent + packedEnclosures;
 	},
 	pack: function(row) {
 		if (row.getAttribute("data-is-packed") !== "1") {

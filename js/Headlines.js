@@ -91,6 +91,32 @@ const Headlines = {
 			Headlines.syncModified(modified);
 		});
 	}),
+	diffMutation: function (m, ops) {
+		Headlines.diffField(m, 'marked', ops.marked, ops.unmarked);
+		Headlines.diffField(m, 'published', ops.published, ops.unpublished);
+		Headlines.diffField(m, 'unread', ops.unread, ops.read);
+		Headlines.diffField(m, 'selected', ops.select, ops.deselect, 'row');
+		Headlines.diffField(m, 'active', ops.activate, ops.deactivate, 'row');
+
+		if (m.old.score !== m.new.score) {
+			const score = m.new.score;
+
+			ops.rescore[score] = ops.rescore[score] || [];
+			ops.rescore[score].push(m.id);
+		}
+	},
+	diffField: function (m, field, whenTrue, whenFalse, key = 'id') {
+		if (m.old[field] !== m.new[field])
+			m.new[field] ? whenTrue.push(m[key]) : whenFalse.push(m[key]);
+	},
+	setRowCheckbox: function (rows, checked, skipClass) {
+		rows.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb && (!skipClass || !row.classList.contains(skipClass)))
+				cb.attr('checked', checked);
+		});
+	},
 	syncModified: function (modified) {
 		const ops = {
 			marked: [],
@@ -106,119 +132,72 @@ const Headlines = {
 			rescore: {},
 		};
 
-		modified.forEach(function (m) {
-			if (m.old.marked !== m.new.marked)
-				m.new.marked ? ops.marked.push(m.id) : ops.unmarked.push(m.id);
-
-			if (m.old.published !== m.new.published)
-				m.new.published ? ops.published.push(m.id) : ops.unpublished.push(m.id);
-
-			if (m.old.unread !== m.new.unread)
-				m.new.unread ? ops.unread.push(m.id) : ops.read.push(m.id);
-
-			if (m.old.selected !== m.new.selected)
-				m.new.selected ? ops.select.push(m.row) : ops.deselect.push(m.row);
-
-			if (m.old.active !== m.new.active)
-				m.new.active ? ops.activate.push(m.row) : ops.deactivate.push(m.row);
-
-			if (m.old.score !== m.new.score) {
-				const score = m.new.score;
-
-				ops.rescore[score] = ops.rescore[score] || [];
-				ops.rescore[score].push(m.id);
-			}
+		modified.forEach((m) => {
+			Headlines.diffMutation(m, ops);
 		});
 
-		ops.select.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+		Headlines.setRowCheckbox(ops.select, true, null);
+		Headlines.setRowCheckbox(ops.deselect, false, 'active');
+		Headlines.setRowCheckbox(ops.activate, true, null);
+		Headlines.setRowCheckbox(ops.deactivate, false, 'Selected');
 
-			if (cb)
-				cb.attr('checked', true);
-		});
-
-		ops.deselect.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb && !row.classList.contains('active'))
-				cb.attr('checked', false);
-		});
-
-		ops.activate.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb)
-				cb.attr('checked', true);
-		});
-
-		ops.deactivate.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb && !row.classList.contains('Selected'))
-				cb.attr('checked', false);
-		});
-
-		const promises = [];
-		if (ops.unmarked.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "markSelected", "ids[]": ops.unmarked, cmode: 0}));
-
-		if (ops.marked.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "markSelected", "ids[]": ops.marked, cmode: 1}));
-
-		if (ops.unpublished.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "publishSelected", "ids[]": ops.unpublished, cmode: 0}));
-
-		if (ops.published.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "publishSelected", "ids[]": ops.published, cmode: 1}));
-
-		if (ops.read.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "catchupSelected", "ids[]": ops.read, cmode: 0}));
-
-		if (ops.unread.length !== 0)
-			promises.push(xhr.post("backend.php",
-				{op: "RPC", method: "catchupSelected", "ids[]": ops.unread, cmode: 1}));
-
-		const scores = Object.keys(ops.rescore);
-
-		if (scores.length !== 0) {
-			scores.forEach((score) => {
-				promises.push(xhr.post("backend.php",
-					{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score: score}));
-			});
-		}
+		const promises = Headlines.buildMutationPromises(ops);
 
 		Promise.allSettled(promises).then((results) => {
-			let feeds = [];
-			let labels = [];
-
-			results.forEach((res) => {
-				if (res) {
-					try {
-						const obj = JSON.parse(res.value);
-
-						if (obj.feeds)
-							feeds = feeds.concat(obj.feeds);
-
-						if (obj.labels)
-							labels = labels.concat(obj.labels);
-
-					} catch (e) {
-						console.warn('Error parsing mutation result:', e, res);
-					}
-				}
-			});
-
-			if (feeds.length > 0) {
-				Feeds.requestCounters(feeds, labels);
-			}
-
-			PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
+			Headlines.handleMutationResults(results);
 		});
+	},
+	buildMutationPromises: function (ops) {
+		const promises = [];
+		const add = (list, method, cmode) => {
+			if (list.length !== 0)
+				promises.push(xhr.post("backend.php",
+					{op: "RPC", method: method, "ids[]": list, cmode: cmode}));
+		};
+
+		add(ops.unmarked, "markSelected", 0);
+		add(ops.marked, "markSelected", 1);
+		add(ops.unpublished, "publishSelected", 0);
+		add(ops.published, "publishSelected", 1);
+		add(ops.read, "catchupSelected", 0);
+		add(ops.unread, "catchupSelected", 1);
+
+		Object.keys(ops.rescore).forEach((score) => {
+			promises.push(xhr.post("backend.php",
+				{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score: score}));
+		});
+
+		return promises;
+	},
+	handleMutationResults: function (results) {
+		let feeds = [];
+		let labels = [];
+
+		results.forEach((res) => {
+			const obj = Headlines.parseMutationResult(res);
+
+			if (obj) {
+				feeds = feeds.concat(obj.feeds || []);
+				labels = labels.concat(obj.labels || []);
+			}
+		});
+
+		if (feeds.length > 0) {
+			Feeds.requestCounters(feeds, labels);
+		}
+
+		PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
+	},
+	parseMutationResult: function (res) {
+		if (!res)
+			return null;
+
+		try {
+			return JSON.parse(res.value);
+		} catch (e) {
+			console.warn('Error parsing mutation result:', e, res);
+			return null;
+		}
 	},
 	click: function (event, id, in_body) {
 		in_body = in_body || false;

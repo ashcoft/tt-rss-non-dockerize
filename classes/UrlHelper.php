@@ -24,14 +24,14 @@ class UrlHelper {
 	static string $fetch_effective_ip_addr;
 
 	public static ?GuzzleHttp\ClientInterface $client = null;
-	private static ?bool $using_curl = null;
+	private static ?bool $usingCurl = null;
 
 	/**
 	 * Basic check for whether Guzzle will use a curl handler (indicating we can add curl options as needed).
 	 * This doesn't fully mirror Guzzle's logic, but should hopefully be close enough.
 	 */
-	private static function using_curl(): bool {
-		return self::$using_curl ??= function_exists('curl_exec') || function_exists('curl_multi_exec');
+	private static function usingCurl(): bool {
+		return self::$usingCurl ??= function_exists('curl_exec') || function_exists('curl_multi_exec');
 	}
 
 	private static function get_client(): GuzzleHttp\ClientInterface {
@@ -220,9 +220,8 @@ class UrlHelper {
 	 * @param string $host hostname or IPv4 literal to normalize
 	 * @return ?string canonical dotted-quad IPv4 string, or null if the input is not a valid dotted IPv4 literal
 	 */
-	public static function canonicalize_ipv4_literal(string $host): ?string {
-		// Match 1 to 4 dot-separated octal, hex, or decimal integers
-		if (!preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/i', $host))
+	public static function canonicalizeIpv4Literal(string $host): ?string {
+		if (self::isDottedIpv4Literal($host) === false)
 			return null;
 
 		$parts = explode('.', $host);
@@ -232,15 +231,32 @@ class UrlHelper {
 		foreach ($parts as $i => $part) {
 			$octet = intval($part, 0);
 
-			if ($octet < 0 || $octet > ($i === $parts_count - 1 ? (1 << (8 * (5 - $parts_count))) - 1 : 255))
+			if (self::isValidIpv4Octet($octet, $i, $parts_count) === false)
 				return null;
 
-			$val = ($i === $parts_count - 1)
-				? ($val << (8 * (5 - $parts_count))) | $octet
-				: ($val << 8) | $octet;
+			$val = self::mergeIpv4Octet($val, $octet, $i, $parts_count);
 		}
 
 		return long2ip($val);
+	}
+
+	private static function isDottedIpv4Literal(string $host): bool {
+		// 1 to 4 dot-separated octal, hexadecimal, or decimal integers
+		return preg_match('/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/iD', $host) === 1;
+	}
+
+	private static function isValidIpv4Octet(int $octet, int $index, int $parts_count): bool {
+		// the final (least significant) part allows a larger value as there are fewer octets
+		$max = ($index === $parts_count - 1) ? (1 << (8 * (5 - $parts_count))) - 1 : 255;
+
+		return $octet >= 0 && $octet <= $max;
+	}
+
+	private static function mergeIpv4Octet(int $value, int $octet, int $index, int $parts_count): int {
+		if ($index === $parts_count - 1)
+			return ($value << (8 * (5 - $parts_count))) | $octet;
+
+		return ($value << 8) | $octet;
 	}
 
 	/**
@@ -270,60 +286,96 @@ class UrlHelper {
 		if ($host === '' || $host === 'localhost')
 			return true;
 
-		// Collect IPs to evaluate-- literal IPs (canonicalizing octal/hex/IPv6) or those from DNS resolution
-		$ips = [];
-
-		if (filter_var($host, FILTER_VALIDATE_IP)) {
-			$ips[] = $host;
-		} elseif (($canon_ipv4 = self::canonicalize_ipv4_literal($host)) !== null) {
-			$ips[] = $canon_ipv4;
-		} elseif ($validate_resolved_ip) {
-			$records = dns_get_record($host, DNS_A | DNS_AAAA);
-
-			if (is_array($records)) {
-				foreach ($records as $r) {
-					if (isset($r['ip']))
-						$ips[] = $r['ip'];
-
-					if (isset($r['ipv6']))
-						$ips[] = $r['ipv6'];
-				}
-			}
-
-			// Also include OS resolver results (e.g. '/etc/hosts', local container hostnames)
-			$sys_ips = gethostbynamel($host);
-			if ($sys_ips !== false)
-				$ips = array_unique([...$ips, ...$sys_ips]);
-		}
+		$ips = self::collectHostIps($host, $validate_resolved_ip);
 
 		// Fail if we need to validate IPs but couldn't determine any.
-		if (empty($ips))
+		if (count($ips) === 0)
 			return $validate_resolved_ip;
 
 		foreach ($ips as $ip) {
-			// Canonicalize IPv6 and unwrap IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
-			if (($bin = inet_pton($ip)) !== false) {
-				$ip = inet_ntop($bin);
-				if (str_starts_with($ip, '::ffff:') && str_contains($ip, '.')) {
-					$ip = substr($ip, 7);
-					$bin = inet_pton($ip);
-				}
-			}
-
-			// Reject loopback, link-local, and reserved ranges (127.0.0.0/8, 169.254.0.0/16, ::1, fe80::/10)
-			if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE))
-				return true;
-
-			// Explicit check for IPv6 Unique Local Addresses (fc00::/7)
-			if (!$is_standard_port && $bin !== false && strlen($bin) === 16 && (ord($bin[0]) & 0xfe) === 0xfc)
-				return true;
-
-			// Reject RFC1918 / private ranges on non-standard ports
-			if (!$is_standard_port && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE))
+			if (self::isDisallowedIp($ip, $is_standard_port) === true)
 				return true;
 		}
 
 		return false;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private static function collectHostIps(string $host, bool $validate_resolved_ip): array {
+		// literal IPv4/IPv6 (as-is) or a dotted IPv4 literal in octal/hex/decimal form
+		if (filter_var($host, FILTER_VALIDATE_IP) !== false)
+			return [ $host ];
+
+		$canon_ipv4 = self::canonicalizeIpv4Literal($host);
+
+		if ($canon_ipv4 !== null)
+			return [ $canon_ipv4 ];
+
+		if ($validate_resolved_ip === false)
+			return [];
+
+		return self::resolveHostIps($host);
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private static function resolveHostIps(string $host): array {
+		$ips = [];
+
+		$records = dns_get_record($host, DNS_A | DNS_AAAA);
+
+		if (is_array($records) === true) {
+			foreach ($records as $r) {
+				if (isset($r['ip']) === true)
+					$ips[] = $r['ip'];
+
+				if (isset($r['ipv6']) === true)
+					$ips[] = $r['ipv6'];
+			}
+		}
+
+		// Also include OS resolver results (e.g. '/etc/hosts', local container hostnames)
+		$sys_ips = gethostbynamel($host);
+
+		if ($sys_ips !== false)
+			return array_unique([ ...$ips, ...$sys_ips ]);
+
+		return $ips;
+	}
+
+	private static function isDisallowedIp(string $ip, bool $is_standard_port): bool {
+		// Canonicalize IPv6 and unwrap IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
+		$bin = inet_pton($ip);
+
+		if ($bin !== false) {
+			$ip = inet_ntop($bin);
+
+			if (str_starts_with($ip, '::ffff:') === true && str_contains($ip, '.') === true) {
+				$ip = substr($ip, 7);
+				$bin = inet_pton($ip);
+			}
+		}
+
+		// Reject loopback, link-local, and reserved ranges (127.0.0.0/8, 169.254.0.0/16, ::1, fe80::/10)
+		if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) === false)
+			return true;
+
+		// Explicit check for IPv6 Unique Local Addresses (fc00::/7) on non-standard ports
+		if ($is_standard_port === false && self::isUniqueLocalIpv6($bin) === true)
+			return true;
+
+		// Reject RFC1918 / private ranges on non-standard ports
+		if ($is_standard_port === false && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) === false)
+			return true;
+
+		return false;
+	}
+
+	private static function isUniqueLocalIpv6(string|false $bin): bool {
+		return $bin !== false && strlen($bin) === 16 && (ord($bin[0]) & 0xfe) === 0xfc;
 	}
 
 	static function resolve_redirects(string $url, int $timeout): false|string {
@@ -464,7 +516,7 @@ class UrlHelper {
 
 		if ($encoding)
 			$req_options[GuzzleHttp\RequestOptions::HEADERS]['Accept-Encoding'] = $encoding;
-		elseif (self::using_curl())
+		elseif (self::usingCurl())
 			$req_options['curl'][\CURLOPT_ENCODING] = '';
 
 		if  ($http_referrer)
@@ -473,7 +525,7 @@ class UrlHelper {
 		if (in_array($auth_type, ['basic', 'digest']) && $login && $pass) {
 			// Let Guzzle handle the details for auth types it supports
 			$req_options[GuzzleHttp\RequestOptions::AUTH] = [$login, $pass, $auth_type];
-		} elseif ($auth_type === 'any' && self::using_curl()) {
+		} elseif ($auth_type === 'any' && self::usingCurl()) {
 			$req_options['curl'][\CURLOPT_HTTPAUTH] = \CURLAUTH_ANY;
 			if ($login && $pass)
 				$req_options['curl'][\CURLOPT_USERPWD] = "$login:$pass";

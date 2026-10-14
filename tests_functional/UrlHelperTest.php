@@ -183,15 +183,15 @@ final class UrlHelperTest extends TestCase {
     }
 
     // ------------------------------------------------------------------------
-    // canonicalize_ipv4_literal
+    // canonicalizeIpv4Literal
     // ------------------------------------------------------------------------
 
-    public function test_canonicalize_ipv4_literal_normalizes_octal_hex_decimal(): void {
-        $this->assertSame('127.0.0.1', UrlHelper::canonicalize_ipv4_literal('0177.0.0.1'));
-        $this->assertSame('127.0.0.1', UrlHelper::canonicalize_ipv4_literal('0x7f.0.0.1'));
-        $this->assertSame('127.0.0.1', UrlHelper::canonicalize_ipv4_literal('127.0.0.1'));
-        $this->assertNull(UrlHelper::canonicalize_ipv4_literal('0xgg.0.0.1'));
-        $this->assertNull(UrlHelper::canonicalize_ipv4_literal('1.2.3.4.5'));
+    public function test_canonicalizeIpv4Literal_normalizes_octal_hex_decimal(): void {
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0177.0.0.1'));
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('0x7f.0.0.1'));
+        $this->assertSame('127.0.0.1', UrlHelper::canonicalizeIpv4Literal('127.0.0.1'));
+        $this->assertNull(UrlHelper::canonicalizeIpv4Literal('0xgg.0.0.1'));
+        $this->assertNull(UrlHelper::canonicalizeIpv4Literal('1.2.3.4.5'));
     }
 
     // ------------------------------------------------------------------------

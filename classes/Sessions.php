@@ -135,7 +135,7 @@ class Sessions implements \SessionHandlerInterface {
 					return false;
 				}
 
-				if ($user->access_level != $_SESSION['access_level']) {
+				if ((int)$user->access_level !== (int)$_SESSION['access_level']) {
 					$_SESSION['login_error_msg'] = __('Session failed to validate (access level changed)');
 					return false;
 				}
