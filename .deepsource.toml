@@ -1,0 +1,79 @@
+version = 1
+
+test_patterns = [
+  "**/tests/**/*.php",
+  "**/tests_functional/**/*.php",
+  "**/tests_integration/**/*.php",
+  "**/tests/integration/selenium_test.py"
+]
+
+exclude_patterns = [
+  "**/node_modules/**",
+  "**/vendor/**",
+  "**/__pycache__/**",
+  "**/.pytest_cache/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/dist/**",
+  "**/build/**"
+]
+
+# JavaScript / Vue (fork's Vite toolchain). Style/legacy rules that clash with
+# the inherited upstream tt-rss sources are explicitly disabled in
+# eslint.config.js, which DeepSource respects.
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+  [analyzers.meta]
+  environment = ["browser", "nodejs"]
+  module_system = "commonjs"
+  dialect = "typescript"
+  ecma_version = "2020"
+  track_test_doc_coverage = false
+  cyclomatic_complexity_threshold = "medium"
+
+# PHP (tt-rss core). `bootstrap_files` loads the project's autoloader and the
+# file defining global constants (LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...)
+# so the analyzer can resolve the classes/constants declared across classes/.
+# Without it, DeepSource reports thousands of false positives such as
+# "PluginHost::run_hooks() is called but not defined" and
+# "Access to undefined constant Config::SINGLE_USER_MODE".
+[[analyzers]]
+name = "php"
+enabled = true
+
+  [analyzers.meta]
+  bootstrap_files = ["include/autoload.php", "include/functions.php"]
+  cyclomatic_complexity_threshold = "medium"
+
+[[analyzers]]
+name = "python"
+enabled = true
+
+  [analyzers.meta]
+  type_checker = "mypy"
+  max_line_length = 100
+  runtime_version = "3.x.x"
+  track_test_doc_coverage = false
+  cyclomatic_complexity_threshold = "medium"
+
+[[analyzers]]
+name = "shell"
+enabled = true
+
+  [analyzers.meta]
+  dialect = "sh"
+
+[[analyzers]]
+name = "sql"
+enabled = true
+
+  [analyzers.meta]
+  comma_style = "trailing"
+  indent_unit = "space"
+  allow_scalar = true
+  tab_space_size = 4
+  max_line_length = 80
+  capitalisation_policy = "consistent"
+  single_table_references = "consistent"
