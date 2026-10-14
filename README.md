@@ -68,3 +68,5 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Copyright (c) 2005 Andrew Dolgov (unless explicitly stated otherwise).
+
+<!-- deepsource config stacked test -->
