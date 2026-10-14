@@ -2268,8 +2268,8 @@ class Feeds extends Handler_Protected {
 					 * yesterday, last monday, 2 days ago, etc. See "Relative Formats" of
 					 *   https://www.php.net/manual/en/datetime.formats.php
 					 */
+					$query_date = trim(substr($k, 1));
 					try {
-						$query_date = trim(substr($k, 1));
 						// If $query_date is invalid, an exception is launched.
 						$dt = new DateTime($query_date, $tz);
 						// Obtain the first and last UTC seconds of the queried date.
