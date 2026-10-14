@@ -908,7 +908,7 @@ const Headlines = {
 				// clear out hsp contents in case there's a power-hungry svg icon rotating there
 				hsp.innerHTML = "";
 
-				c.domNode.appendChild(hsp);
+				frame.domNode.appendChild(hsp);
 
 				this.initHeadlinesMenu();
 

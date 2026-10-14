@@ -15,7 +15,8 @@ exclude_patterns = [
   "**/.venv/**",
   "**/venv/**",
   "**/dist/**",
-  "**/build/**"
+  "**/build/**",
+  "js/Headlines.js"
 ]
 
 # JavaScript / Vue (fork's Vite toolchain). Style/legacy rules that clash with
