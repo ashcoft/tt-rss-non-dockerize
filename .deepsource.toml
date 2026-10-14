@@ -15,8 +15,7 @@ exclude_patterns = [
   "**/.venv/**",
   "**/venv/**",
   "**/dist/**",
-  "**/build/**",
-  "js/Headlines.js"
+  "**/build/**"
 ]
 
 # JavaScript / Vue (fork's Vite toolchain). Style/legacy rules that clash with
@@ -28,7 +27,7 @@ enabled = true
 
   [analyzers.meta]
   environment = ["browser", "nodejs"]
-  cyclomatic_complexity_threshold = "critical"
+  cyclomatic_complexity_threshold = "medium"
 
 # PHP (tt-rss core). `bootstrap_files` loads the project's autoloader and the
 # file defining global constants (LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...)

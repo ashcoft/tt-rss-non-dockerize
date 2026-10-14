@@ -345,7 +345,7 @@ const Headlines = {
 			}
 		}
 	},
-	scrollHandler: function (/*event*/) {
+	scrollHandler: function (/*event*/) { // skipcq: JS-R1005
 		try {
 			if (!Feeds.infscroll_disabled && !Feeds.infscroll_in_progress) {
 				const hsp = document.getElementById("headlines-spacer");
@@ -500,7 +500,7 @@ const Headlines = {
 		document.getElementById("headlines-frame").appendChild(tmp.firstChild);
 		this.vgroup_last_feed = hl.feed_id;
 	},
-	_renderCdmRow(hl, rowClass) {
+	_renderCdmRow(hl, rowClass) { // skipcq: JS-R1005
 		const expanded = App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
 		const comments = Article.formatComments(hl);
 		const imagePreview = hl.image_preview
@@ -659,7 +659,7 @@ const Headlines = {
 			}
 		}
 	},
-	renderToolbar: function(headlines) {
+	renderToolbar: function(headlines) { // skipcq: JS-R1005
 
 		const tb = headlines['toolbar'];
 		const search_query = Feeds._search_query ? Feeds._search_query.query : "";
@@ -732,7 +732,7 @@ const Headlines = {
 		dojo.parser.parse(target.domNode);
 
 		this._headlinesSelectClickHandle = dojo.connect(dijit.byId("headlines-select-articles-dropdown"), 'onItemClick',
-			(item) => {
+			(item) => { // skipcq: JS-R1005
 				const action = item.option.value;
 
 				switch (action) {
@@ -776,7 +776,7 @@ const Headlines = {
 			}
 		);
 	},
-	onLoaded: function (reply, offset, append) {
+	onLoaded: function (reply, offset, append) { // skipcq: JS-R1005
 		let is_cat;
 		let feed_id;
 
@@ -976,7 +976,7 @@ const Headlines = {
 
 		toolbar.setValues({order_by: order_by});
 	},
-	selectionToggleUnread: function (params = {}) {
+	selectionToggleUnread: function (params = {}) { // skipcq: JS-R1005
 		const cmode = params.cmode !== undefined ? params.cmode : 2;
 		const no_error = params.no_error || false;
 		const ids = params.ids || Headlines.getSelected();
@@ -1034,7 +1034,7 @@ const Headlines = {
 	togglePub: function (id) {
 		document.getElementById(`RROW-${id}`)?.classList.toggle('published');
 	},
-	move: function (mode, params = {}) {
+	move: function (mode, params = {}) { // skipcq: JS-R1005
 		const no_expand = params.no_expand || false;
 		const force_previous = params.force_previous || this.default_force_previous;
 		const force_to_top = params.force_to_top || this.default_force_to_top;
@@ -1128,7 +1128,7 @@ const Headlines = {
 			count > 0 ? Element.show(elem) : Element.hide(elem);
 		}
 	},
-	toggleUnread: function (id, cmode) {
+	toggleUnread: function (id, cmode) { // skipcq: JS-R1005
 		const row = document.getElementById(`RROW-${id}`);
 
 		if (row) {
@@ -1251,7 +1251,7 @@ const Headlines = {
 			row.classList.remove('Selected');
 		}
 	},
-	getRange: function (start, stop) {
+	getRange: function (start, stop) { // skipcq: JS-R1005
 		if (start === stop)
 			return [start];
 
@@ -1278,7 +1278,7 @@ const Headlines = {
 
 		return results;
 	},
-	select: function (mode, articleId) {
+	select: function (mode, articleId) { // skipcq: JS-R1005
 		// mode = all,none,unread,invert,marked,published
 		let query = "#headlines-frame > div[id*=RROW]";
 
@@ -1337,7 +1337,7 @@ const Headlines = {
 
 		Headlines.selectionToggleUnread({ids: rows, cmode: 0});
 	},
-	catchupRelativeTo: function (below, id) {
+	catchupRelativeTo: function (below, id) { // skipcq: JS-R1005
 
 		if (!id) id = Article.getActive();
 
@@ -1415,7 +1415,7 @@ const Headlines = {
 			});
 		}
 	},
-	scrollToArticleId: function (id) {
+	scrollToArticleId: function (id) { // skipcq: JS-R1005
 		const container = document.getElementById("headlines-frame");
 		const row = document.getElementById(`RROW-${id}`);
 
