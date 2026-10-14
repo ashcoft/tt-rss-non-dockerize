@@ -51,8 +51,10 @@ export default defineConfig({
       // Entry point for the application
       input: path.resolve(__dirname, 'src/vue/index.html'),
       
-      // Keep the existing directory structure for compatibility
-      preserveEntrySignatures: 'allow-empty',
+      // Keep the existing directory structure for compatibility.
+      // Entries without exports are allowed; rolldown (Vite 8) only accepts
+      // 'exports-only' | 'strict' | 'allow-extension' | false.
+      preserveEntrySignatures: false,
       
       // External dependencies that should not be bundled
       external: [],
