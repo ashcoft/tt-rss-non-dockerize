@@ -40,7 +40,8 @@
     [
       "@semantic-release/github",
       {
-        "addChannels": true
+        "addChannels": true,
+        "successCommentCondition": false
       }
     ]
   ]
