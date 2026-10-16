@@ -22,6 +22,12 @@ updates:
     # it adds support for the TS 7 API.
     - dependency-name: 'typescript'
       versions: ['>=7.0.0']
+    # The conventionalcommits v10 preset requires conventional-changelog-writer@9+,
+    # but @semantic-release/release-notes-generator@14 pins writer@8, so rendering
+    # the preset aborts the Release workflow at generateNotes. Hold at 9.x until
+    # the stable semantic-release plugins move to writer@9.
+    - dependency-name: 'conventional-changelog-conventionalcommits'
+      versions: ['>=10.0.0']
 
 - package-ecosystem: docker
   directories:
