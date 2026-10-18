@@ -295,6 +295,12 @@ const App = {
 	get_seq: function() {
 		return this._rpc_seq;
 	},
+	set_seq: function(seq) {
+		// adopt server sequence numbers monotonically so out-of-order
+		// responses can be detected as stale instead of breaking sync
+		if (seq > this._rpc_seq)
+			this._rpc_seq = seq;
+	},
 	setLoadingProgress: function(p) {
 		this._loading_progress += p;
 
@@ -509,9 +515,18 @@ const App = {
             return false;
          }
 
-         if (seq && this.get_seq() !== seq) {
-            console.warn("handleRpcJson: sequence mismatch: ", seq, '!=', this.get_seq());
-            return false;
+         // replies carrying a seq we've already moved past are stale
+         // (e.g. overlapping getAllCounters requests answered out of
+         // order): drop them quietly instead of failing the promise
+         if (seq) {
+            if (seq < this.get_seq()) {
+               console.info("handleRpcJson: dropping stale reply, seq:", seq, "<", this.get_seq());
+               return true;
+            }
+
+            // reply is current or ahead: adopt it so client and server
+            // sequence numbers stay in sync
+            this.set_seq(seq);
          }
 
          // not in preferences
