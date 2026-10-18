@@ -1,7 +1,7 @@
 <?php
 class API extends Handler {
 
-	const API_LEVEL  = 23;
+	const API_LEVEL  = 25;
 
 	const STATUS_OK  = 0;
 	const STATUS_ERR = 1;
@@ -864,14 +864,22 @@ class API extends Handler {
 		$category_id = (int) clean($_REQUEST["category_id"]);
 		$login = clean($_REQUEST["login"] ?? "");
 		$password = clean($_REQUEST["password"] ?? "");
+		$update_interval = filter_var($_REQUEST["update_interval"] ?? 0, FILTER_VALIDATE_INT);
+
+		if (!in_array($update_interval, array_keys(Feeds::_get_update_intervals())))
+			return $this->_wrap(self::STATUS_ERR, ["error" => self::E_INCORRECT_USAGE]);
 
 		if ($feed_url) {
-			$rc = Feeds::_subscribe($feed_url, $category_id, $login, $password);
+			$rc = Feeds::_subscribe($feed_url, $category_id, $login, $password, $update_interval);
 
 			return $this->_wrap(self::STATUS_OK, ["status" => $rc]);
 		} else {
 			return $this->_wrap(self::STATUS_ERR, ["error" => self::E_INCORRECT_USAGE]);
 		}
+	}
+
+	function getFeedUpdateIntervals(): bool {
+		return $this->_wrap(self::STATUS_OK, ['update_intervals' => Feeds::_get_update_intervals()]);
 	}
 
 	function getFeedTree(): bool {
