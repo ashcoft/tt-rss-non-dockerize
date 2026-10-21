@@ -29,18 +29,25 @@ enabled = true
   environment = ["browser", "nodejs"]
   cyclomatic_complexity_threshold = "medium"
 
-# PHP (tt-rss core). `bootstrap_files` loads the project's autoloader and the
-# file defining global constants (LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...)
-# so the analyzer can resolve the classes/constants declared across classes/.
-# Without it, DeepSource reports thousands of false positives such as
+# PHP (tt-rss core). `bootstrap_files` loads the project's autoloader so the
+# analyzer can resolve the classes/constants declared across classes/. Without
+# it, DeepSource reports thousands of false positives such as
 # "PluginHost::run_hooks() is called but not defined" and
 # "Access to undefined constant Config::SINGLE_USER_MODE".
+#
+# include/autoload.php is sufficient: it loads vendor/autoload.php, whose
+# files-autoload already pulls in include/functions.php (the file defining
+# LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...). Listing functions.php as well
+# makes the analyzer load it twice, which is a fatal
+# "Cannot redeclare get_pref()" that aborts the bootstrap and leaves every
+# class and constant unresolved - producing exactly the false positives this
+# stanza exists to prevent.
 [[analyzers]]
 name = "php"
 enabled = true
 
   [analyzers.meta]
-  bootstrap_files = ["include/autoload.php", "include/functions.php"]
+  bootstrap_files = ["include/autoload.php"]
   cyclomatic_complexity_threshold = "medium"
 
 [[analyzers]]

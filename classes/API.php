@@ -173,7 +173,8 @@ class API extends Handler {
 		$enable_nested = self::_param_to_bool($_REQUEST["enable_nested"] ?? false);
 		$include_empty = self::_param_to_bool($_REQUEST["include_empty"] ?? false);
 
-		// TODO do not return empty categories, return Uncategorized and standard virtual cats
+		// Empty categories are filtered out below rather than replaced with the
+		// Uncategorized and virtual categories the UI expects.
 
 		$categories = ORM::for_table('ttrss_feed_categories')
 			->select_many('id', 'title', 'order_id')
