@@ -1,18 +1,24 @@
 <?php
+/**
+ * JSON API handler.
+ *
+ * Dispatches the operations listed in API_LEVEL; the status and error
+ * constants below are part of the wire format returned to clients.
+ */
 class API extends Handler {
 
-	const API_LEVEL  = 25;
+	public const API_LEVEL  = 25;
 
-	const STATUS_OK  = 0;
-	const STATUS_ERR = 1;
+	public const STATUS_OK  = 0;
+	public const STATUS_ERR = 1;
 
-	const E_API_DISABLED = "API_DISABLED";
-	const E_NOT_LOGGED_IN = "NOT_LOGGED_IN";
-	const E_LOGIN_ERROR = "LOGIN_ERROR";
-	const E_INCORRECT_USAGE = "INCORRECT_USAGE";
-	const E_UNKNOWN_METHOD = "UNKNOWN_METHOD";
-	const E_OPERATION_FAILED = "E_OPERATION_FAILED";
-	const E_NOT_FOUND = "E_NOT_FOUND";
+	public const E_API_DISABLED = "API_DISABLED";
+	public const E_NOT_LOGGED_IN = "NOT_LOGGED_IN";
+	public const E_LOGIN_ERROR = "LOGIN_ERROR";
+	public const E_INCORRECT_USAGE = "INCORRECT_USAGE";
+	public const E_UNKNOWN_METHOD = "UNKNOWN_METHOD";
+	public const E_OPERATION_FAILED = "E_OPERATION_FAILED";
+	public const E_NOT_FOUND = "E_NOT_FOUND";
 
 	private ?int $seq = null;
 
