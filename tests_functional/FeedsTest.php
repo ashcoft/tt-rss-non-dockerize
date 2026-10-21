@@ -64,4 +64,47 @@ final class FeedsTest extends TestCase {
             Feeds::_get_title("some-string-id", $_SESSION['uid'])
         );
     }
+
+    /**
+     * A malformed interval must be rejected, not silently read as the
+     * default interval (key 0). filter_var() returns false for these, which a
+     * loose in_array() would match against 0.
+     */
+    public function test_validate_update_interval_rejects_malformed(): void {
+        foreach (['abc', '60.5', '', '0x1E', '60abc', []] as $malformed) {
+            $this->assertFalse(
+                Feeds::validateUpdateInterval($malformed),
+                "malformed interval " . var_export($malformed, true) . " must be rejected"
+            );
+        }
+    }
+
+    /** Surrounding whitespace is tolerated, as filter_var() strips it. */
+    public function test_validate_update_interval_tolerates_whitespace(): void {
+        $this->assertSame(60, Feeds::validateUpdateInterval(' 60 '));
+    }
+
+    /** A well-formed but disallowed interval is rejected too. */
+    public function test_validate_update_interval_rejects_unknown(): void {
+        $this->assertFalse(Feeds::validateUpdateInterval(9000));
+        $this->assertFalse(Feeds::validateUpdateInterval('9000'));
+    }
+
+    /** The allowed intervals (including the 0 default) are accepted. */
+    public function test_validate_update_interval_accepts_allowed(): void {
+        foreach (array_keys(Feeds::_get_update_intervals()) as $allowed) {
+            $this->assertSame(
+                $allowed,
+                Feeds::validateUpdateInterval($allowed),
+                "allowed interval $allowed must be accepted"
+            );
+            $this->assertSame($allowed, Feeds::validateUpdateInterval((string)$allowed));
+        }
+    }
+
+    /** Interval keys are shared by both helpers, so the default is key 0. */
+    public function test_update_intervals_include_default_only_when_requested(): void {
+        $this->assertArrayHasKey(0, Feeds::_get_update_intervals());
+        $this->assertArrayNotHasKey(0, Feeds::_get_update_intervals(with_default: false));
+    }
 }

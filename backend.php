@@ -52,7 +52,8 @@
 		return;
 	}
 
-	// TODO: Replace references to these with function calls.  Also look for plugin usage.
+	// These are exposed to templates as globals; Pref_Feeds and Feeds::_format_headlines_list
+	// read them via `global`. Keep the assignments until those call sites are converted.
 	$purge_intervals = Feeds::_get_purge_intervals();
 	$update_intervals = Feeds::_get_update_intervals();
 	$update_intervals_nodefault = Feeds::_get_update_intervals(with_default: false);

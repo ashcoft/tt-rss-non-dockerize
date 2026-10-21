@@ -864,10 +864,11 @@ class API extends Handler {
 		$category_id = (int) clean($_REQUEST["category_id"]);
 		$login = clean($_REQUEST["login"] ?? "");
 		$password = clean($_REQUEST["password"] ?? "");
-		$update_interval = filter_var($_REQUEST["update_interval"] ?? 0, FILTER_VALIDATE_INT);
+		$update_interval = Feeds::validateUpdateInterval($_REQUEST["update_interval"] ?? 0);
 
-		if (!in_array($update_interval, array_keys(Feeds::_get_update_intervals())))
+		if ($update_interval === false) {
 			return $this->_wrap(self::STATUS_ERR, ["error" => self::E_INCORRECT_USAGE]);
+		}
 
 		if ($feed_url) {
 			$rc = Feeds::_subscribe($feed_url, $category_id, $login, $password, $update_interval);
@@ -878,7 +879,10 @@ class API extends Handler {
 		}
 	}
 
-	function getFeedUpdateIntervals(): bool {
+	/**
+	 * Report the selectable feed update intervals.
+	 */
+	public function getFeedUpdateIntervals(): bool {
 		return $this->_wrap(self::STATUS_OK, ['update_intervals' => Feeds::_get_update_intervals()]);
 	}
 

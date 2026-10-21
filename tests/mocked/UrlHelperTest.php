@@ -624,8 +624,9 @@ final class UrlHelperTest extends TestCase {
 
 	private function requireCurlConstants(): void {
 		foreach (['CURL_VERSION_SSL', 'CURL_SSLVERSION_TLSv1_2', 'CURLMOPT_MAX_HOST_CONNECTIONS', 'CURLMOPT_MAX_TOTAL_CONNECTIONS'] as $const) {
-			if (!defined($const))
+			if (defined($const) === false) {
 				$this->markTestSkipped("$const is not available in this PHP build");
+			}
 		}
 	}
 
