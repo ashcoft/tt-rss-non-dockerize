@@ -43,7 +43,7 @@ final class Psr7Compat {
 		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
 
 		// Cheapest test first: psr/http-message >= 1.1 accepts a plain string.
-		if (self::acceptsStringParam($method)) {
+		if (self::acceptsStringParam($method) === true) {
 			return null;
 		}
 
@@ -57,7 +57,7 @@ final class Psr7Compat {
 
 		$loadedFrom = (new \ReflectionClass(self::URI_INTERFACE))->getFileName();
 
-		return "Incompatible " . self::URI_INTERFACE . " loaded from " . ($loadedFrom ?: '(unknown file)') .
+		return "Incompatible " . self::URI_INTERFACE . " loaded from " . self::describePath($loadedFrom) .
 			": withScheme() must declare a non-nullable string parameter to be satisfied by the bundled " .
 			"guzzlehttp/psr7, which requires psr/http-message >= 2.0. " .
 			"Run 'composer install' to rebuild vendor/, and make sure no other copy of psr/http-message " .
@@ -78,7 +78,7 @@ final class Psr7Compat {
 	private static function acceptsStringParam(\ReflectionMethod $method): bool {
 		$param = $method->getParameters()[0] ?? null;
 
-		if ($param === null || $param->isOptional()) {
+		if ($param === null || $param->isOptional() === true) {
 			return false;
 		}
 
@@ -87,6 +87,11 @@ final class Psr7Compat {
 		return $type instanceof \ReflectionNamedType
 			&& $type->getName() === 'string'
 			&& $type->allowsNull() === false;
+	}
+
+	/** @param string|false $path value returned by ReflectionClass::getFileName() */
+	private static function describePath(string|false $path): string {
+		return $path === false || $path === '' ? '(unknown file)' : $path;
 	}
 
 	/** @return string|null path to the psr7 Uri implementation, if one is installed */
