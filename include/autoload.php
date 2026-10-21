@@ -9,11 +9,16 @@
 	$psr7_problem = Psr7Compat::check();
 
 	if ($psr7_problem !== null) {
-		if (php_sapi_name() != 'cli') {
+		if (php_sapi_name() !== 'cli') {
+			// The check runs before authentication, so log the detail and show
+			// anonymous visitors a generic message instead of server paths.
+			error_log($psr7_problem);
+
 			http_response_code(503);
-			echo "<h1>Startup failed</h1><p>" . htmlspecialchars($psr7_problem, ENT_QUOTES, 'UTF-8') . "</p>";
+			echo "<h1>Startup failed</h1><p>Incompatible PSR-7 interfaces in vendor/. " .
+				"Check the PHP error log for details.</p>";
 		} else {
-			echo "error: $psr7_problem\n";
+			fwrite(STDERR, "error: $psr7_problem\n");
 		}
 
 		exit(1);
