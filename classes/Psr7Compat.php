@@ -19,16 +19,18 @@
  * the bundled implementation is checked before reporting a problem.
  */
 final class Psr7Compat {
+	private const URI_INTERFACE = 'Psr\Http\Message\UriInterface';
+
 	private function __construct() {}
 
 	/**
 	 * @return string|null problem description, or null when the loaded interface is usable
 	 */
-	static function check(): ?string {
-		if (!interface_exists('Psr\Http\Message\UriInterface'))
+	public static function check(): ?string {
+		if (!interface_exists(self::URI_INTERFACE))
 			return null;
 
-		$method = new \ReflectionMethod('Psr\Http\Message\UriInterface', 'withScheme');
+		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
 		$param = $method->getParameters()[0] ?? null;
 
 		// psr/http-message >= 1.1 types the parameter, which every psr7 release accepts.
@@ -41,9 +43,9 @@ final class Psr7Compat {
 		if ($uri_file === null || !self::requires_typed_param($uri_file))
 			return null;
 
-		$loaded_from = (new \ReflectionClass('Psr\Http\Message\UriInterface'))->getFileName();
+		$loaded_from = (new \ReflectionClass(self::URI_INTERFACE))->getFileName();
 
-		return "Incompatible Psr\\Http\\Message\\UriInterface loaded from " . ($loaded_from ?: '(unknown file)') .
+		return "Incompatible " . self::URI_INTERFACE . " loaded from " . ($loaded_from ?: '(unknown file)') .
 			": withScheme() has no parameter type, so psr/http-message 1.0.x is in use, but the bundled " .
 			"guzzlehttp/psr7 requires psr/http-message >= 2.0 and cannot be loaded. " .
 			"Run 'composer install' to rebuild vendor/, and make sure no other copy of psr/http-message " .
@@ -75,6 +77,6 @@ final class Psr7Compat {
 		if ($source === false)
 			return false;
 
-		return preg_match('/function\s+withScheme\s*\(\s*(?:\?\s*)?(?:\\\\?string)\s+\$/i', $source) === 1;
+		return preg_match('/function\s+withScheme\s*\(\s*\??\\\\?string\s+\$/i', $source) === 1;
 	}
 }
