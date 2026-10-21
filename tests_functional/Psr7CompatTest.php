@@ -87,7 +87,7 @@ final class Psr7CompatTest extends TestCase { // skipcq
 		$file = self::temporaryFile($name, "withScheme($declaration)");
 
 		try {
-			require $file;
+			require_once $file;
 
 			return (bool)(new ReflectionMethod('Psr7Compat', 'acceptsStringParam'))
 				->invoke(null, new ReflectionMethod($name, 'withScheme'));

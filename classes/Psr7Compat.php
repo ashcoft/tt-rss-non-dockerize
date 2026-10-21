@@ -40,18 +40,7 @@ final class Psr7Compat {
 			return null;
 		}
 
-		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
-
-		// Cheapest test first: psr/http-message >= 1.1 accepts a plain string.
-		if (self::acceptsStringParam($method) === true) {
-			return null;
-		}
-
-		// Only now is it worth locating and reading the bundled implementation.
-		$uriFile = self::locateUri();
-
-		// No bundled psr7, or a 2.x implementation that accepts an untyped argument.
-		if ($uriFile === null || self::declaresStringParam($uriFile) === false) {
+		if (self::isCompatible()) {
 			return null;
 		}
 
@@ -63,6 +52,26 @@ final class Psr7Compat {
 			"Run 'composer install' to rebuild vendor/, and make sure no other copy of psr/http-message " .
 			"is autoloaded before vendor/ (for example a distribution package installed under " .
 			"include_path, such as /usr/share/php).";
+	}
+
+	/**
+	 * Whether the loaded interface can be implemented by the bundled psr7.
+	 *
+	 * The cheap reflection test runs first, so a healthy install does no file
+	 * I/O. psr7 2.x declares an untyped withScheme() and accepts anything, so
+	 * the bundled implementation is only consulted once the interface looks
+	 * typed.
+	 */
+	private static function isCompatible(): bool {
+		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
+
+		if (self::acceptsStringParam($method) === true) {
+			return true;
+		}
+
+		$uriFile = self::locateUri();
+
+		return $uriFile === null || self::declaresStringParam($uriFile) === false;
 	}
 
 	/**
