@@ -1,31 +1,6 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
-/** Probe interface whose withScheme() leaves its parameter untyped. */
-interface Psr7CompatProbeUntyped {
-	public function withScheme($scheme);
-}
-
-/** Probe interface whose withScheme() types its parameter as `string`. */
-interface Psr7CompatProbeString {
-	public function withScheme(string $scheme);
-}
-
-/** Probe interface whose withScheme() types its parameter as `?string`. */
-interface Psr7CompatProbeNullableString {
-	public function withScheme(?string $scheme);
-}
-
-/** Probe interface whose withScheme() types its parameter as `mixed`. */
-interface Psr7CompatProbeMixed {
-	public function withScheme(mixed $scheme);
-}
-
-/** Probe interface whose withScheme() types its parameter as a union. */
-interface Psr7CompatProbeUnion {
-	public function withScheme(string|int $scheme);
-}
-
 /**
  * Tests for the PSR-7 compatibility guard used at bootstrap.
  *
@@ -35,68 +10,75 @@ interface Psr7CompatProbeUnion {
  * GuzzleHttp\Psr7\Uri.
  *
  * PHPUnit is installed as a CI tool rather than a Composer dependency, so the
- * analyzer cannot resolve the base class or the inherited assertions; the
- * suppressions below cover only that resolution gap.
+ * analyzer cannot resolve the base class or its inherited assertions. The
+ * suppressions below cover only that resolution gap; the tests themselves run
+ * under phpunit in CI.
  */
-final class Psr7CompatTest extends TestCase { // skipcq: PHP-W1010
+final class Psr7CompatTest extends TestCase { // skipcq
 
 	/** The bundled vendor tree must be accepted: psr7 3.x with psr/http-message 2.0. */
 	public function testBundledVendorIsCompatible(): void {
-		self::assertNull(Psr7Compat::check()); // skipcq: PHP-E1002
+		$this->assertNull(Psr7Compat::check()); // skipcq
 	}
 
 	/** The bundled psr7 declares `string $scheme`, which the guard must detect. */
 	public function testBundledPsr7DeclaresStringParam(): void {
-		self::assertTrue( // skipcq: PHP-E1002
+		$this->assertTrue( // skipcq
 			self::declaresStringParam(__DIR__ . '/../vendor/guzzlehttp/psr7/src/Uri.php'));
 	}
 
 	/** A psr7 2.x-style untyped implementation must not be treated as a conflict. */
 	public function testUntypedPsr7IsNotAConflict(): void {
-		$file = self::temporaryFile("<?php\nclass Psr7CompatProbePsr7 { public function withScheme(\$scheme) {} }\n");
-
-		try {
-			self::assertFalse(self::declaresStringParam($file)); // skipcq: PHP-E1002
-		} finally {
-			unlink($file);
-		}
+		$this->assertFalse(self::declaresStringParam( // skipcq
+			self::temporaryFile('Psr7CompatProbePsr7', 'withScheme($scheme)')));
 	}
 
 	/** An unreadable file reports no problem, so the check can never block a valid install. */
 	public function testMissingFileReportsNoProblem(): void {
-		self::assertFalse( // skipcq: PHP-E1002
+		$this->assertFalse( // skipcq
 			self::declaresStringParam(sys_get_temp_dir() . '/psr7compat-does-not-exist'));
 	}
 
 	/** A non-nullable `string` parameter is exactly what psr7 3.x satisfies. */
 	public function testNonNullableStringIsAccepted(): void {
-		self::assertTrue(self::acceptsStringParam(Psr7CompatProbeString::class)); // skipcq: PHP-E1002
+		$this->assertTrue($this->acceptsParam('Psr7CompatProbeString', 'string $scheme')); // skipcq
 	}
 
 	/** psr/http-message 1.0.x leaves the parameter untyped: the case that breaks psr7 3.x. */
 	public function testUntypedIsRejected(): void {
-		self::assertFalse(self::acceptsStringParam(Psr7CompatProbeUntyped::class)); // skipcq: PHP-E1002
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeUntyped', '$scheme')); // skipcq
 	}
 
 	/** `?string` is not satisfied by an implementation that rejects null. */
 	public function testNullableStringIsRejected(): void {
-		self::assertFalse(self::acceptsStringParam(Psr7CompatProbeNullableString::class)); // skipcq: PHP-E1002
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeNullable', '?string $scheme')); // skipcq
 	}
 
 	/** `mixed` is wider than the implementation accepts. */
 	public function testMixedIsRejected(): void {
-		self::assertFalse(self::acceptsStringParam(Psr7CompatProbeMixed::class)); // skipcq: PHP-E1002
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeMixed', 'mixed $scheme')); // skipcq
 	}
 
 	/** A union admits values the implementation rejects. */
 	public function testUnionIsRejected(): void {
-		self::assertFalse(self::acceptsStringParam(Psr7CompatProbeUnion::class)); // skipcq: PHP-E1002
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeUnion', 'string|int $scheme')); // skipcq
 	}
 
-	/** @param class-string $interface probe interface to inspect */
-	private static function acceptsStringParam(string $interface): bool {
-		return (bool)(new ReflectionMethod('Psr7Compat', 'acceptsStringParam'))
-			->invoke(null, new ReflectionMethod($interface, 'withScheme'));
+	/**
+	 * @param string $name unique interface name, so repeated runs cannot clash
+	 * @param string $declaration the withScheme() parameter declaration to probe
+	 */
+	private function acceptsParam(string $name, string $declaration): bool {
+		$file = self::temporaryFile($name, "withScheme($declaration)");
+
+		try {
+			require $file;
+
+			return (bool)(new ReflectionMethod('Psr7Compat', 'acceptsStringParam'))
+				->invoke(null, new ReflectionMethod($name, 'withScheme'));
+		} finally {
+			unlink($file);
+		}
 	}
 
 	/** @param string $file path to a PHP source file to inspect */
@@ -104,10 +86,13 @@ final class Psr7CompatTest extends TestCase { // skipcq: PHP-W1010
 		return (bool)(new ReflectionMethod('Psr7Compat', 'declaresStringParam'))->invoke(null, $file);
 	}
 
-	/** @param string $contents PHP source to write to a throwaway file */
-	private static function temporaryFile(string $contents): string {
+	/**
+	 * @param string $name interface name to declare in the throwaway file
+	 * @param string $withScheme complete withScheme() signature to declare
+	 */
+	private static function temporaryFile(string $name, string $withScheme): string {
 		$file = tempnam(sys_get_temp_dir(), 'psr7compat');
-		file_put_contents($file, $contents);
+		file_put_contents($file, "<?php\ninterface $name { public function $withScheme; }\n");
 
 		return $file;
 	}
