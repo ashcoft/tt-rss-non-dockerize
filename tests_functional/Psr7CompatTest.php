@@ -10,9 +10,9 @@ use PHPUnit\Framework\TestCase;
  * GuzzleHttp\Psr7\Uri.
  *
  * PHPUnit is installed as a CI tool rather than a Composer dependency, so the
- * analyzer cannot resolve the base class or its inherited assertions. The
- * suppressions below cover only that resolution gap; the tests themselves run
- * under phpunit in CI.
+ * analyzer cannot resolve the base class or the assertions inherited from it.
+ * Each such call carries an inline skipcq, which covers only that resolution
+ * gap; the tests themselves run under phpunit in CI.
  */
 final class Psr7CompatTest extends TestCase { // skipcq
 
@@ -23,8 +23,8 @@ final class Psr7CompatTest extends TestCase { // skipcq
 
 	/** The bundled psr7 declares `string $scheme`, which the guard must detect. */
 	public function testBundledPsr7DeclaresStringParam(): void {
-		$this->assertTrue( // skipcq
-			self::declaresStringParam(__DIR__ . '/../vendor/guzzlehttp/psr7/src/Uri.php'));
+		$uri = __DIR__ . '/../vendor/guzzlehttp/psr7/src/Uri.php';
+		$this->assertTrue(self::declaresStringParam($uri)); // skipcq
 	}
 
 	/** A psr7 2.x-style untyped implementation must not be treated as a conflict. */
@@ -40,43 +40,43 @@ final class Psr7CompatTest extends TestCase { // skipcq
 
 	/** An unreadable file reports no problem, so the check can never block a valid install. */
 	public function testMissingFileReportsNoProblem(): void {
-		$this->assertFalse( // skipcq
-			self::declaresStringParam(sys_get_temp_dir() . '/psr7compat-does-not-exist'));
+		$missing = sys_get_temp_dir() . '/psr7compat-does-not-exist';
+		$this->assertFalse(self::declaresStringParam($missing)); // skipcq
 	}
 
 	/** A non-nullable `string` parameter is exactly what psr7 3.x satisfies. */
 	public function testNonNullableStringIsAccepted(): void {
-		$this->assertTrue($this->acceptsParam('Psr7CompatProbeString', 'string $scheme')); // skipcq
+		$this->assertTrue($this->acceptsParam('ProbeString', 'string $scheme')); // skipcq
 	}
 
 	/** psr/http-message 1.0.x leaves the parameter untyped: the case that breaks psr7 3.x. */
 	public function testUntypedIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeUntyped', '$scheme')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeUntyped', '$scheme')); // skipcq
 	}
 
 	/** `?string` is not satisfied by an implementation that rejects null. */
 	public function testNullableStringIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeNullable', '?string $scheme')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeNullable', '?string $scheme')); // skipcq
 	}
 
 	/** `mixed` is wider than the implementation accepts. */
 	public function testMixedIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeMixed', 'mixed $scheme')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeMixed', 'mixed $scheme')); // skipcq
 	}
 
 	/** A union admits values the implementation rejects. */
 	public function testUnionIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeUnion', 'string|int $scheme')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeUnion', 'string|int $scheme')); // skipcq
 	}
 
 	/** An optional parameter lets callers omit an argument the implementation requires. */
 	public function testOptionalParameterIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeOptional', 'string $scheme = ""')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeOptional', 'string $scheme = ""')); // skipcq
 	}
 
 	/** A parameterless declaration cannot be implemented by `withScheme(string $scheme)`. */
 	public function testMissingParameterIsRejected(): void {
-		$this->assertFalse($this->acceptsParam('Psr7CompatProbeNoParams', '')); // skipcq
+		$this->assertFalse($this->acceptsParam('ProbeNoParams', '')); // skipcq
 	}
 
 	/**
