@@ -17,6 +17,9 @@
  * so that this becomes an actionable message naming the file that was loaded.
  * psr7 2.x declares an untyped withScheme() and is valid alongside any
  * psr/http-message, so the bundled implementation is inspected first.
+ *
+ * Called from Config::sanity_check(), which reports the problem through the
+ * usual startup-failure path for both web and CLI entrypoints.
  */
 final class Psr7Compat {
 	private const URI_INTERFACE = 'Psr\\Http\\Message\\UriInterface';
@@ -37,14 +40,18 @@ final class Psr7Compat {
 			return null;
 		}
 
+		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
+
+		// Cheapest test first: psr/http-message >= 1.1 accepts a plain string.
+		if (self::acceptsStringParam($method)) {
+			return null;
+		}
+
+		// Only now is it worth locating and reading the bundled implementation.
 		$uriFile = self::locateUri();
 
 		// No bundled psr7, or a 2.x implementation that accepts an untyped argument.
 		if ($uriFile === null || self::declaresStringParam($uriFile) === false) {
-			return null;
-		}
-
-		if (self::acceptsStringParam(new \ReflectionMethod(self::URI_INTERFACE, 'withScheme'))) {
 			return null;
 		}
 
@@ -62,15 +69,17 @@ final class Psr7Compat {
 	 * Whether the interface parameter can be satisfied by `withScheme(string $scheme)`.
 	 *
 	 * An implementation may only widen a parameter relative to its interface, so
-	 * the interface has to accept exactly a plain string: an untyped or `mixed`
-	 * parameter is wider and rejected, and `?string`, a union, or an intersection
-	 * cannot be satisfied by an implementation that rejects null and non-strings.
+	 * the interface has to accept exactly one required, non-nullable string: an
+	 * untyped or `mixed` parameter is wider and rejected, `?string`, a union, or
+	 * an intersection cannot be satisfied by an implementation that rejects null
+	 * and non-strings, and an optional or absent parameter allows callers to omit
+	 * an argument the implementation requires.
 	 */
 	private static function acceptsStringParam(\ReflectionMethod $method): bool {
 		$param = $method->getParameters()[0] ?? null;
 
-		if ($param === null) {
-			return true;
+		if ($param === null || $param->isOptional()) {
+			return false;
 		}
 
 		$type = $param->getType();

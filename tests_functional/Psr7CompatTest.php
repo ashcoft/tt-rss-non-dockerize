@@ -2,7 +2,7 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests for the PSR-7 compatibility guard used at bootstrap.
+ * Tests for the PSR-7 compatibility guard used by Config::sanity_check().
  *
  * The guard has to accept a psr/http-message whose withScheme() is satisfied by
  * the bundled guzzlehttp/psr7 3.x `string $scheme` implementation, and reject
@@ -29,8 +29,13 @@ final class Psr7CompatTest extends TestCase { // skipcq
 
 	/** A psr7 2.x-style untyped implementation must not be treated as a conflict. */
 	public function testUntypedPsr7IsNotAConflict(): void {
-		$this->assertFalse(self::declaresStringParam( // skipcq
-			self::temporaryFile('Psr7CompatProbePsr7', 'withScheme($scheme)')));
+		$file = self::temporaryFile('Psr7CompatProbePsr7', 'withScheme($scheme)');
+
+		try {
+			$this->assertFalse(self::declaresStringParam($file)); // skipcq
+		} finally {
+			unlink($file);
+		}
 	}
 
 	/** An unreadable file reports no problem, so the check can never block a valid install. */
@@ -62,6 +67,16 @@ final class Psr7CompatTest extends TestCase { // skipcq
 	/** A union admits values the implementation rejects. */
 	public function testUnionIsRejected(): void {
 		$this->assertFalse($this->acceptsParam('Psr7CompatProbeUnion', 'string|int $scheme')); // skipcq
+	}
+
+	/** An optional parameter lets callers omit an argument the implementation requires. */
+	public function testOptionalParameterIsRejected(): void {
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeOptional', 'string $scheme = ""')); // skipcq
+	}
+
+	/** A parameterless declaration cannot be implemented by `withScheme(string $scheme)`. */
+	public function testMissingParameterIsRejected(): void {
+		$this->assertFalse($this->acceptsParam('Psr7CompatProbeNoParams', '')); // skipcq
 	}
 
 	/**
