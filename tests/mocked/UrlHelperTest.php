@@ -622,6 +622,7 @@ final class UrlHelperTest extends TestCase {
 
 	// ===== curl_handler_supported() Tests =====
 
+	/** Skip the curl-handler tests when this PHP build lacks the curl constants. */
 	private function requireCurlConstants(): void {
 		foreach (['CURL_VERSION_SSL', 'CURL_SSLVERSION_TLSv1_2', 'CURLMOPT_MAX_HOST_CONNECTIONS', 'CURLMOPT_MAX_TOTAL_CONNECTIONS'] as $const) {
 			if (defined($const) === false) {
@@ -630,27 +631,31 @@ final class UrlHelperTest extends TestCase {
 		}
 	}
 
+	/** Guzzle selects its curl handler for a current libcurl built with SSL. */
 	public function testCurlHandlerSupportedWithCurrentLibcurlAndSsl(): void {
 		$this->requireCurlConstants();
 		$this->assertTrue(UrlHelper::curl_handler_supported(['version' => '8.5.0', 'features' => \CURL_VERSION_SSL]));
 	}
 
+	/** 7.34.0 is the minimum libcurl Guzzle accepts. */
 	public function testCurlHandlerSupportedAtMinimumVersion(): void {
 		$this->requireCurlConstants();
 		$this->assertTrue(UrlHelper::curl_handler_supported(['version' => '7.34.0', 'features' => \CURL_VERSION_SSL]));
 	}
 
+	/** An older libcurl, such as CentOS 7's 7.29.0, is not used by Guzzle. */
 	public function testCurlHandlerNotSupportedWithOldLibcurl(): void {
 		$this->requireCurlConstants();
-		// e.g. CentOS 7 ships libcurl 7.29.0, which Guzzle won't use
 		$this->assertFalse(UrlHelper::curl_handler_supported(['version' => '7.29.0', 'features' => \CURL_VERSION_SSL]));
 	}
 
+	/** A libcurl without SSL support is not used by Guzzle. */
 	public function testCurlHandlerNotSupportedWithoutSsl(): void {
 		$this->requireCurlConstants();
 		$this->assertFalse(UrlHelper::curl_handler_supported(['version' => '8.5.0', 'features' => 0]));
 	}
 
+	/** curl_version() returning false means the curl handler is unusable. */
 	public function testCurlHandlerNotSupportedWithoutVersionInfo(): void {
 		$this->assertFalse(UrlHelper::curl_handler_supported(false));
 	}

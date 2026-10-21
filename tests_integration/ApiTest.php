@@ -34,6 +34,7 @@ final class ApiTest extends IntegrationTestCase {
         $this->assertArrayHasKey("feed_id", $resp['content']['status']);
     }
 
+    /** Subscribing with an explicit update_interval stores that interval on the feed. */
     public function test_subscribeToFeedWithUpdateInterval() : void {
         $feed_url = $this->app_url . "/tests_integration/feed.xml";
 
