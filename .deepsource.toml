@@ -38,7 +38,7 @@ enabled = true
 # include/autoload.php is sufficient: it loads vendor/autoload.php, whose
 # files-autoload already pulls in include/functions.php (the file defining
 # LABEL_BASE_INDEX, PLUGIN_FEED_BASE_INDEX, ...). Listing functions.php as well
-# makes the analyzer load it twice, which is a fatal
+# makes the analyzer load it a second time, which is a fatal
 # "Cannot redeclare get_pref()" that aborts the bootstrap and leaves every
 # class and constant unresolved - producing exactly the false positives this
 # stanza exists to prevent.
