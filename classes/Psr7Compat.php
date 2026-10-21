@@ -40,7 +40,7 @@ final class Psr7Compat {
 			return null;
 		}
 
-		if (self::isCompatible()) {
+		if (self::isCompatible() === true) {
 			return null;
 		}
 
