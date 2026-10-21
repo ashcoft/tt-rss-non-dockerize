@@ -2,8 +2,10 @@
 /**
  * JSON API handler.
  *
- * Dispatches the operations listed in API_LEVEL; the status and error
- * constants below are part of the wire format returned to clients.
+ * Dispatches the JSON API operations exposed to clients; each method reads its
+ * arguments from $_REQUEST and answers through _wrap(). API_LEVEL is the
+ * compatibility level clients negotiate against, and the STATUS_/E_ constants
+ * are part of that wire format.
  */
 class API extends Handler {
 
@@ -173,8 +175,8 @@ class API extends Handler {
 		$enable_nested = self::_param_to_bool($_REQUEST["enable_nested"] ?? false);
 		$include_empty = self::_param_to_bool($_REQUEST["include_empty"] ?? false);
 
-		// Empty categories are filtered out below rather than replaced with the
-		// Uncategorized and virtual categories the UI expects.
+		// Empty categories are dropped here; Uncategorized and the virtual
+		// categories are appended after this loop.
 
 		$categories = ORM::for_table('ttrss_feed_categories')
 			->select_many('id', 'title', 'order_id')
@@ -445,7 +447,9 @@ class API extends Handler {
 	}
 
 	/**
-	 * Update a feed subscription (category, title, interval).
+	 * Trigger an immediate refresh of a feed.
+	 *
+	 * Skipped when open_basedir is set, since the fetch would be restricted.
 	 */
 	public function updateFeed(): bool {
 		$feed_id = (int) clean($_REQUEST["feed_id"]);

@@ -71,7 +71,9 @@
 	/* if (str_contains($op, PluginHost::PUBLIC_METHOD_DELIMITER)) {
 		list ($plugin, $pmethod) = explode(PluginHost::PUBLIC_METHOD_DELIMITER, $op, 2);
 
-		// Superseded by PluginHost::lookup_handler(); the old form mutated $_REQUEST as a side effect.
+		// Disabled: this rewrote $op into "pluginhandler" and injected $_REQUEST["plugin"].
+		// PluginHost::lookup_handler() below resolves plugin handlers directly, so the
+		// rewrite is no longer needed.
 		$_REQUEST["plugin"] = $plugin;
 		$method = $pmethod;
 		$op = "pluginhandler";
