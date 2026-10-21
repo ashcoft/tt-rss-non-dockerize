@@ -766,3 +766,5 @@ class Config {
 	}
 
 }
+
+/* probe: does DeepSource fail on any PHP change? */
