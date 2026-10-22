@@ -19,31 +19,6 @@
 	$csrf_token = $_POST['csrf_token'] ?? "";
 
 	require_once __DIR__ . '/include/autoload.php';
-
-	/* backend.php does not run Config::sanity_check(), so guard here as well:
-		this loads the bundled PSR-7 interfaces before another autoloader can
-		supply an older copy, and turns an already-loaded incompatible copy into
-		JSON instead of a compile-time fatal on the first Guzzle class. */
-	$psr7_problem = Psr7Compat::check();
-
-	if ($psr7_problem !== null) {
-		error_log($psr7_problem);
-
-		http_response_code(503);
-		header("Content-Type: application/json; charset=utf-8");
-
-		print json_encode([
-			"error" => [
-				"code" => "E_STARTUP",
-				"params" => [
-					"message" => "Incompatible PSR-7 interfaces in vendor/. Check the PHP error log for details.",
-				],
-			],
-		]);
-
-		return;
-	}
-
 	require_once __DIR__ . '/include/sessions.php';
 
 	$op = clean($op);
