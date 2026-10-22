@@ -30,3 +30,54 @@
 *.zip binary
 *.gz binary
 *.tar binary
+
+# ---------------------------------------------------------------------------
+# Development-only files. Everything below is needed to develop, lint, test or
+# package tt-rss, but is not part of a production deployment. `git archive`
+# honors these rules, so production tarballs/zips (and the release workflow)
+# contain only runtime files.
+# ---------------------------------------------------------------------------
+.codacy.yml export-ignore
+.deepsource.toml export-ignore
+.editorconfig export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.github/ export-ignore
+.npmrc export-ignore
+.releaserc.json export-ignore
+.snyk export-ignore
+.stylelintrc.json export-ignore
+CONTRIBUTING.md export-ignore
+VITE_MIGRATION.md export-ignore
+eslint.config.js export-ignore
+gulpfile.js export-ignore
+jsconfig.json export-ignore
+package.json export-ignore
+phpstan.neon export-ignore
+phpunit.integration.xml export-ignore
+phpunit.xml export-ignore
+pnpm-lock.yaml export-ignore
+pnpm-workspace.yaml export-ignore
+rector.php export-ignore
+tsconfig.json export-ignore
+vite.config.js export-ignore
+
+# Test suites
+tests/ export-ignore
+tests_functional/ export-ignore
+tests_integration/ export-ignore
+
+# Vue/Vite development sources (production uses the compiled output)
+src/ export-ignore
+js/index.html export-ignore
+
+# Dojo sources used to rebuild the bundled dojo layer
+lib/dojo-src/ export-ignore
+
+# Translation template and helper (runtime uses the compiled .mo files)
+messages.pot export-ignore
+utils/rebase-translations.sh export-ignore
+
+# Theme and type sources (themes are served as compiled CSS)
+*.less export-ignore
+*.ts export-ignore
