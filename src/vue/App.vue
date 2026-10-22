@@ -94,6 +94,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTheme } from 'vuetify';
+import api from './api/client';
 import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
 import FeedTree from './components/FeedTree.vue';
 import Toolbar from './components/Toolbar.vue';
@@ -179,14 +180,17 @@ const onLogout = async () => {
 
 /**
  * Feed tree context actions (Phase 3).
- * Special feed ids: -1 all, -2 fresh, -3 starred, -4 published.
+ * Special feed ids mirror Feeds::FEED_* in classes/Feeds.php:
+ * -1 starred, -2 published, -3 fresh, -4 all, -6 recently read, 0 archived.
  */
 const handleFeedAction = async (action: string, feedId: number) => {
   if (action === 'mark_read') {
-    if (feedId === -1 || feedId === -2) {
+    if (feedId === -4 || feedId === -3) {
+      // "All articles" / "Fresh": there is no per-feed catchup for virtual
+      // feeds, so use the global mark-all-read handler.
       await headlinesStore.catchupAll();
       showMessage('All headlines marked as read', 'success');
-    } else if (feedId === -3 || feedId === -4) {
+    } else if (feedId === -1 || feedId === -2) {
       // Starred/published special views use the normal mark-read path
       const ids = headlinesStore.headlines.map(h => h.id);
       await headlinesStore.markAsRead(ids);
@@ -247,11 +251,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
 };
 
 const handleHeadlineSelect = async (headline: Headline) => {
+  // loadArticle promotes the loaded headline and persists the read state,
+  // updating feed counters itself.
   await headlinesStore.loadArticle(headline.id);
-  if (!headline.is_read) {
-    await headlinesStore.markAsRead([headline.id]);
-    feedsStore.updateFeedUnread(headline.feed_id, -1);
-  }
 };
 
 const handleHeadlineAction = async (headline: Headline, action: string) => {
@@ -259,10 +261,8 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
     case 'toggle_read':
       if (headline.is_read) {
         await headlinesStore.markAsUnread([headline.id]);
-        feedsStore.updateFeedUnread(headline.feed_id, 1);
       } else {
         await headlinesStore.markAsRead([headline.id]);
-        feedsStore.updateFeedUnread(headline.feed_id, -1);
       }
       break;
     case 'mark_read':
@@ -306,8 +306,12 @@ const handleLoadMore = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  if (authStore.loggedIn) {
-    await feedsStore.loadFeeds();
+  // The legacy shell only serves this page to an authenticated session, so a
+  // readable CSRF token means we are already logged in.
+  const authenticated = await api.checkSession();
+  if (authenticated) {
+    authStore.setLoggedIn(true);
+    await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels()]);
     startPolling();
   }
 });

@@ -114,6 +114,18 @@ export default defineConfig({
     
     // Proxy configuration for PHP backend
     proxy: {
+      // The PHP shell (index.php/prefs.php) is where the Vue client reads the
+      // session CSRF token from, so it must be forwarded too.
+      '/index.php': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      '/prefs.php': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
       // Proxy API calls to backend.php
       '/backend.php': {
         target: 'http://localhost:8080',

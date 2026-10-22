@@ -126,18 +126,9 @@ const toggleRead = (headline: Headline) => {
   emit('action', headline, 'toggle_read');
 };
 
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-
-  if (hours < 1) return 'Just now';
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
-};
+// Feeds/view returns pre-localised date strings ("14:05", "Mar 03, 9:12",
+// "Never"), not Unix timestamps, so they are rendered as-is.
+const formatDate = (updated: string): string => updated;
 </script>
 
 <style scoped>

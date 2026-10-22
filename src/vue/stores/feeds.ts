@@ -81,13 +81,10 @@ export const useFeedsStore = defineStore('feeds', () => {
       const response = await api.getFeedTree();
       
       if (response.status === 0) {
-        // TypeScript type narrowing - content is guaranteed when status is 0
-        const content = response.content;
-        const feedData = (content as { feeds?: Feed[]; categories?: Category[] });
-        feeds.value = feedData.feeds ?? [];
-        categories.value = feedData.categories ?? [];
+        feeds.value = response.content.feeds;
+        categories.value = response.content.categories;
       } else {
-        error.value = 'Failed to load feeds';
+        error.value = response.error ?? 'Failed to load feeds';
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Unknown error';
@@ -137,14 +134,15 @@ export const useFeedsStore = defineStore('feeds', () => {
   // Feed & category management (Phase 3)
   // ============================================
 
-  async function addFeed(feedUrl: string, categoryId?: number, title?: string): Promise<boolean> {
+  async function addFeed(feedUrl: string, categoryId?: number): Promise<boolean> {
     try {
-      const response = await api.addFeed(feedUrl, categoryId, title);
+      // Feeds/add does not accept a custom title; the feed keeps its own title.
+      const response = await api.addFeed(feedUrl, categoryId ?? 0);
       if (response.status === 0) {
         await loadFeeds();
         return true;
       }
-      error.value = 'Failed to add feed';
+      error.value = response.error ?? 'Failed to add feed';
       return false;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to add feed';
@@ -162,7 +160,7 @@ export const useFeedsStore = defineStore('feeds', () => {
         }
         return true;
       }
-      error.value = 'Failed to delete feed';
+      error.value = response.error ?? 'Failed to delete feed';
       return false;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete feed';
@@ -170,9 +168,10 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
-  async function purgeFeed(feedId: number): Promise<boolean> {
+  async function purgeFeed(): Promise<boolean> {
     try {
-      const response = await api.purgeFeed(feedId);
+      // Purging is a scheduled/CLI operation; there is no backend.php method.
+      const response = await api.purgeFeed();
       return response.status === 0;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to purge feed';
@@ -180,14 +179,14 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
-  async function createCategory(title: string, parentId?: number): Promise<boolean> {
+  async function createCategory(title: string): Promise<boolean> {
     try {
-      const response = await api.createCategory(title, parentId);
+      const response = await api.createCategory(title);
       if (response.status === 0) {
         await loadFeeds();
         return true;
       }
-      error.value = 'Failed to create category';
+      error.value = response.error ?? 'Failed to create category';
       return false;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to create category';
@@ -206,7 +205,7 @@ export const useFeedsStore = defineStore('feeds', () => {
         }
         return true;
       }
-      error.value = 'Failed to delete category';
+      error.value = response.error ?? 'Failed to delete category';
       return false;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete category';

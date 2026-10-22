@@ -52,7 +52,7 @@ const sanitizedContent = computed(() => {
           <h1>{{ article.title }}</h1>
         </div>
         <div class="article-meta">
-          <span class="feed">{{ article.feed_title || article.feed }}</span>
+          <span class="feed">{{ article.feed_title }}</span>
           <span v-if="article.author" class="author">by {{ article.author }}</span>
           <time :datetime="article.updated">{{ article.updated }}</time>
         </div>

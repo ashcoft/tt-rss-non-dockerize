@@ -14,11 +14,13 @@ export interface Headline {
   link: string;
   content: string;
   excerpt: string;
-  updated: number;
+  updated: string;
+  updated_long: string;
   is_marked: boolean;
   is_read: boolean;
   is_published: boolean;
   tags: string[];
+  labels: unknown[];
   feed_id: number;
   feed_title: string;
   comments_count: number;
@@ -35,15 +37,19 @@ export interface Article {
   link: string;
   content: string;
   excerpt: string;
-  updated: number;
+  updated: string;
+  updated_long: string;
   is_marked: boolean;
   is_read: boolean;
   is_published: boolean;
   tags: string[];
+  labels: unknown[];
   feed_id: number;
   feed_title: string;
   comments_count: number;
+  comments_link: string;
   author: string;
+  score: number;
   note: string;
 }
 
@@ -58,7 +64,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const searchQuery = ref('');
   const hasMore = ref(false);
   const skip = ref(0);
-  const limit = 30;
+  const pageSize = 30;
 
   // Getters
   const unreadCount = computed(() => {
@@ -79,19 +85,17 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       const response = await api.getHeadlines(feedId, {
         isCat,
         viewMode: viewMode.value,
-        limit,
         skip: 0,
         search: searchQuery.value,
       });
 
       if (response.status === 0) {
-        // TypeScript type narrowing - content is guaranteed when status is 0
-        const content = response.content;
-        const headlineData = (content as { headlines?: Headline[] });
-        headlines.value = headlineData.headlines ?? [];
-        hasMore.value = headlines.value.length >= limit;
+        headlines.value = response.content.headlines;
+        // Feeds/view hardcodes a page size of 30 and does not accept `limit`.
+        hasMore.value = response.content.headlines.length >= pageSize;
+        if (response.content.message) error.value = response.content.message;
       } else {
-        error.value = 'Failed to load headlines';
+        error.value = response.error ?? 'Failed to load headlines';
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Unknown error';
@@ -105,33 +109,29 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     if (loadingMore.value || !hasMore.value) return;
 
     loadingMore.value = true;
-    skip.value += limit;
+    skip.value += pageSize;
 
     try {
       const response = await api.getHeadlines(feedId, {
         isCat,
         viewMode: viewMode.value,
-        limit,
         skip: skip.value,
         search: searchQuery.value,
       });
 
       if (response.status === 0) {
-        // TypeScript type narrowing - content is guaranteed when status is 0
-        const content = response.content;
-        const headlineData = (content as { headlines?: Headline[] });
-        const newHeadlines = headlineData.headlines ?? [];
+        const newHeadlines = response.content.headlines;
         headlines.value.push(...newHeadlines);
         // Only continue if we got a full page of results
-        hasMore.value = newHeadlines.length === limit;
+        hasMore.value = newHeadlines.length >= pageSize;
       } else {
         console.warn('Load more returned non-success status:', response.status);
-        skip.value -= limit; // Revert skip on failure status
+        skip.value -= pageSize; // Revert skip on failure status
         hasMore.value = false; // Stop pagination on failure
       }
     } catch (err) {
       console.error('Failed to load more headlines:', err);
-      skip.value -= limit; // Revert skip on error
+      skip.value -= pageSize; // Revert skip on error
     } finally {
       loadingMore.value = false;
     }
@@ -141,51 +141,33 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     error.value = null;
 
     try {
-      const response = await api.getArticle(articleId);
+      // The legacy backend returns full article content with the headline
+      // list, so there is no per-article fetch. Promote the already-loaded
+      // headline into the selected article and persist the read state.
+      const headline = headlines.value.find(h => h.id === articleId);
+      if (!headline) {
+        error.value = 'Article is not loaded in the current headline list.';
+        return;
+      }
 
-                  if (response.status === 0) {
-        // Map API's article shape onto the store Article type.
-        // Backend returns `is_starred`; the store uses `is_marked`.
-        const data = response.content as unknown as {
-          id: number;
-          guid: string;
-          title: string;
-          link: string;
-          content: string;
-          excerpt: string;
-          updated: number;
-          is_marked: boolean;
-          is_read: boolean;
-          is_published: boolean;
-          tags: string[];
-          feed_id: number;
-          feed_title: string;
-          comments_count: number;
-          author: string;
-          note: string;
-          score?: number;
-        };
-        selectedArticle.value = {
-          ...data,
-                    is_marked: data.is_marked ?? false,
-        };
-        
-        // Mark as read on backend when an unread headline is opened
-        const headline = headlines.value.find(h => h.id === articleId);
-        if (headline && !headline.is_read) {
-          // Optimistically update local state first
-          headline.is_read = true;
-          const feedsStore = useFeedsStore();
-          feedsStore.updateFeedUnread(headline.feed_id, -1);
-          
-          // Then persist to backend
-          try {
-            await markAsRead([articleId]);
-          } catch {
-            // Revert optimistic update if API fails
-            headline.is_read = false;
-            feedsStore.updateFeedUnread(headline.feed_id, 1);
+      selectedArticle.value = { ...headline };
+
+      if (!headline.is_read) {
+        const feedsStore = useFeedsStore();
+        // Optimistically update local state first
+        headline.is_read = true;
+        selectedArticle.value.is_read = true;
+        feedsStore.updateFeedUnread(headline.feed_id, -1);
+
+        try {
+          await markAsRead([articleId]);
+        } catch {
+          // Revert optimistic update if API fails
+          headline.is_read = false;
+          if (selectedArticle.value?.id === articleId) {
+            selectedArticle.value.is_read = false;
           }
+          feedsStore.updateFeedUnread(headline.feed_id, 1);
         }
       }
     } catch (err) {
@@ -345,10 +327,11 @@ export const useHeadlinesStore = defineStore('headlines', () => {
    * Mark every loaded headline as read (Phase 3).
    */
   async function catchupAll(): Promise<void> {
-    const ids = headlines.value.filter(h => !h.is_read).map(h => h.id);
-    if (ids.length === 0) return;
     try {
-      await api.catchupArticles(ids, 1);
+      const response = await api.catchupAll();
+      if (response.status !== 0) {
+        throw new Error(response.error ?? 'Failed to mark all articles as read');
+      }
       for (const h of headlines.value) h.is_read = true;
       if (selectedArticle.value) selectedArticle.value.is_read = true;
     } catch (err) {
