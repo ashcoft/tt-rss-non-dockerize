@@ -2,29 +2,55 @@
 /**
  * Guards against an incompatible psr/http-message at bootstrap.
  *
- * guzzlehttp/psr7 3.x declares `withScheme(string $scheme): UriInterface` and
- * requires psr/http-message >= 2.0. When an older copy of that interface wins
- * the autoload race (a stale vendor tree, or a distribution package reachable
- * through include_path such as /usr/share/php), PHP aborts the first time
- * GuzzleHttp\Psr7\Uri is loaded with a compile-time fatal that names neither
- * the offending file nor a remedy:
+ * guzzlehttp/psr7 3.x types the PSR-7 method signatures (for example
+ * `withRequestTarget(string $requestTarget): RequestInterface` and
+ * `withScheme(string $scheme): UriInterface`) and requires psr/http-message
+ * >= 2.0. When an older 1.0.x copy wins the autoload race (a stale vendor
+ * tree, or a distribution package reachable through include_path such as
+ * /usr/share/php), PHP aborts the first time a psr7 class is loaded with a
+ * compile-time fatal that names neither the offending file nor a remedy:
  *
- *   Declaration of GuzzleHttp\Psr7\Uri::withScheme(string $scheme):
- *   Psr\Http\Message\UriInterface must be compatible with
- *   Psr\Http\Message\UriInterface::withScheme($scheme)
+ *   Declaration of GuzzleHttp\Psr7\Request::withRequestTarget(string $requestTarget):
+ *   Psr\Http\Message\RequestInterface must be compatible with
+ *   Psr\Http\Message\RequestInterface::withRequestTarget($requestTarget)
  *
- * The loaded interface is compared against the bundled implementation up front
- * so that this becomes an actionable message naming the file that was loaded.
- * psr7 2.x declares an untyped withScheme() and is valid alongside any
- * psr/http-message, so the bundled implementation is inspected first.
+ * check() loads the bundled interfaces first, so they win over a copy that
+ * would otherwise be autoloaded later, and compares where each one came from.
+ * A stale bundled copy is detected by reading the psr7 implementation (without
+ * loading it, which is what raises the fatal) and checking the parameter type.
  *
- * Called from Config::sanity_check(), which reports the problem through the
- * usual startup-failure path for both web and CLI entrypoints.
+ * Config::sanity_check() reports the problem through the normal startup path.
+ * backend.php and api/index.php call check() directly because they do not run
+ * sanity_check() and would otherwise raise the fatal before any output.
  */
 final class Psr7Compat {
-	private const URI_INTERFACE = 'Psr\\Http\\Message\\UriInterface';
+	/**
+	 * PSR-7 interfaces used by the bundled psr7.
+	 */
+	private const INTERFACES = [
+		'Psr\\Http\\Message\\MessageInterface',
+		'Psr\\Http\\Message\\RequestInterface',
+		'Psr\\Http\\Message\\ResponseInterface',
+		'Psr\\Http\\Message\\ServerRequestInterface',
+		'Psr\\Http\\Message\\StreamInterface',
+		'Psr\\Http\\Message\\UploadedFileInterface',
+		'Psr\\Http\\Message\\UriInterface',
+	];
 
-	private const URI_IMPLEMENTATION = 'guzzlehttp/psr7';
+	/**
+	 * Methods psr7 3.x narrows to a required, non-nullable string, mapped to the
+	 * psr7 source file that declares them.
+	 *
+	 * @var array<string, array{0: string, 1: string}>
+	 */
+	private const TYPED_STRING_METHODS = [
+		'Psr\\Http\\Message\\RequestInterface' => ['withRequestTarget', 'Request.php'],
+		'Psr\\Http\\Message\\UriInterface' => ['withScheme', 'Uri.php'],
+	];
+
+	private const INTERFACE_PACKAGE = 'psr/http-message';
+
+	private const IMPLEMENTATION_PACKAGE = 'guzzlehttp/psr7';
 
 	/**
 	 * This class only exposes static methods.
@@ -33,45 +59,112 @@ final class Psr7Compat {
 	}
 
 	/**
-	 * @return string|null problem description, or null when the loaded interface is usable
+	 * @return string|null problem description, or null when the loaded interfaces are usable
 	 */
 	public static function check(): ?string {
-		if (interface_exists(self::URI_INTERFACE) === false) {
+		$interfaceDir = self::packageDir(self::INTERFACE_PACKAGE, '/src');
+		$implementationDir = self::packageDir(self::IMPLEMENTATION_PACKAGE, '/src');
+
+		// Without both packages there is no psr7 conflict to report; leave the
+		// install alone so a failed check cannot block something that works.
+		if ($interfaceDir === null || $implementationDir === null) {
 			return null;
 		}
 
-		if (self::isCompatible() === true) {
-			return null;
+		foreach (self::INTERFACES as $interface) {
+			if (interface_exists($interface) === false) {
+				continue;
+			}
+
+			$loadedFrom = (new \ReflectionClass($interface))->getFileName();
+
+			if (self::isForeignCopy($interface, $loadedFrom, $interfaceDir) === true) {
+				return self::foreignCopyMessage($interface, $loadedFrom, $interfaceDir);
+			}
+
+			$typedMethod = self::TYPED_STRING_METHODS[$interface] ?? null;
+
+			if ($typedMethod === null) {
+				continue;
+			}
+
+			[$methodName, $implementationName] = $typedMethod;
+
+			if (self::acceptsStringParam(new \ReflectionMethod($interface, $methodName)) === true) {
+				continue;
+			}
+
+			if (self::declaresStringParam($implementationDir . '/' . $implementationName, $methodName) === false) {
+				continue;
+			}
+
+			return self::signatureMessage($interface, $loadedFrom, $methodName);
 		}
 
-		$loadedFrom = (new \ReflectionClass(self::URI_INTERFACE))->getFileName();
+		return null;
+	}
 
-		return "Incompatible " . self::URI_INTERFACE . " loaded from " . self::describePath($loadedFrom) .
-			": withScheme() must declare a non-nullable string parameter to be satisfied by the bundled " .
+	/**
+	 * Whether the interface was loaded from a copy other than the bundled one.
+	 *
+	 * @param string|false $loadedFrom value returned by ReflectionClass::getFileName()
+	 */
+	private static function isForeignCopy(string $interface, string|false $loadedFrom, string $interfaceDir): bool {
+		$expected = realpath($interfaceDir . '/' . self::shortName($interface) . '.php');
+
+		if ($expected === false) {
+			return false;
+		}
+
+		return realpath($loadedFrom === false ? '' : $loadedFrom) !== $expected;
+	}
+
+	/**
+	 * @param string|false $loadedFrom value returned by ReflectionClass::getFileName()
+	 */
+	private static function foreignCopyMessage(string $interface, string|false $loadedFrom, string $interfaceDir): string {
+		return "Incompatible " . $interface . " loaded from " . self::describePath($loadedFrom) .
+			" instead of the bundled " . $interfaceDir . '/' . self::shortName($interface) . '.php' .
+			": another copy of psr/http-message is being autoloaded ahead of vendor/. " .
+			"Run 'composer install' to rebuild vendor/, then remove or disable the other copy " .
+			"(for example the distribution's php-psr-http-message package under include_path, " .
+			"such as /usr/share/php).";
+	}
+
+	/**
+	 * @param string|false $loadedFrom value returned by ReflectionClass::getFileName()
+	 */
+	private static function signatureMessage(string $interface, string|false $loadedFrom, string $methodName): string {
+		return "Incompatible " . $interface . " loaded from " . self::describePath($loadedFrom) .
+			": " . $methodName . "() must declare a non-nullable string parameter to be satisfied by the bundled " .
 			"guzzlehttp/psr7, which requires psr/http-message >= 2.0. " .
 			"Run 'composer install' to rebuild vendor/, and make sure no other copy of psr/http-message " .
 			"is autoloaded before vendor/ (for example a distribution package installed under " .
 			"include_path, such as /usr/share/php).";
 	}
 
-	/**
-	 * Whether the loaded interface can be implemented by the bundled psr7.
-	 *
-	 * The cheap reflection test runs first, so a healthy install does no file
-	 * I/O. psr7 2.x declares an untyped withScheme() and accepts anything, so
-	 * the bundled implementation is only consulted once the interface looks
-	 * typed.
-	 */
-	private static function isCompatible(): bool {
-		$method = new \ReflectionMethod(self::URI_INTERFACE, 'withScheme');
+	/** @return string short interface name, e.g. `RequestInterface` */
+	private static function shortName(string $interface): string {
+		return basename(str_replace('\\', '/', $interface));
+	}
 
-		if (self::acceptsStringParam($method) === true) {
-			return true;
+	/** @return string|null directory of an installed package, with an optional suffix */
+	private static function packageDir(string $package, string $suffix = ''): ?string {
+		if (class_exists('Composer\\InstalledVersions') === true &&
+				Composer\InstalledVersions::isInstalled($package) === true) {
+			$dir = Composer\InstalledVersions::getInstallPath($package);
+
+			if ($dir !== null && is_dir($dir . $suffix) === true) {
+				return $dir . $suffix;
+			}
 		}
 
-		$uriFile = self::locateUri();
+		// Fall back to the bundled path when composer's install metadata is
+		// stale or missing (a copied vendor tree is itself a common cause of a
+		// psr/http-message mismatch).
+		$fallback = __DIR__ . '/../vendor/' . $package . $suffix;
 
-		return $uriFile === null || self::declaresStringParam($uriFile) === false;
+		return is_dir($fallback) === true ? $fallback : null;
 	}
 
 	/**
@@ -103,36 +196,26 @@ final class Psr7Compat {
 		return $path === false || $path === '' ? '(unknown file)' : $path;
 	}
 
-	/** @return string|null path to the psr7 Uri implementation, if one is installed */
-	private static function locateUri(): ?string {
-		if (class_exists('Composer\\InstalledVersions') === false ||
-				Composer\InstalledVersions::isInstalled(self::URI_IMPLEMENTATION) === false) {
-			return null;
-		}
-
-		$dir = Composer\InstalledVersions::getInstallPath(self::URI_IMPLEMENTATION);
-
-		return $dir !== null ? $dir . '/src/Uri.php' : null;
-	}
-
 	/**
-	 * Whether the psr7 Uri implementation types its withScheme() parameter as string.
+	 * Whether the psr7 implementation types the given method's parameter as string.
 	 *
 	 * The file is read rather than loaded, because loading it is what raises the
 	 * fatal. An unreadable file reports no problem, so a failed check cannot block
 	 * an install that would otherwise work.
 	 */
-	private static function declaresStringParam(string $uriFile): bool {
-		if (is_readable($uriFile) === false) {
+	private static function declaresStringParam(string $implementationFile, string $methodName = 'withScheme'): bool {
+		if (is_readable($implementationFile) === false) {
 			return false;
 		}
 
-		$source = file_get_contents($uriFile);
+		$source = file_get_contents($implementationFile);
 
 		if ($source === false) {
 			return false;
 		}
 
-		return preg_match('/function\s+withScheme\s*\(\s*\\\\?string\s+\$/i', $source) === 1;
+		$method = preg_quote($methodName, '/');
+
+		return preg_match('/function\s+' . $method . '\s*\(\s*\\\\?string\s+\$/i', $source) === 1;
 	}
 }

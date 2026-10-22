@@ -6,6 +6,28 @@
 	define('NO_SESSION_AUTOSTART', true);
 
 	require_once __DIR__ . '/../include/autoload.php';
+
+	/* api/index.php does not run Config::sanity_check(): load the bundled PSR-7
+		interfaces before anything else can autoload an older copy, and report an
+		already-loaded incompatible copy in the API wire format instead of
+		letting the first Guzzle class raise E_COMPILE_ERROR. */
+	$psr7_problem = Psr7Compat::check();
+
+	if ($psr7_problem !== null) {
+		error_log($psr7_problem);
+
+		http_response_code(503);
+		header('Content-Type: application/json');
+
+		print json_encode([
+			'seq' => -1,
+			'status' => 1,
+			'content' => ['error' => 'STARTUP_FAILED'],
+		]);
+
+		return;
+	}
+
 	require_once __DIR__ . '/../include/sessions.php';
 
 	ini_set('session.use_cookies', "0");
