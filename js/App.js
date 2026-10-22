@@ -510,8 +510,14 @@ const App = {
          }
 
          if (seq && this.get_seq() !== seq) {
-            console.warn("handleRpcJson: sequence mismatch: ", seq, '!=', this.get_seq());
-            return false;
+            // Counter requests can overlap (periodic refresh, UPDATE_COUNTERS,
+            // post-mutation refresh), so replies may arrive out of order. A reply
+            // carrying an older sequence is stale: drop its payload, but treat it
+            // as handled rather than as a failed request, otherwise xhr.json()
+            // rejects the promise and nothing is listening for that rejection.
+            console.debug("handleRpcJson: ignoring stale reply: seq", seq, '!=', this.get_seq());
+
+            return true;
          }
 
          // not in preferences

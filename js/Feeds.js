@@ -171,7 +171,12 @@ const	Feeds = {
 							"feed_id_count": feed_ids ? feed_ids.length : -1,
 							"label_ids[]": label_ids,
 							"label_id_count": label_ids ? label_ids.length : -1,
-							seq: App.next_seq()});
+							seq: App.next_seq()})
+			// Counter refreshes are fire-and-forget; keep a failed request from
+			// surfacing as an unhandled promise rejection in the console.
+			.catch((e) => {
+				console.warn("requestCounters: request failed", e);
+			});
 	},
 	reload: function() {
 		try {
