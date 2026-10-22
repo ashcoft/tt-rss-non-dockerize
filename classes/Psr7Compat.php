@@ -14,29 +14,15 @@
  *   Psr\Http\Message\RequestInterface must be compatible with
  *   Psr\Http\Message\RequestInterface::withRequestTarget($requestTarget)
  *
- * check() loads the bundled interfaces first, so they win over a copy that
- * would otherwise be autoloaded later, and compares where each one came from.
- * A stale bundled copy is detected by reading the psr7 implementation (without
- * loading it, which is what raises the fatal) and checking the parameter type.
+ * check() compares the signatures psr7 relies on against the bundled
+ * implementation. A compatible copy from another path is accepted: only a
+ * parameter that psr7 rejects is reported.
  *
  * Config::sanity_check() reports the problem through the normal startup path.
- * backend.php and api/index.php call check() directly because they do not run
- * sanity_check() and would otherwise raise the fatal before any output.
+ * include/autoload.php also declares the bundled interfaces first, so a copy
+ * reached later through include_path cannot win the autoload race.
  */
 final class Psr7Compat {
-	/**
-	 * PSR-7 interfaces used by the bundled psr7.
-	 */
-	private const INTERFACES = [
-		'Psr\\Http\\Message\\MessageInterface',
-		'Psr\\Http\\Message\\RequestInterface',
-		'Psr\\Http\\Message\\ResponseInterface',
-		'Psr\\Http\\Message\\ServerRequestInterface',
-		'Psr\\Http\\Message\\StreamInterface',
-		'Psr\\Http\\Message\\UploadedFileInterface',
-		'Psr\\Http\\Message\\UriInterface',
-	];
-
 	/**
 	 * Methods psr7 3.x narrows to a required, non-nullable string, mapped to the
 	 * psr7 source file that declares them.
@@ -47,8 +33,6 @@ final class Psr7Compat {
 		'Psr\\Http\\Message\\RequestInterface' => ['withRequestTarget', 'Request.php'],
 		'Psr\\Http\\Message\\UriInterface' => ['withScheme', 'Uri.php'],
 	];
-
-	private const INTERFACE_PACKAGE = 'psr/http-message';
 
 	private const IMPLEMENTATION_PACKAGE = 'guzzlehttp/psr7';
 
@@ -62,29 +46,8 @@ final class Psr7Compat {
 	 * @return string|null problem description, or null when the loaded interfaces are usable
 	 */
 	public static function check(): ?string {
-		$interfaceDir = self::packageDir(self::INTERFACE_PACKAGE, '/src');
-		$implementationDir = self::packageDir(self::IMPLEMENTATION_PACKAGE, '/src');
-
-		// Without both packages there is no psr7 conflict to report; leave the
-		// install alone so a failed check cannot block something that works.
-		if ($interfaceDir === null || $implementationDir === null) {
-			return null;
-		}
-
-		foreach (self::INTERFACES as $interface) {
+		foreach (self::TYPED_STRING_METHODS as $interface => $typedMethod) {
 			if (interface_exists($interface) === false) {
-				continue;
-			}
-
-			$loadedFrom = (new \ReflectionClass($interface))->getFileName();
-
-			if (self::isForeignCopy($interface, $loadedFrom, $interfaceDir) === true) {
-				return self::foreignCopyMessage($interface, $loadedFrom, $interfaceDir);
-			}
-
-			$typedMethod = self::TYPED_STRING_METHODS[$interface] ?? null;
-
-			if ($typedMethod === null) {
 				continue;
 			}
 
@@ -94,9 +57,14 @@ final class Psr7Compat {
 				continue;
 			}
 
-			if (self::declaresStringParam($implementationDir . '/' . $implementationName, $methodName) === false) {
+			$implementationFile = self::implementationFile($implementationName);
+
+			if ($implementationFile === null ||
+					self::declaresStringParam($implementationFile, $methodName) === false) {
 				continue;
 			}
+
+			$loadedFrom = (new \ReflectionClass($interface))->getFileName();
 
 			return self::signatureMessage($interface, $loadedFrom, $methodName);
 		}
@@ -104,31 +72,11 @@ final class Psr7Compat {
 		return null;
 	}
 
-	/**
-	 * Whether the interface was loaded from a copy other than the bundled one.
-	 *
-	 * @param string|false $loadedFrom value returned by ReflectionClass::getFileName()
-	 */
-	private static function isForeignCopy(string $interface, string|false $loadedFrom, string $interfaceDir): bool {
-		$expected = realpath($interfaceDir . '/' . self::shortName($interface) . '.php');
+	/** @return string|null path to a bundled psr7 implementation file */
+	private static function implementationFile(string $name): ?string {
+		$dir = self::packageDir(self::IMPLEMENTATION_PACKAGE, '/src');
 
-		if ($expected === false) {
-			return false;
-		}
-
-		return realpath($loadedFrom === false ? '' : $loadedFrom) !== $expected;
-	}
-
-	/**
-	 * @param string|false $loadedFrom value returned by ReflectionClass::getFileName()
-	 */
-	private static function foreignCopyMessage(string $interface, string|false $loadedFrom, string $interfaceDir): string {
-		return "Incompatible " . $interface . " loaded from " . self::describePath($loadedFrom) .
-			" instead of the bundled " . $interfaceDir . '/' . self::shortName($interface) . '.php' .
-			": another copy of psr/http-message is being autoloaded ahead of vendor/. " .
-			"Run 'composer install' to rebuild vendor/, then remove or disable the other copy " .
-			"(for example the distribution's php-psr-http-message package under include_path, " .
-			"such as /usr/share/php).";
+		return $dir !== null ? $dir . '/' . $name : null;
 	}
 
 	/**
@@ -141,11 +89,6 @@ final class Psr7Compat {
 			"Run 'composer install' to rebuild vendor/, and make sure no other copy of psr/http-message " .
 			"is autoloaded before vendor/ (for example a distribution package installed under " .
 			"include_path, such as /usr/share/php).";
-	}
-
-	/** @return string short interface name, e.g. `RequestInterface` */
-	private static function shortName(string $interface): string {
-		return basename(str_replace('\\', '/', $interface));
 	}
 
 	/** @return string|null directory of an installed package, with an optional suffix */
@@ -168,7 +111,7 @@ final class Psr7Compat {
 	}
 
 	/**
-	 * Whether the interface parameter can be satisfied by `withScheme(string $scheme)`.
+	 * Whether the interface parameter can be satisfied by a string implementation.
 	 *
 	 * An implementation may only widen a parameter relative to its interface, so
 	 * the interface has to accept exactly one required, non-nullable string: an
