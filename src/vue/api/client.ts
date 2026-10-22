@@ -173,6 +173,7 @@ class ApiClient {
       viewMode?: 'adaptive' | 'all_articles' | 'unread';
       skip?: number;
       search?: string;
+      searchLanguage?: string;
       orderBy?: string;
       forceUpdate?: boolean;
     } = {}
@@ -278,6 +279,16 @@ class ApiClient {
 
   async getInitParams(): Promise<ApiResponse<Record<string, unknown>>> {
     return this.wrap(() => endpoints.getInitParams(legacyBackend), {});
+  }
+
+  async getSearchOptions(): Promise<
+    ApiResponse<{ showLanguage: boolean; defaultLanguage: string; allLanguages: string[] }>
+  > {
+    return this.wrap(() => endpoints.getSearchOptions(legacyBackend), {
+      showLanguage: false,
+      defaultLanguage: 'english',
+      allLanguages: [],
+    });
   }
 
   async setPref(prefName: string, value: string): Promise<ApiResponse<boolean>> {

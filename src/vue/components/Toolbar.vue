@@ -24,6 +24,21 @@
         class="search-input"
         @keyup.enter="handleAction('search', searchQuery)"
       />
+
+      <!-- Word stemming language. Required by the backend: an empty value
+           makes PostgreSQL reject the query and matches nothing. -->
+      <v-select
+        v-if="searchLanguages.length > 1"
+        v-model="searchLanguage"
+        :items="searchLanguages"
+        label="Language"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="search-language"
+        title="Used for word stemming"
+        @update:model-value="onLanguageChange"
+      />
     </div>
 
     <div class="toolbar-center">
@@ -99,9 +114,14 @@ import type { Feed } from '../types';
 
 interface Props {
   feedInfo: Feed | null;
+  searchLanguages?: string[];
+  modelSearchLanguage?: string;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  searchLanguages: () => [],
+  modelSearchLanguage: 'english',
+});
 
 const emit = defineEmits<{
   (e: 'action', action: string, payload?: string | number | object): void;
@@ -109,6 +129,7 @@ const emit = defineEmits<{
 
 // State
 const searchQuery = ref('');
+const searchLanguage = ref(props.modelSearchLanguage);
 const viewMode = ref<'list' | 'grid' | 'expanded'>('list');
 const sortBy = ref('date');
 const sortOrder = ref<'asc' | 'desc'>('desc');
@@ -159,7 +180,21 @@ const handleSort = (command: string) => {
  * @param command - The action command to emit.
  */
 const handleAction = (command: string, payload?: string | number | object) => {
+  // Searches must carry the stemming language, so pass it alongside the term.
+  if (command === 'search') {
+    emit('action', 'search', { query: payload, language: searchLanguage.value });
+    return;
+  }
   emit('action', command, payload);
+};
+
+/**
+ * Notifies the parent when the stemming language changes so it can be stored.
+ * @param language - The newly selected language.
+ */
+const onLanguageChange = (language: string) => {
+  searchLanguage.value = language;
+  emit('action', 'searchLanguage', language);
 };
 </script>
 

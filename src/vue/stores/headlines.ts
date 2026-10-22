@@ -62,6 +62,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const error = ref<string | null>(null);
   const viewMode = ref<'adaptive' | 'all_articles' | 'unread'>('adaptive');
   const searchQuery = ref('');
+  // Search needs a PostgreSQL text-search config name; the backend turns an
+  // empty one into a query that matches nothing. Populated from Feeds/search.
+  const searchLanguage = ref('english');
   const hasMore = ref(false);
   const skip = ref(0);
   const pageSize = 30;
@@ -87,6 +90,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         viewMode: viewMode.value,
         skip: 0,
         search: searchQuery.value,
+        searchLanguage: searchLanguage.value,
       });
 
       if (response.status === 0) {
@@ -117,6 +121,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         viewMode: viewMode.value,
         skip: skip.value,
         search: searchQuery.value,
+        searchLanguage: searchLanguage.value,
       });
 
       if (response.status === 0) {
@@ -343,9 +348,28 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   /**
    * Execute a search against the currently selected feed (Phase 3).
    */
-  async function search(query: string, feedId: number | string, isCat: boolean = false): Promise<void> {
+  async function search(
+    query: string,
+    feedId: number | string,
+    isCat: boolean = false,
+    language?: string
+  ): Promise<void> {
     searchQuery.value = query;
+    if (language) searchLanguage.value = language;
     await loadHeadlines(feedId, isCat);
+  }
+
+  /** Load the available search languages from the backend. */
+  async function loadSearchOptions(): Promise<{ defaultLanguage: string; allLanguages: string[] }> {
+    const response = await api.getSearchOptions();
+    if (response.status === 0) {
+      searchLanguage.value = response.content.defaultLanguage;
+      return {
+        defaultLanguage: response.content.defaultLanguage,
+        allLanguages: response.content.allLanguages,
+      };
+    }
+    return { defaultLanguage: searchLanguage.value, allLanguages: [] };
   }
 
   /**
@@ -378,6 +402,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     error,
     viewMode,
     searchQuery,
+    searchLanguage,
     hasMore,
     
     // Getters
@@ -399,6 +424,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     clearSelection,
     catchupAll,
     search,
+    loadSearchOptions,
     assignLabel,
     reset,
   };

@@ -29,6 +29,8 @@
         <section class="content">
           <Toolbar
             :feed-info="feedsStore.currentFeed"
+            :search-languages="searchLanguages"
+            :model-search-language="headlinesStore.searchLanguage"
             @action="handleToolbarAction"
           />
 
@@ -120,6 +122,7 @@ const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
+const searchLanguages = ref<string[]>([]);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -166,8 +169,14 @@ const stopPolling = () => {
 // Auth flow (Phase 3)
 const onLoggedIn = async () => {
   showMessage('Welcome back!', 'success');
-  await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels()]);
+  await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
   startPolling();
+};
+
+/** Fetch the search stemming languages once the session is available. */
+const loadSearchLanguages = async () => {
+  const { allLanguages } = await headlinesStore.loadSearchOptions();
+  searchLanguages.value = allLanguages;
 };
 
 const onLogout = async () => {
@@ -226,14 +235,22 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
         showMessage('Failed to mark feed as read', 'error');
       }
       break;
-    case 'search':
-      if (typeof payload === 'string' && payload.trim()) {
-        await headlinesStore.search(payload.trim(), feedId, isCat);
-        showMessage(`Searching for "${payload}"`, 'info');
+    case 'search': {
+      // The toolbar sends {query, language} so the stemming language always
+      // reaches the backend (an empty one matches nothing).
+      const query = typeof payload === 'string' ? payload : payload?.query;
+      const language = typeof payload === 'object' && payload !== null ? payload.language : undefined;
+      if (typeof query === 'string' && query.trim()) {
+        await headlinesStore.search(query.trim(), feedId, isCat, language);
+        showMessage(`Searching for "${query}"`, 'info');
       } else {
         headlinesStore.setSearchQuery('');
         await headlinesStore.loadHeadlines(feedId, isCat);
       }
+      break;
+    }
+    case 'searchLanguage':
+      if (typeof payload === 'string') headlinesStore.searchLanguage = payload;
       break;
     case 'viewMode':
       if (typeof payload === 'string') {
@@ -311,7 +328,7 @@ onMounted(async () => {
   const authenticated = await api.checkSession();
   if (authenticated) {
     authStore.setLoggedIn(true);
-    await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels()]);
+    await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
     startPolling();
   }
 });
