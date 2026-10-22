@@ -295,6 +295,12 @@ const App = {
 	get_seq: function() {
 		return this._rpc_seq;
 	},
+	set_seq: function(seq) {
+		// adopt server sequence numbers monotonically so out-of-order
+		// responses can be detected as stale instead of breaking sync
+		if (seq > this._rpc_seq)
+			this._rpc_seq = seq;
+	},
 	setLoadingProgress: function(p) {
 		this._loading_progress += p;
 
@@ -509,15 +515,18 @@ const App = {
             return false;
          }
 
-         if (seq && this.get_seq() !== seq) {
-            // Counter requests can overlap (periodic refresh, UPDATE_COUNTERS,
-            // post-mutation refresh), so replies may arrive out of order. A reply
-            // carrying an older sequence is stale: drop its payload, but treat it
-            // as handled rather than as a failed request, otherwise xhr.json()
-            // rejects the promise and nothing is listening for that rejection.
-            console.debug("handleRpcJson: ignoring stale reply: seq", seq, '!=', this.get_seq());
+         // replies carrying a seq we've already moved past are stale
+         // (e.g. overlapping getAllCounters requests answered out of
+         // order): drop them quietly instead of failing the promise
+         if (seq) {
+            if (seq < this.get_seq()) {
+               console.info("handleRpcJson: dropping stale reply, seq:", seq, "<", this.get_seq());
+               return true;
+            }
 
-            return true;
+            // reply is current or ahead: adopt it so client and server
+            // sequence numbers stay in sync
+            this.set_seq(seq);
          }
 
          // not in preferences

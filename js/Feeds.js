@@ -172,11 +172,7 @@ const	Feeds = {
 							"label_ids[]": label_ids,
 							"label_id_count": label_ids ? label_ids.length : -1,
 							seq: App.next_seq()})
-			// Counter refreshes are fire-and-forget; keep a failed request from
-			// surfacing as an unhandled promise rejection in the console.
-			.catch((e) => {
-				console.warn("requestCounters: request failed", e);
-			});
+			.catch((e) => console.warn("Feeds.requestCounters:", e));
 	},
 	reload: function() {
 		try {

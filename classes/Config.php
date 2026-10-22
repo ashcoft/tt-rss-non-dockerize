@@ -630,6 +630,16 @@ class Config {
 
 		$errors = [];
 
+		/* An incompatible psr/http-message copy (a stale vendor tree, or a
+			distribution package on include_path) makes PHP abort the first time
+			GuzzleHttp\Psr7\Uri is loaded, with a message that names neither the
+			file nor a remedy. Report it here instead. */
+		$psr7_problem = Psr7Compat::check();
+
+		if ($psr7_problem !== null) {
+			$errors[] = $psr7_problem;
+		}
+
 		if (!str_contains(self::get(Config::PLUGINS), "auth_")) {
 			$errors[] = 'Please enable at least one authentication module via PLUGINS';
 		}
