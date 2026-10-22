@@ -957,7 +957,12 @@ class Feeds extends Handler_Protected {
 		$need_auth = isset($_REQUEST['need_auth']);
 		$login = $need_auth ? clean($_REQUEST['login']) : '';
 		$pass = $need_auth ? clean($_REQUEST['pass']) : '';
-		$update_interval = (int) clean($_REQUEST['update_interval'] ?? 0);
+		$update_interval = self::validateUpdateInterval($_REQUEST['update_interval'] ?? 0);
+
+		if ($update_interval === false) {
+			print json_encode(["result" => ['code' => 9, 'parameters' => ['update_interval']]]);
+			return;
+		}
 
 		$rc = Feeds::_subscribe($feed, $cat, $login, $pass, $update_interval);
 
@@ -965,11 +970,12 @@ class Feeds extends Handler_Protected {
 	}
 
 	/**
-	 * @return array{code: int, message?: string}|array{code: int, feeds: array<string>}|array{code: int, feed_id: int}
+	 * @return array{code: int, message?: string}|array{code: int, feeds: array<string>}|array{code: int, feed_id: int}|array{code: int, parameters: array<string>}
 	 * code - status code (see below)
 	 * message - optional error message
 	 * feeds - list of discovered feed URLs
 	 * feed_id - ID of the existing or added feed
+	 * parameters - invalid argument names, for code 9
 	 *
 	 * 0 - OK, Feed already exists
 	 * 1 - OK, Feed added
@@ -982,8 +988,14 @@ class Feeds extends Handler_Protected {
 	 * 6 - Feed parsing failure (invalid content)
 	 * 7 - Error while creating feed database entry.
 	 * 8 - Permission denied (ACCESS_LEVEL_READONLY).
+	 * 9 - Invalid argument value provided (e.g. update_interval 9000).  URL has a dedicated code (2).
 	 */
 	static function _subscribe(string $url, int $cat_id = 0, string $auth_login = '', string $auth_pass = '', int $update_interval = 0): array {
+		// cat_id is not validated here: ttrss_feeds.cat_id has a foreign key to
+		// ttrss_feed_categories, so an unknown category is rejected on insert.
+		if (!in_array($update_interval, array_keys(self::_get_update_intervals()), true)) {
+			return ['code' => 9, 'parameters' => ['update_interval']];
+		}
 
 		$user = ORM::for_table('ttrss_users')
 			->select_many('id', 'login', 'access_level')
@@ -2423,5 +2435,55 @@ class Feeds extends Handler_Protected {
 		return $auth_pass;
 	}
 
+	/**
+	 * Validate a requested feed update interval.
+	 *
+	 * filter_var() returns false for malformed input such as "abc"; under a
+	 * loose comparison that value matches the 0 (default interval) key, which
+	 * would silently subscribe at the default interval instead of reporting the
+	 * bad argument. Membership is therefore tested strictly.
+	 *
+	 * @return int|false the validated interval, or false when it is not allowed
+	 */
+	public static function validateUpdateInterval(mixed $raw): int|false {
+		$interval = filter_var($raw, FILTER_VALIDATE_INT);
+
+		if ($interval === false || !in_array($interval, array_keys(self::_get_update_intervals()), true)) {
+			return false;
+		}
+
+		return $interval;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	public static function _get_purge_intervals(): array {
+		return [
+			0 => __('Use default'),
+			-1 => __('Never purge'),
+			7 => __('1 week old'),
+			14 => __('2 weeks old'),
+			31 => __('1 month old'),
+			60 => __('2 months old'),
+			90 => __('3 months old'),
+		];
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	public static function _get_update_intervals(bool $with_default = true): array {
+		return ($with_default ? [0 => __('Default interval')] : []) + [
+			-1 => __('Disable updates'),
+			15 => __('15 minutes'),
+			30 => __('30 minutes'),
+			60 => __('Hourly'),
+			240 => __('4 hours'),
+			720 => __('12 hours'),
+			1440 => __('Daily'),
+			10080 => __('Weekly'),
+		];
+	}
 }
 

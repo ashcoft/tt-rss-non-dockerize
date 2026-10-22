@@ -52,35 +52,12 @@
 		return;
 	}
 
-	$purge_intervals = [
-		0  => __("Use default"),
-		-1 => __("Never purge"),
-		7  => __("1 week old"),
-		14 => __("2 weeks old"),
-		31 => __("1 month old"),
-		60 => __("2 months old"),
-		90 => __("3 months old")];
-
-	$update_intervals = [
-		0   => __("Default interval"),
-		-1  => __("Disable updates"),
-		15  => __("15 minutes"),
-		30  => __("30 minutes"),
-		60  => __("Hourly"),
-		240 => __("4 hours"),
-		720 => __("12 hours"),
-		1440 => __("Daily"),
-		10080 => __("Weekly")];
-
-	$update_intervals_nodefault = [
-		-1  => __("Disable updates"),
-		15  => __("15 minutes"),
-		30  => __("30 minutes"),
-		60  => __("Hourly"),
-		240 => __("4 hours"),
-		720 => __("12 hours"),
-		1440 => __("Daily"),
-		10080 => __("Weekly")];
+	// These are exposed to templates as globals; Feeds::subscribeToFeed(),
+	// Pref_Feeds and Pref_Prefs read them via `global`. Keep the assignments
+	// until those call sites are converted.
+	$purge_intervals = Feeds::_get_purge_intervals();
+	$update_intervals = Feeds::_get_update_intervals();
+	$update_intervals_nodefault = Feeds::_get_update_intervals(with_default: false);
 
 	$access_level_names = [
 		UserHelper::ACCESS_LEVEL_DISABLED 	=> __("Disabled"),
@@ -94,7 +71,9 @@
 	/* if (str_contains($op, PluginHost::PUBLIC_METHOD_DELIMITER)) {
 		list ($plugin, $pmethod) = explode(PluginHost::PUBLIC_METHOD_DELIMITER, $op, 2);
 
-		// TODO: better implementation that won't modify $_REQUEST
+		// Disabled: this rewrote $op into "pluginhandler" and injected $_REQUEST["plugin"].
+		// PluginHost::lookup_handler() below resolves plugin handlers directly, so the
+		// rewrite is no longer needed.
 		$_REQUEST["plugin"] = $plugin;
 		$method = $pmethod;
 		$op = "pluginhandler";
