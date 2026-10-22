@@ -2,26 +2,58 @@
 
 ## Verified status (2026-10-22)
 
-**The frontend now talks to the real legacy backend, but is still not the
-production entry point.** The Vue client no longer targets the external JSON
-API: it uses a scoped, authenticated adapter over `backend.php` that reproduces
-the wire contract the Dojo client relies on. Keep the existing PHP/Dojo UI as
-the production entry point until the browser test matrix below is signed off.
+**The frontend talks to the real legacy backend through a verified adapter, but
+is still not the production entry point.** The Vue client no longer targets the
+external JSON API: it uses a scoped, authenticated adapter over `backend.php`
+that reproduces the wire contract the Dojo client relies on. Keep the existing
+PHP/Dojo UI as the production entry point.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
 instance, and the external `/api/` endpoint enabled for comparison):
 
-- `npm run build`, `npm run type-check`, `npm run lint:vue` all pass.
-- `npm run test:vue` runs 24 Node tests: 6 pre-existing renderer/scroll
-  regressions plus 18 new adapter tests covering CSRF handling, response
-  mapping, error propagation, and unsupported-operation guards.
-- The adapter was exercised end-to-end against the live backend for login
-  bootstrap, feed tree, headlines (list, paging, search), article
-  mark/star/publish/delete, labels, label assignment, feed catch-up, category
-  creation, and preference reads.
+- `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
+  all pass.
+- `npm run test:vue` runs 28 Node tests: 6 pre-existing renderer/scroll
+  regressions plus 22 adapter tests covering CSRF handling, response mapping,
+  error propagation, search-language resolution, and unsupported-operation
+  guards.
+- The adapter **and the Pinia stores** were driven against the live backend,
+  both directly and through the Vite dev proxy, for feed tree, headlines list,
+  read/unread toggling, star, publish, delete, search, labels, label
+  assignment, feed catch-up, category creation, and preference reads. All
+  returned the expected data.
 - The repository's own PHP integration suite runs unchanged (554 tests) and
   shows the same pre-existing failures as the unmodified tree; no new failure
   is attributable to this work.
+
+### Defect found and fixed by browser testing
+
+**Search silently returned nothing.** `Feeds/view` passes the stemming
+language to PostgreSQL `to_tsquery()`. When it is empty, PostgreSQL raises
+`invalid name syntax`; the backend catches that and substitutes a
+match-nothing query, so the UI reported "Incorrect search syntax" or an empty
+list rather than an error. The legacy Dojo client always submits a language
+from a dialog dropdown.
+
+Confirmed live against PostgreSQL 17: `to_tsquery('', 'widgets')` fails, while
+`to_tsquery('english', 'widgets')` succeeds. The adapter now resolves the
+configured default via `Feeds/search` before a search, the store tracks it,
+and the toolbar exposes the language list. Verified end-to-end afterwards:
+searching "widgets" returns 3 articles and "gadgets" returns 2.
+
+### Browser interaction testing was inconclusive
+
+The app was driven in a headless browser against the dev server. The feed tree
+rendered with correct names and counters, mount-time requests
+(`Pref_Feeds/getfeedtree`, `RPC/getAllCounters`, `Pref_Labels/getlabeltree`,
+`Feeds/search`) all succeeded with the real CSRF token, and the backend
+confirmed it produced correct headline payloads for the browser's own
+requests. However, in that environment the `@click` handlers on the
+`v-list-item` feed entries never fired, so headline loading could not be
+confirmed through the UI. The same calls succeed from the store layer, so this
+is either an artifact of the automation or a genuine list-item interaction bug
+that needs investigation. **This is the first thing to check before a
+cutover.**
 
 ### How the adapter works
 
@@ -70,7 +102,8 @@ These were confirmed by calling the running backend, not by reading code:
 
 ### Next production gate
 
-Run browser tests (login, feeds, search, pagination, mutations, preferences)
+Investigate the list-item click behaviour noted above, then run the full
+browser matrix (login, feeds, search, pagination, mutations, preferences)
 against a real instance before switching the entry point. Also decide whether
 feed subscribe should pass the optional custom title (`Feeds/add` ignores it)
 and whether the `note` plugin should be enabled by default. Do not weaken
@@ -334,7 +367,7 @@ For production build issues:
 - [x] Feed management (add, delete feeds; purge is CLI-only)
 - [x] Category management (create, rename, delete)
 - [x] Labels management (create, remove, assign)
-- [x] Search functionality (via `Feeds/view` `query` parameter)
+- [x] Search functionality (via `Feeds/view` `query` + stemming language)
 - [x] Filter listing and deletion
 - [x] User authentication/login flow
 - [ ] Drag and drop support

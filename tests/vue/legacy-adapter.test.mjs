@@ -280,10 +280,74 @@ test('getHeadlines searches via `query`, not `search`', async () => {
   const backend = new LegacyBackend();
   backend.setCsrfToken('t');
 
-  await endpoints.getHeadlines(backend, 7, { search: 'hello world' });
+  await endpoints.getHeadlines(backend, 7, { search: 'hello world', searchLanguage: 'english' });
 
   assert.ok(calls[0].body.includes('query=hello+world'));
   assert.ok(!calls[0].body.includes('search='));
+});
+
+test('a search without a language resolves the configured default first', async () => {
+  installGlobals();
+  // Regression: an empty search_language makes PostgreSQL raise
+  // "invalid name syntax", which the backend turns into a match-nothing
+  // query. The adapter must look the default up instead of sending "".
+  const calls = stubFetch([
+    { text: JSON.stringify({ show_language: true, all_languages: ['english', 'simple'], default_language: 'simple' }) },
+    { text: JSON.stringify({ headlines: { content: [] }, 'headlines-info': { count: 0 } }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.getHeadlines(backend, 7, { search: 'widgets' });
+
+  assert.ok(calls[0].body.includes('method=search'), 'should ask Feeds/search for options');
+  assert.ok(calls[1].body.includes('search_language=simple'));
+});
+
+test('an explicit search language is used as-is without an options lookup', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: JSON.stringify({ headlines: { content: [] }, 'headlines-info': { count: 0 } }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.getHeadlines(backend, 7, { search: 'widgets', searchLanguage: 'french' });
+
+  assert.equal(calls.length, 1, 'should not fetch options when a language is given');
+  assert.ok(calls[0].body.includes('search_language=french'));
+});
+
+test('a non-search request never resolves a search language', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: JSON.stringify({ headlines: { content: [] }, 'headlines-info': { count: 0 } }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.getHeadlines(backend, -4);
+
+  assert.equal(calls.length, 1, 'should not fetch search options when not searching');
+  // An empty language is only harmful alongside a non-empty query.
+  assert.ok(calls[0].body.includes('query='), 'sends an empty query');
+  assert.ok(calls[0].body.includes('search_language='));
+});
+
+test('getSearchOptions never returns an empty language', async () => {
+  installGlobals();
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  stubFetch([
+    { text: JSON.stringify({ show_language: true, all_languages: ['english', 'french'], default_language: '' }) },
+  ]);
+  const options = await endpoints.getSearchOptions(backend);
+  assert.equal(options.defaultLanguage, 'english', 'falls back to the first available language');
+
+  stubFetch([{ text: JSON.stringify({ show_language: true, all_languages: [], default_language: '' }) }]);
+  const empty = await endpoints.getSearchOptions(backend);
+  assert.equal(empty.defaultLanguage, 'english', 'has a last-resort default');
 });
 
 test('getHeadlines reports a string content body as a message, not as headlines', async () => {

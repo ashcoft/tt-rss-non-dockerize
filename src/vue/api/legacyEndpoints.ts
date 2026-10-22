@@ -263,6 +263,14 @@ export async function getHeadlines(
     forceUpdate?: boolean;
   } = {}
 ): Promise<HeadlinesPage> {
+  // A search without a language makes PostgreSQL raise "invalid name syntax",
+  // which the backend turns into a query matching nothing. Resolve the
+  // configured default before searching so results are never silently empty.
+  let searchLanguage = options.searchLanguage ?? '';
+  if (options.search && !searchLanguage) {
+    searchLanguage = (await getSearchOptions(backend)).defaultLanguage;
+  }
+
   const response = await backend.call('Feeds', 'view', {
     feed: feedId,
     cat: options.isCat ? 1 : 0,
@@ -270,7 +278,7 @@ export async function getHeadlines(
     skip: options.skip ?? 0,
     // Feeds/view reads the search term from `query`, not `search`.
     query: options.search ?? '',
-    search_language: options.searchLanguage ?? '',
+    search_language: searchLanguage,
     order_by: options.orderBy ?? '',
     // "ForceUpdate" makes the backend refresh the feed before listing.
     m: options.forceUpdate ? 'ForceUpdate' : '',
@@ -386,6 +394,34 @@ export async function getInitParams(
   });
   const body = requireBody(response, 'RPC/sanityCheck');
   return expectObject(body['init-params'], 'RPC/sanityCheck.init-params');
+}
+
+/**
+ * `Feeds/search` returns the options the search dialog needs: whether to show
+ * the language selector, the language list, and the default to preselect.
+ *
+ * The language matters for correctness, not just presentation: `Feeds/view`
+ * passes it to PostgreSQL `to_tsquery()`, and an empty value raises
+ * "invalid name syntax", which the backend converts into a match-nothing
+ * query. The legacy client therefore always submits a language.
+ */
+export async function getSearchOptions(
+  backend: LegacyBackend
+): Promise<{ showLanguage: boolean; defaultLanguage: string; allLanguages: string[] }> {
+  const response = await backend.call('Feeds', 'search');
+  const body = requireBody(response, 'Feeds/search');
+  const allLanguages = Array.isArray(body.all_languages)
+    ? body.all_languages.map((lang) => asString(lang)).filter((lang) => lang !== '')
+    : [];
+  const defaultLanguage = asString(body.default_language);
+
+  return {
+    showLanguage: body.show_language === true,
+    // Never hand back an empty language; fall back to the first available one
+    // so a search cannot silently return nothing.
+    defaultLanguage: defaultLanguage || allLanguages[0] || 'english',
+    allLanguages,
+  };
 }
 
 /**
