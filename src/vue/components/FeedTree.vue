@@ -179,14 +179,15 @@ const emit = defineEmits<{
 // State
 const searchQuery = ref('');
 
-// Special feeds (built-in)
+// Special feeds (built-in). IDs mirror the Feeds::FEED_* constants in
+// classes/Feeds.php and must not be renumbered.
 const specialFeeds = [
-  { id: -1, name: 'All Articles', icon: 'mdi-newspaper', unread: 0 },
-  { id: -2, name: 'Fresh Articles', icon: 'mdi-weather-sunny', unread: 0 },
-  { id: -3, name: 'Starred', icon: 'mdi-star', unread: 0 },
-  { id: -4, name: 'Published', icon: 'mdi-publish', unread: 0 },
-  { id: -5, name: 'Recently Read', icon: 'mdi-history', unread: 0 },
-  { id: -6, name: 'Archived', icon: 'mdi-archive', unread: 0 },
+  { id: -4, name: 'All Articles', icon: 'mdi-newspaper', unread: 0 },
+  { id: -3, name: 'Fresh Articles', icon: 'mdi-weather-sunny', unread: 0 },
+  { id: -1, name: 'Starred', icon: 'mdi-star', unread: 0 },
+  { id: -2, name: 'Published', icon: 'mdi-publish', unread: 0 },
+  { id: -6, name: 'Recently Read', icon: 'mdi-history', unread: 0 },
+  { id: 0, name: 'Archived', icon: 'mdi-archive', unread: 0 },
 ];
 
 // Computed

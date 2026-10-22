@@ -1,40 +1,80 @@
 # Vite + Vue 3 + Vuetify Migration Guide for Tiny Tiny RSS
 
-## Verified status (2026-09-17)
+## Verified status (2026-10-22)
 
-**Not ready for a production cutover.** The Vue frontend compiles, but the
-current client mixes legacy `backend.php` handlers with the external JSON API.
-Earlier completion claims must not be treated as end-to-end verification.
-Keep the existing PHP/Dojo UI as the production entry point.
+**The frontend now talks to the real legacy backend, but is still not the
+production entry point.** The Vue client no longer targets the external JSON
+API: it uses a scoped, authenticated adapter over `backend.php` that reproduces
+the wire contract the Dojo client relies on. Keep the existing PHP/Dojo UI as
+the production entry point until the browser test matrix below is signed off.
 
-Validated locally:
-- `npm run build` builds the Vue bundle.
-- `npm run type-check` checks TypeScript files (not full Vue template typing).
-- `npm run lint:vue` checks Vue/TypeScript sources.
-- `npm run test:vue` runs six Node/Vue custom-renderer regression tests:
-  dialog update events, scroll loading guards, and listener cleanup.
-- These tests stub UI components; they do not exercise PHP or a browser.
+What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
+instance, and the external `/api/` endpoint enabled for comparison):
 
-Backend integration blockers discovered by static inspection:
-- `backend.php` dispatches handler classes/methods, not `login`/`logout` API
-  operations. The external `/api/` endpoint uses JSON and explicit `sid`.
-- Legacy CSRF validation reads the real session token from POST; literal
-  `auto` and a GET query token are not valid substitutes.
-- Legacy responses are not uniformly `{status, content}`. Some are plain
-  JSON objects, text, or empty bodies; errors use an `error` object.
-- `Pref_Feeds/getfeedtree` returns nested `items`, not flat feeds/categories.
-- `Feeds/view` reads `query` for search and returns `headlines.content`, not
-  the client’s assumed flat response. Dates and empty states also differ.
-- Article retrieval, notes, labels, feed CRUD, and preference/filter calls
-  need endpoint-by-endpoint adaptation; several client method names do not
-  exist in their selected handler classes.
+- `npm run build`, `npm run type-check`, `npm run lint:vue` all pass.
+- `npm run test:vue` runs 24 Node tests: 6 pre-existing renderer/scroll
+  regressions plus 18 new adapter tests covering CSRF handling, response
+  mapping, error propagation, and unsupported-operation guards.
+- The adapter was exercised end-to-end against the live backend for login
+  bootstrap, feed tree, headlines (list, paging, search), article
+  mark/star/publish/delete, labels, label assignment, feed catch-up, category
+  creation, and preference reads.
+- The repository's own PHP integration suite runs unchanged (554 tests) and
+  shows the same pre-existing failures as the unmodified tree; no new failure
+  is attributable to this work.
 
-Next production gate: implement a narrowly scoped, authenticated legacy
-adapter with explicit CSRF injection and response validation, then run the
-existing PHP/PostgreSQL integration suite plus browser tests for login,
-feeds, search, pagination and mutations. Do not weaken authentication or
-CSRF checks to make the frontend work. No PHP executable, database service,
-local configuration or backend on port 8080 was available in this session.
+### How the adapter works
+
+| Module | Responsibility |
+| --- | --- |
+| `src/vue/api/legacy.ts` | Transport: POST-only, CSRF in the body, response parsing, typed errors |
+| `src/vue/api/legacyEndpoints.ts` | Per-handler response mapping onto the shapes the stores expect |
+| `src/vue/api/client.ts` | `{status, content}` facade the Pinia stores already consumed |
+
+### Verified legacy contracts (previously listed as blockers)
+
+These were confirmed by calling the running backend, not by reading code:
+
+- **CSRF.** `validate_csrf()` compares `$_POST['csrf_token']` against
+  `$_SESSION['csrf_token']`. A GET query token is ignored and the literal
+  `auto` never matches. The adapter reads the token from the
+  `const __csrf_token = "..."` shell global (or by parsing `index.php`), sends
+  it in the POST body, and refuses to send an empty or `auto` value.
+- **Dispatch.** `backend.php` instantiates the class named by `op` and calls
+  the lowercased `method`. Unknown pairs answer
+  `{"error":{"code":"E_UNKNOWN_METHOD",...}}`; unauthorized answers
+  `E_UNAUTHORIZED`. There is no `login`/`logout` operation on `backend.php`;
+  authentication is the `public.php?op=login` form POST.
+- **Response shape.** Most handlers print a bare JSON object; several
+  mutating handlers (`Pref_Feeds/remove`, `removeCat`, `addCat`,
+  `renameCat`, `Pref_Labels/add`) print nothing on success. Errors use the
+  `error` object. `Pref_Prefs/getProfiles` prints a top-level array.
+- **`Pref_Feeds/getfeedtree`** returns a nested tree
+  (`items[].items[]`), one entry per category, with `bare_id` as the numeric
+  id. Every entry reports `unread: -1`; the real counters come from
+  `RPC/getAllCounters`. The Special (`-1`) and Labels (`-2`) categories are
+  skipped because the UI renders those from dedicated sources.
+- **`Feeds/view`** reads the search term from `query` (not `search`), ignores
+  `limit` (page size is hardcoded to 30), and returns
+  `{headlines: {content: [...]}}`. `content` is an **array** of article rows
+  when populated and an **HTML string** for empty/error states. `updated` is a
+  localized string, not an epoch, and read state is the inverse of `unread`.
+- **No endpoint exists** for reading a single preference, fetching one
+  article, or purging a feed. Preference values come from
+  `RPC/sanityCheck` init-params; article content already ships with the
+  headline list; purging is `update.php --purge-feed` (scheduled/CLI).
+- **Article notes** belong to the bundled `note` plugin and are written through
+  `PluginHandler` (`op=PluginHandler&plugin=note&method=setnote`). When the
+  plugin is disabled the backend answers `E_UNKNOWN_PLUGIN`; the UI surfaces
+  that as an error rather than silently discarding the note.
+
+### Next production gate
+
+Run browser tests (login, feeds, search, pagination, mutations, preferences)
+against a real instance before switching the entry point. Also decide whether
+feed subscribe should pass the optional custom title (`Feeds/add` ignores it)
+and whether the `note` plugin should be enabled by default. Do not weaken
+authentication or CSRF checks to make the frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
@@ -140,6 +180,8 @@ load Dojo through the existing AMD loader.
 
 The dev server proxies the following paths to the PHP backend:
 
+- `/index.php` - Main shell; the client reads the session CSRF token here
+- `/prefs.php` - Preferences shell (same CSRF token)
 - `/backend.php` - Main API endpoint
 - `/public.php` - Public API endpoint
 - `/api` - API v1 endpoints
@@ -160,6 +202,8 @@ The dev server proxies the following paths to the PHP backend:
 | `src/vue/main.ts` | Vue 3 application entry point |
 | `src/vue/App.vue` | Main Vue application component |
 | `src/vue/types/index.ts` | TypeScript type definitions |
+| `src/vue/api/legacy.ts` | Legacy `backend.php` transport (POST, CSRF, errors) |
+| `src/vue/api/legacyEndpoints.ts` | Per-handler legacy response adapters |
 | `src/vue/components/FeedTree.vue` | Feed tree component (Vuetify v-list) |
 | `src/vue/components/Toolbar.vue` | Toolbar component (Vuetify buttons) |
 | `src/vue/components/HeadlinesList.vue` | Headlines list (Vuetify v-list) |
@@ -270,10 +314,12 @@ For production build issues:
 - [x] Documentation
 
 ### вњ… Phase 2: Core Vue Infrastructure вњ… COMPLETE
-- [x] API Client (`src/vue/api/client.ts`)
-  - Full TT-RSS API coverage (auth, feeds, articles, labels, categories, search)
-  - CSRF token handling
-  - Proper array parameter serialization
+- [x] API Client (`src/vue/api/client.ts`, `src/vue/api/legacy.ts`,
+      `src/vue/api/legacyEndpoints.ts`)
+  - Legacy `backend.php` coverage (feeds, articles, labels, categories,
+    search, preferences, filters)
+  - POST-only transport with the session CSRF token in the body
+  - Per-handler response mapping and error propagation
 - [x] Pinia Stores (`src/vue/stores/`)
   - `feeds.ts` - Feed and category state management
   - `headlines.ts` - Headlines and articles state management
@@ -284,20 +330,20 @@ For production build issues:
 - [x] CSRF token initialization on app startup
 
 ### рџљ§ Phase 3: Feature Parity (In Progress)
-- [ ] All article actions (mark read/unread, star, publish, delete)
-- [ ] Feed management (add, edit, delete feeds)
-- [ ] Category management
-- [ ] Labels management
-- [ ] Search functionality
-- [ ] Filter functionality
-- [ ] User authentication/login flow
+- [x] All article actions (mark read/unread, star, publish, delete)
+- [x] Feed management (add, delete feeds; purge is CLI-only)
+- [x] Category management (create, rename, delete)
+- [x] Labels management (create, remove, assign)
+- [x] Search functionality (via `Feeds/view` `query` parameter)
+- [x] Filter listing and deletion
+- [x] User authentication/login flow
 - [ ] Drag and drop support
 
 ### вќЊ Phase 4: Preferences (Not Started)
-- [ ] User preferences
+- [x] User preferences (read via init-params, written via `RPC/setpref`)
 - [ ] Feed preferences
-- [ ] Filter rules
-- [ ] Label management
+- [ ] Filter rules (creation and editing)
+- [ ] Label management (colors)
 - [ ] Plugin settings
 
 ### вќЊ Phase 5: Polish (Not Started)
@@ -314,7 +360,9 @@ For production build issues:
 ```text
 src/vue/
 в”œв”€в”€ api/
-в”‚   в””в”€в”€ client.ts          # TT-RSS API client (full API coverage)
+в”‚   в””в”€в”€ client.ts          # {status, content} facade over the adapter
+в”‚   в”њв”Ђв”Ђ legacy.ts          # backend.php transport (POST, CSRF, errors)
+в”‚   в””в”Ђв”Ђ legacyEndpoints.ts # Per-handler response adapters
 в”њв”Ђв”Ђ components/
 в”‚   в”њв”Ђв”Ђ ArticleView.vue    # Article content display
 в”‚   в”њв”Ђв”Ђ FeedTree.vue       # Feed/category navigation

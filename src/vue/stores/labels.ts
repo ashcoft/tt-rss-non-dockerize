@@ -29,9 +29,9 @@ export const useLabelsStore = defineStore('labels', () => {
     try {
       const response = await api.getLabels();
       if (response.status === 0) {
-        labels.value = (response.content ?? []) as unknown as LabelInfo[];
+        labels.value = response.content;
       } else {
-        error.value = 'Failed to load labels';
+        error.value = response.error ?? 'Failed to load labels';
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Unknown error';

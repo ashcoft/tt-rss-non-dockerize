@@ -136,7 +136,7 @@ const notify = (text: string, type: 'success' | 'error' = 'success') => {
 
 const addFeed = async () => {
   busy.value = true;
-  const ok = await feedStore.addFeed(newFeedUrl.value, newFeedCategory.value ?? 0, newFeedTitle.value || undefined);
+  const ok = await feedStore.addFeed(newFeedUrl.value, newFeedCategory.value ?? 0);
   busy.value = false;
   if (ok) {
     notify('Feed added');
@@ -150,9 +150,12 @@ const addFeed = async () => {
 const purge = async () => {
   if (!selectedFeedId.value) return;
   busy.value = true;
-  const ok = await feedStore.purgeFeed(selectedFeedId.value);
+  const ok = await feedStore.purgeFeed();
   busy.value = false;
-  notify(ok ? 'Feed purged' : 'Failed to purge feed', ok ? 'success' : 'error');
+  notify(
+    ok ? 'Feed purged' : feedStore.error ?? 'Failed to purge feed',
+    ok ? 'success' : 'error'
+  );
 };
 
 const remove = async () => {

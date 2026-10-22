@@ -99,17 +99,22 @@ interface EditablePref {
   type: 'bool' | 'string';
 }
 
-// The subset of TT-RSS user preferences surfaced in the UI
+// The subset of TT-RSS user preferences surfaced in the UI. The keys are the
+// lowercased Prefs::* names as they appear in RPC/sanityCheck init-params.
 const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: string }> = [
-  { name: 'PURGE_UNREAD_ON_DAYS', type: 'string', label: 'Purge unread articles older than (days)' },
-  { name: 'PURGE_READ_ON_DAYS', type: 'string', label: 'Purge read articles older than (days)' },
-  { name: 'UPDATE_POST_ON_CHECK', type: 'bool', label: 'Update articles in background' },
-  { name: 'ENABLE_FEED_ICONS', type: 'bool', label: 'Show feed icons' },
-  { name: 'HIDE_READ_FEEDS', type: 'bool', label: 'Hide read feeds in the feed list' },
-  { name: 'SORT_FEEDS_UNREAD', type: 'bool', label: 'Sort feeds by unread count' },
-  { name: 'SHOW_CONTENT_PREVIEW', type: 'bool', label: 'Show content preview in headlines' },
-  { name: 'STRIP_UNSAFE_IMAGES', type: 'bool', label: 'Strip unsafe images from articles' },
+  { name: 'purge_old_days', type: 'string', label: 'Purge articles older than (days)' },
+  { name: 'purge_unread_articles', type: 'bool', label: 'Purge unread articles' },
+  { name: 'enable_feed_cats', type: 'bool', label: 'Enable feed categories' },
+  { name: 'show_content_preview', type: 'bool', label: 'Show content preview in headlines' },
+  { name: 'hide_read_feeds', type: 'bool', label: 'Hide read feeds in the feed list' },
+  { name: 'feeds_sort_by_unread', type: 'bool', label: 'Sort feeds by unread count' },
+  { name: 'confirm_feed_catchup', type: 'bool', label: 'Confirm before marking a feed as read' },
+  { name: 'cdm_auto_catchup', type: 'bool', label: 'Automatically mark articles as read in combined mode' },
+  { name: 'vfeed_group_by_feed', type: 'bool', label: 'Group headlines by feed' },
 ];
+
+/** Map a UI pref key back to the Prefs::* name `RPC/setpref` expects. */
+const prefConstant = (name: string) => name.toUpperCase();
 
 const editablePrefs = ref<EditablePref[]>([]);
 const filters = ref<Array<Record<string, unknown>>>([]);
@@ -131,28 +136,28 @@ const prefText = (name: string) =>
 
 async function loadPrefs() {
   loadingPrefs.value = true;
-  const result: EditablePref[] = [];
-  for (const def of prefDefinitions) {
-    try {
-      const response = await api.getPref(def.name);
-      result.push({
-        name: def.name,
-        type: def.type,
-        value: response.status === 0 ? String((response.content as { Value?: unknown })?.Value ?? '') : '',
-      });
-    } catch {
-      result.push({ name: def.name, type: def.type, value: '' });
-    }
+  try {
+    // Preference values are only readable through the RPC/sanityCheck
+    // init-params payload; there is no per-preference read endpoint.
+    const response = await api.getInitParams();
+    const params = response.status === 0 ? response.content : {};
+    editablePrefs.value = prefDefinitions.map(def => ({
+      name: def.name,
+      type: def.type,
+      value: params[def.name] === undefined ? '' : String(params[def.name]),
+    }));
+  } catch {
+    notify('Failed to load preferences', 'error');
+  } finally {
+    loadingPrefs.value = false;
   }
-  editablePrefs.value = result;
-  loadingPrefs.value = false;
 }
 
 async function savePref(name: string, value: string) {
   try {
-    const response = await api.setPref(name, value);
+    const response = await api.setPref(prefConstant(name), value);
     notify(
-      response.status === 0 ? 'Preference saved' : 'Failed to save preference',
+      response.status === 0 ? 'Preference saved' : response.error ?? 'Failed to save preference',
       response.status === 0 ? 'success' : 'error'
     );
   } catch {
@@ -165,9 +170,9 @@ async function loadFilters() {
   try {
     const response = await api.getFilters();
     if (response.status === 0) {
-      const content = response.content as { content?: unknown };
-      const list = Array.isArray(content) ? content : content?.content;
-      filters.value = Array.isArray(list) ? (list as Array<Record<string, unknown>>) : [];
+      filters.value = response.content;
+    } else {
+      notify(response.error ?? 'Failed to load filters', 'error');
     }
   } catch {
     notify('Failed to load filters', 'error');

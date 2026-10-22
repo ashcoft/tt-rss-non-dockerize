@@ -120,7 +120,9 @@ async function loadLabels() {
   try {
     const response = await api.getLabels();
     if (response.status === 0) {
-      labels.value = response.content as unknown as LabelInfo[];
+      labels.value = response.content;
+    } else {
+      notify(response.error ?? 'Failed to load labels', 'error');
     }
   } catch (err) {
     console.error('Failed to load labels:', err);
@@ -142,7 +144,7 @@ async function create() {
       newCaption.value = '';
       await loadLabels();
     } else {
-      notify('Failed to create label', 'error');
+      notify(response.error ?? 'Failed to create label', 'error');
     }
   } catch {
     notify('Failed to create label', 'error');
@@ -158,7 +160,7 @@ async function removeLabel(label: LabelInfo) {
       await loadLabels();
       notify('Label removed');
     } else {
-      notify('Failed to remove label', 'error');
+      notify(response.error ?? 'Failed to remove label', 'error');
     }
   } catch {
     notify('Failed to remove label', 'error');

@@ -37,11 +37,13 @@ export interface Headline {
   link: string;
   content: string;
   excerpt: string;
-  updated: number;
+  updated: string;
+  updated_long?: string;
   is_marked: boolean;
   is_read: boolean;
   is_published: boolean;
   tags: string[];
+  labels?: unknown[];
   feed_id: number;
   feed_title: string;
   comments_count: number;
@@ -58,15 +60,19 @@ export interface Article {
   link: string;
   content: string;
   excerpt: string;
-  updated: number;
+  updated: string;
+  updated_long?: string;
   is_marked: boolean;
   is_read: boolean;
   is_published: boolean;
   tags: string[];
+  labels?: unknown[];
   feed_id: number;
   feed_title: string;
   comments_count: number;
+  comments_link: string;
   author: string;
+  score: number;
   note: string;
 }
 
