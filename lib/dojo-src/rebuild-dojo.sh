@@ -47,7 +47,8 @@ if [ -d util/buildscripts/ ]; then
     if command -v node >/dev/null 2>&1; then
       node -e 'const fs = require("fs"); const p = "dojo/package.json"; const manifest = JSON.parse(fs.readFileSync(p, "utf8")); delete manifest.scripts; delete manifest.devDependencies; fs.writeFileSync(p, JSON.stringify(manifest, null, "\t") + "\n");'
     else
-      echo "$0: warning: node not found, remove scripts/devDependencies from dojo/package.json manually."
+      echo "$0: ERROR: node is required to strip the Dojo test-harness manifest." >&2
+      exit 1
     fi
   else
     echo "$0: ERROR: Dojo build seems to have failed."
