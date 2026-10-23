@@ -29,14 +29,9 @@ updates:
     - dependency-name: 'conventional-changelog-conventionalcommits'
       versions: ['>=10.0.0']
 
-- package-ecosystem: docker
-  directories:
-  - /.docker/app
-  - /.docker/web-nginx
-  schedule:
-    interval: weekly
-  commit-message:
-    prefix: 'Docker:'
+# No docker entry: the fork dropped the container deployment (nondockerize),
+# so /.docker/app and /.docker/web-nginx no longer exist. Keeping the entry
+# made every Docker update job fail with dependency_file_not_found.
 
 - package-ecosystem: github-actions
   directory: /
