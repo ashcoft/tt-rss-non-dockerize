@@ -27,6 +27,22 @@ final class Psr7CompatTest extends TestCase { // skipcq
 		$this->assertTrue(self::declaresStringParam($uri)); // skipcq
 	}
 
+	/** psr7 3.x also types withRequestTarget(), which RequestInterface must satisfy. */
+	public function testBundledRequestDeclaresStringParam(): void {
+		$request = __DIR__ . '/../vendor/guzzlehttp/psr7/src/Request.php';
+		$this->assertTrue(self::declaresStringParam($request, 'withRequestTarget')); // skipcq
+	}
+
+	/** psr/http-message 1.0.x leaves withRequestTarget() untyped: the reported failure. */
+	public function testUntypedRequestTargetIsRejected(): void {
+		$this->assertFalse($this->acceptsParam('ProbeRequestUntyped', '$requestTarget', 'withRequestTarget')); // skipcq
+	}
+
+	/** A typed withRequestTarget() is accepted. */
+	public function testStringRequestTargetIsAccepted(): void {
+		$this->assertTrue($this->acceptsParam('ProbeRequestString', 'string $requestTarget', 'withRequestTarget')); // skipcq
+	}
+
 	/** A psr7 2.x-style untyped implementation must not be treated as a conflict. */
 	public function testUntypedPsr7IsNotAConflict(): void {
 		$file = self::temporaryFile('Psr7CompatProbePsr7', 'withScheme($scheme)');
@@ -81,24 +97,25 @@ final class Psr7CompatTest extends TestCase { // skipcq
 
 	/**
 	 * @param string $name unique interface name, so repeated runs cannot clash
-	 * @param string $declaration the withScheme() parameter declaration to probe
+	 * @param string $declaration the parameter declaration to probe
+	 * @param string $method method to declare on the probe interface
 	 */
-	private function acceptsParam(string $name, string $declaration): bool {
-		$file = self::temporaryFile($name, "withScheme($declaration)");
+	private function acceptsParam(string $name, string $declaration, string $method = 'withScheme'): bool {
+		$file = self::temporaryFile($name, $method . "($declaration)");
 
 		try {
 			require_once $file;
 
 			return (bool)(new ReflectionMethod('Psr7Compat', 'acceptsStringParam'))
-				->invoke(null, new ReflectionMethod($name, 'withScheme'));
+				->invoke(null, new ReflectionMethod($name, $method));
 		} finally {
 			unlink($file);
 		}
 	}
 
 	/** @param string $file path to a PHP source file to inspect */
-	private static function declaresStringParam(string $file): bool {
-		return (bool)(new ReflectionMethod('Psr7Compat', 'declaresStringParam'))->invoke(null, $file);
+	private static function declaresStringParam(string $file, string $method = 'withScheme'): bool {
+		return (bool)(new ReflectionMethod('Psr7Compat', 'declaresStringParam'))->invoke(null, $file, $method);
 	}
 
 	/**
