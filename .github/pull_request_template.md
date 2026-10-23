@@ -18,6 +18,13 @@
 - [ ] Refactoring (non-breaking change)
 - [ ] Breaking change (fix or feature that would cause existing functionality to change)
 
+## Category
+<!-- Optional. Used by the Label workflow to tag this pull request, so keep it to -->
+<!-- one or more of: dependencies, ci, documentation, translations, bug, -->
+<!-- enhancement, php, javascript, frontend, plugins. -->
+<!-- Leave it empty to infer the label from the boxes above, the title, or the -->
+<!-- files changed. -->
+
 ## Checklist
 <!-- Go over all the following points, and put an `x` in all the boxes that apply. -->
 <!-- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
