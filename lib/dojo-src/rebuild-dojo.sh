@@ -50,8 +50,8 @@ if [ -d util/buildscripts/ ]; then
       echo "$0: warning: node not found, remove scripts/devDependencies from dojo/package.json manually."
     fi
   else
-    echo $0: ERROR: Dojo build seems to have failed.
+    echo "$0: ERROR: Dojo build seems to have failed."
   fi
 else
-  echo $0: ERROR: Please unpack Dojo source release into current directory.
+  echo "$0: ERROR: Please unpack Dojo source release into current directory."
 fi
