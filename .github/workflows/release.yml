@@ -21,6 +21,8 @@ jobs:
   build-legacy:
     name: Build Legacy (Dojo) Package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.ref_name == 'main' && github.repository_owner == 'ashcoft'
     steps:
       - name: Checkout
