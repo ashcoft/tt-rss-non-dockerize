@@ -1,0 +1,132 @@
+# Adds labels to pull requests based on their "Category" field, the checked
+# "Types of Changes" boxes, the title, or the files changed, so that release
+# notes and filters can be grouped by change type.
+name: 🏷️ Label
+
+on:
+  # pull_request_target is needed to label pull requests opened from forks.
+  # The job never checks out or executes pull request code: it only reads the
+  # PR metadata through the API.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    types: [opened, edited, reopened]
+  # Allow labelling an existing pull request by hand.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        type: string
+        description: Pull request number to label
+        required: true
+
+concurrency:
+  group: label-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  label:
+    name: 🏷️ Apply Category Label
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Determine and Apply Label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // [ label, matches the Category field / title / checkboxes, matches changed file paths ]
+            const categories = [
+              ['dependencies', /dependenc|\bdeps?\b|\bbump\b/i,
+                /^(composer\.(json|lock)|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/],
+              ['ci', /\bci\b|build|workflow|tooling|dependabot/i,
+                /^(\.github\/|utils\/|vite\.config\.js|eslint\.config\.js|gulpfile\.js|phpstan\.neon|phpunit[^/]*\.xml|rector\.php|tsconfig\.json|jsconfig\.json|\.stylelintrc\.json|\.editorconfig)/],
+              ['documentation', /documentation|\bdocs?\b|readme/i,
+                /(\.md$|(^|\/)README)/],
+              ['translations', /translat|\bi18n\b|locale/i,
+                /^(locale\/|messages\.pot$)/],
+              ['bug', /bug ?fix|\bbug\b|\bfix(?=[(!:])/i, null],
+              ['enhancement', /new feature|enhancement|\bfeat(?=[(!:])/i, null],
+              ['php', /\bphp\b/i, /\.php$/],
+              ['javascript', /javascript|\bjs\b|vite|vue|eslint/i,
+                /^(js\/|src\/)|\.(js|mjs|ts|vue)$/],
+              ['frontend', /frontend|\bthemes?\b|\bcss\b|\bless\b|stylelint/i,
+                /^(themes\/|lib\/flat-ttrss\/)|\.(css|less|scss|sass)$/],
+              ['plugins', /\bplugins?\b/i, /^plugins(\.local)?\//],
+            ];
+
+            const prNumber = context.payload.pull_request?.number
+              ?? Number(context.payload.inputs?.pr_number);
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              core.setFailed('No pull request in context; pass pr_number when running manually.');
+              return;
+            }
+
+            const pr = context.payload.pull_request
+              ?? (await github.rest.pulls.get({ ...context.repo, pull_number: prNumber })).data;
+
+            const existing = pr.labels.map((label) => label.name);
+            if (categories.some(([label]) => existing.includes(label))) {
+              core.info('PR is already categorised, nothing to do');
+              return;
+            }
+
+            // Read the Category field, ignoring the template's comment hints.
+            const body = (pr.body || '').replace(/<!--[\s\S]*?-->/g, '');
+            const stated = (body.match(/^#{1,3}[^\n]*Category[^\n]*\n+\s*([^\n#]+)/im) || ['', ''])[1].trim();
+            const matches = (text) => categories
+              .filter(([, pattern]) => pattern.test(text))
+              .map(([label]) => label);
+
+            let labels = matches(stated);
+
+            // Fall back to the checked "Types of Changes" boxes, then the title.
+            if (!labels.length) {
+              const checked = [...body.matchAll(/^\s*-\s*\[x\]\s*([^\n]+)$/gim)]
+                .map((match) => match[1])
+                .join(', ');
+              labels = matches(checked);
+            }
+            if (!labels.length) {
+              labels = matches(pr.title);
+            }
+
+            // If the body and title say nothing useful, infer one label from the files changed.
+            if (!labels.length) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                ...context.repo, pull_number: pr.number, per_page: 100,
+              });
+              const names = files.map((file) => file.filename);
+              const counts = categories
+                .filter(([, , paths]) => paths)
+                .map(([label, , paths]) => [label, names.filter((name) => paths.test(name)).length]);
+              const [best] = counts.sort((a, b) => b[1] - a[1]);
+              if (best && best[1] * 2 > names.length) labels = [best[0]];
+            }
+
+            if (!labels.length) {
+              core.info('Unable to determine a category for this PR');
+              return;
+            }
+
+            // Never fail on labels that are missing from the repository.
+            const repoLabels = new Set(
+              (await github.paginate(github.rest.issues.listLabelsForRepo, {
+                ...context.repo, per_page: 100,
+              })).map((label) => label.name),
+            );
+            const missing = labels.filter((label) => !repoLabels.has(label));
+            if (missing.length) {
+              core.warning(`Skipping labels that do not exist in this repository: ${missing.join(', ')}`);
+            }
+            labels = labels.filter((label) => repoLabels.has(label));
+            if (!labels.length) return;
+
+            await github.rest.issues.addLabels({
+              ...context.repo, issue_number: pr.number, labels,
+            });
+            core.info(`Applied label(s): ${labels.join(', ')}`);
