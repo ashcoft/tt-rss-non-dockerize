@@ -32,7 +32,7 @@
                   :label="prefText(pref.name)"
                   density="compact"
                   hide-details
-                  @change="(value: string) => savePref(pref.name, value)"
+                  @update:model-value="(value: string) => savePref(pref.name, value)"
                 />
               </v-list-item>
             </v-list>

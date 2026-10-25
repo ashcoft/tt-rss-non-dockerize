@@ -588,6 +588,11 @@ export const FEED_PURGE_INTERVALS: Array<{ title: string; value: number }> = [
   { title: '3 months old', value: 90 },
 ];
 
+/**
+ * Every field `Pref_Feeds/editSave` writes. They are all round-tripped through
+ * a save because the handler assigns each one unconditionally; omitting any of
+ * them would silently reset that setting.
+ */
 export interface FeedDetails {
   id: number;
   title: string;
@@ -596,9 +601,15 @@ export interface FeedDetails {
   cat_id: number | null;
   update_interval: number;
   purge_interval: number;
-  /** Round-tripped so a save does not clear per-feed HTTP auth. */
   auth_login: string;
   auth_pass: string;
+  private: boolean;
+  cache_images: boolean;
+  hide_images: boolean;
+  feed_language: string;
+  include_in_digest: boolean;
+  always_display_enclosures: boolean;
+  mark_unread_on_update: boolean;
 }
 
 /** `Pref_Feeds/editfeed` returns `{feed: {...}, cats: {...}, intervals: {...}}`. */
@@ -618,6 +629,13 @@ export async function getFeedDetails(backend: LegacyBackend, feedId: number): Pr
     auth_login: asString(feed.auth_login),
     // editfeed returns the decrypted password; editSave re-encrypts it.
     auth_pass: asString(feed.auth_pass),
+    private: asBoolean(feed.private),
+    cache_images: asBoolean(feed.cache_images),
+    hide_images: asBoolean(feed.hide_images),
+    feed_language: asString(feed.feed_language),
+    include_in_digest: asBoolean(feed.include_in_digest),
+    always_display_enclosures: asBoolean(feed.always_display_enclosures),
+    mark_unread_on_update: asBoolean(feed.mark_unread_on_update),
   };
 }
 
@@ -636,6 +654,9 @@ export async function saveFeed(
   const current = await getFeedDetails(backend, feedId);
   const merged: FeedDetails = { ...current, ...changes, id: feedId };
 
+  // The checkbox fields go through checkbox_to_sql_bool(), which returns 1 only
+  // for the literal string "on" and 0 for everything else. Sending 1/0 (or
+  // true/false) would silently disable every flag, so the checked value is "on".
   await backend.call('Pref_Feeds', 'editSave', {
     id: merged.id,
     title: merged.title,
@@ -646,7 +667,19 @@ export async function saveFeed(
     cat_id: merged.cat_id ?? 0,
     auth_login: merged.auth_login,
     auth_pass: merged.auth_pass,
+    private: checkboxValue(merged.private),
+    cache_images: checkboxValue(merged.cache_images),
+    hide_images: checkboxValue(merged.hide_images),
+    feed_language: merged.feed_language,
+    include_in_digest: checkboxValue(merged.include_in_digest),
+    always_display_enclosures: checkboxValue(merged.always_display_enclosures),
+    mark_unread_on_update: checkboxValue(merged.mark_unread_on_update),
   });
+}
+
+/** The value `checkbox_to_sql_bool()` recognises as checked. */
+function checkboxValue(checked: boolean): string {
+  return checked ? 'on' : '';
 }
 
 /** Article tags are stored comma-separated; `tags_str` is what the handler reads. */

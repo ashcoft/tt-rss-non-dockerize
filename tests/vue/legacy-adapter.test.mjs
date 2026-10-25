@@ -420,29 +420,42 @@ test('getFeedDetails maps the editfeed payload', async () => {
     purge_interval: 30,
     auth_login: 'user',
     auth_pass: 'secret',
+    private: false,
+    cache_images: false,
+    hide_images: false,
+    feed_language: '',
+    include_in_digest: false,
+    always_display_enclosures: false,
+    mark_unread_on_update: false,
   });
 });
+
+/** Every field editSave writes, so a partial save must round-trip all of them. */
+const FEED_FIXTURE = {
+  id: 4,
+  title: 'Alpha',
+  feed_url: 'http://example.com/a.xml',
+  site_url: 'http://example.com',
+  cat_id: 2,
+  update_interval: 60,
+  purge_interval: 30,
+  auth_login: 'user',
+  auth_pass: 'secret',
+  private: true,
+  cache_images: true,
+  hide_images: true,
+  feed_language: 'de',
+  include_in_digest: true,
+  always_display_enclosures: true,
+  mark_unread_on_update: true,
+};
 
 test('saveFeed merges over a fresh snapshot so omitted fields are preserved', async () => {
   installGlobals();
   // Regression: editSave writes every field it manages unconditionally, so
   // sending only the changed field cleared feed_url/site_url/auth in the DB.
   const calls = stubFetch([
-    {
-      text: JSON.stringify({
-        feed: {
-          id: 4,
-          title: 'Alpha',
-          feed_url: 'http://example.com/a.xml',
-          site_url: 'http://example.com',
-          cat_id: 2,
-          update_interval: 60,
-          purge_interval: 30,
-          auth_login: 'user',
-          auth_pass: 'secret',
-        },
-      }),
-    },
+    { text: JSON.stringify({ feed: FEED_FIXTURE }) },
     { text: '' },
   ]);
   const backend = new LegacyBackend();
@@ -463,6 +476,49 @@ test('saveFeed merges over a fresh snapshot so omitted fields are preserved', as
   assert.ok(save.includes('auth_login=user'), 'preserves auth_login');
   assert.ok(save.includes('auth_pass=secret'), 'preserves auth_pass');
   assert.ok(save.includes('cat_id=2'), 'preserves the category');
+  assert.ok(save.includes('feed_language=de'), 'preserves feed_language');
+});
+
+test('saveFeed encodes checkbox fields as "on", not 1/0', async () => {
+  installGlobals();
+  // Regression: the checkbox fields go through checkbox_to_sql_bool(), which
+  // returns 1 only for the literal string "on". Sending 1 (or true) disabled
+  // every flag on save, verified against the live backend.
+  const calls = stubFetch([
+    { text: JSON.stringify({ feed: FEED_FIXTURE }) },
+    { text: '' },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFeed(backend, 4, { title: 'Renamed' });
+
+  const save = calls[1].body;
+  for (const field of [
+    'private',
+    'cache_images',
+    'hide_images',
+    'include_in_digest',
+    'always_display_enclosures',
+    'mark_unread_on_update',
+  ]) {
+    assert.ok(save.includes(`${field}=on`), `${field} must be sent as "on"`);
+    assert.ok(!save.includes(`${field}=1`), `${field} must not be sent as 1`);
+  }
+});
+
+test('getFeedDetails defaults the checkbox fields to false when absent', async () => {
+  installGlobals();
+  stubFetch([{ text: JSON.stringify({ feed: { id: 4, title: 'Bare' } }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFeedDetails(backend, 4);
+
+  assert.equal(details.private, false);
+  assert.equal(details.cache_images, false);
+  assert.equal(details.mark_unread_on_update, false);
+  assert.equal(details.feed_language, '');
 });
 
 test('getSearchOptions never returns an empty language', async () => {

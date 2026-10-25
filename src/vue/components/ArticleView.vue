@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
@@ -17,6 +17,18 @@ const noteDraft = ref(props.article.note ?? '');
 const tagDraft = ref<string[]>([...(props.article.tags ?? [])]);
 const tagSuggestions = ref<string[]>([]);
 const saving = ref(false);
+
+// App.vue reuses this component when the selected article changes (no :key),
+// so the drafts must follow the new article. Without this, the previous
+// article's note or tags stay on screen and would be saved onto the new one.
+watch(
+  () => props.article.id,
+  () => {
+    noteDraft.value = props.article.note ?? '';
+    tagDraft.value = [...(props.article.tags ?? [])];
+    tagSuggestions.value = [];
+  }
+);
 
 const closeArticle = () => {
   emit('close');
