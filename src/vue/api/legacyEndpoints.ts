@@ -561,6 +561,90 @@ export async function setArticleNote(
   await backend.call('PluginHandler', 'setnote', { plugin: 'note', id: articleId, note });
 }
 
+/** Feed purge/update interval choices, mirroring the maps in backend.php. */
+export const FEED_UPDATE_INTERVALS: Array<{ title: string; value: number }> = [
+  { title: 'Default interval', value: 0 },
+  { title: 'Disable updates', value: -1 },
+  { title: '15 minutes', value: 15 },
+  { title: '30 minutes', value: 30 },
+  { title: 'Hourly', value: 60 },
+  { title: '4 hours', value: 240 },
+  { title: '12 hours', value: 720 },
+  { title: 'Daily', value: 1440 },
+  { title: 'Weekly', value: 10080 },
+];
+
+export const FEED_PURGE_INTERVALS: Array<{ title: string; value: number }> = [
+  { title: 'Use default', value: 0 },
+  { title: 'Never purge', value: -1 },
+  { title: '1 week old', value: 7 },
+  { title: '2 weeks old', value: 14 },
+  { title: '1 month old', value: 31 },
+  { title: '2 months old', value: 60 },
+  { title: '3 months old', value: 90 },
+];
+
+export interface FeedDetails {
+  id: number;
+  title: string;
+  feed_url: string;
+  site_url: string;
+  cat_id: number | null;
+  update_interval: number;
+  purge_interval: number;
+  /** Round-tripped so a save does not clear per-feed HTTP auth. */
+  auth_login: string;
+  auth_pass: string;
+}
+
+/** `Pref_Feeds/editfeed` returns `{feed: {...}, cats: {...}, intervals: {...}}`. */
+export async function getFeedDetails(backend: LegacyBackend, feedId: number): Promise<FeedDetails> {
+  const response = await backend.call('Pref_Feeds', 'editfeed', { id: feedId });
+  const body = requireBody(response, 'Pref_Feeds/editfeed');
+  const feed = expectObject(body.feed, 'Pref_Feeds/editfeed.feed');
+
+  return {
+    id: asNumber(feed.id),
+    title: asString(feed.title),
+    feed_url: asString(feed.feed_url),
+    site_url: asString(feed.site_url),
+    cat_id: feed.cat_id === null || feed.cat_id === undefined ? null : asNumber(feed.cat_id, 0),
+    update_interval: asNumber(feed.update_interval),
+    purge_interval: asNumber(feed.purge_interval),
+    auth_login: asString(feed.auth_login),
+    // editfeed returns the decrypted password; editSave re-encrypts it.
+    auth_pass: asString(feed.auth_pass),
+  };
+}
+
+/**
+ * `Pref_Feeds/editSave` unconditionally writes every field it manages, so a
+ * partial request clears the fields it omits (including `feed_url`, `site_url`
+ * and the per-feed HTTP auth). It must therefore always be given a complete
+ * record: the current settings are re-read and the requested changes merged
+ * over them before saving.
+ */
+export async function saveFeed(
+  backend: LegacyBackend,
+  feedId: number,
+  changes: Partial<Omit<FeedDetails, 'id'>>
+): Promise<void> {
+  const current = await getFeedDetails(backend, feedId);
+  const merged: FeedDetails = { ...current, ...changes, id: feedId };
+
+  await backend.call('Pref_Feeds', 'editSave', {
+    id: merged.id,
+    title: merged.title,
+    feed_url: merged.feed_url,
+    site_url: merged.site_url,
+    update_interval: merged.update_interval,
+    purge_interval: merged.purge_interval,
+    cat_id: merged.cat_id ?? 0,
+    auth_login: merged.auth_login,
+    auth_pass: merged.auth_pass,
+  });
+}
+
 /** Article tags are stored comma-separated; `tags_str` is what the handler reads. */
 export async function setArticleTags(
   backend: LegacyBackend,

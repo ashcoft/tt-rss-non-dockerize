@@ -168,6 +168,36 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
+  /** Load a single feed's editable settings. */
+  async function loadFeedDetails(feedId: number) {
+    try {
+      const response = await api.getFeedDetails(feedId);
+      return response.status === 0 ? response.content : null;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load feed';
+      return null;
+    }
+  }
+
+  /** Persist changes to a feed's settings, then refresh the tree. */
+  async function saveFeed(
+    feedId: number,
+    changes: Partial<Omit<import('../api/legacyEndpoints').FeedDetails, 'id'>>
+  ): Promise<boolean> {
+    try {
+      const response = await api.saveFeed(feedId, changes);
+      if (response.status === 0) {
+        await loadFeeds();
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save feed';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save feed';
+      return false;
+    }
+  }
+
   async function purgeFeed(): Promise<boolean> {
     try {
       // Purging is a scheduled/CLI operation; there is no backend.php method.
@@ -272,6 +302,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     updateFeedUnread,
     updateCategoryUnread,
     addFeed,
+    loadFeedDetails,
+    saveFeed,
     removeFeed,
     purgeFeed,
     createCategory,

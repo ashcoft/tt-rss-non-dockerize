@@ -120,6 +120,20 @@ class ApiClient {
     }, false);
   }
 
+  async getFeedDetails(feedId: number): Promise<ApiResponse<endpoints.FeedDetails | null>> {
+    return this.wrap(() => endpoints.getFeedDetails(legacyBackend, feedId), null);
+  }
+
+  async saveFeed(
+    feedId: number,
+    changes: Partial<Omit<endpoints.FeedDetails, 'id'>>
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFeed(legacyBackend, feedId, changes);
+      return true;
+    }, false);
+  }
+
   async purgeFeed(): Promise<ApiResponse<boolean>> {
     return this.wrap(async () => {
       endpoints.purgeFeed();

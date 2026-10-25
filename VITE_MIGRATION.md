@@ -2,58 +2,68 @@
 
 ## Verified status (2026-10-22)
 
-**The frontend talks to the real legacy backend through a verified adapter, but
-is still not the production entry point.** The Vue client no longer targets the
-external JSON API: it uses a scoped, authenticated adapter over `backend.php`
-that reproduces the wire contract the Dojo client relies on. Keep the existing
-PHP/Dojo UI as the production entry point.
+**The Vue client is now feature-complete for the main reading flow, but the
+Dojo UI is still the production entry point.** The Dojo/dijit stack has not
+been removed: `index.php` and `prefs.php` still render Dojo markup, and the
+`js/*.js` AMD modules plus `lib/dojo` and `lib/dijit` (about 12.7 MB) are still
+shipped and loaded. Replacing all of that is a multi-session effort; this
+document records what is done and what is not.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
-instance, and the external `/api/` endpoint enabled for comparison):
+instance):
 
 - `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
   all pass.
-- `npm run test:vue` runs 28 Node tests: 6 pre-existing renderer/scroll
-  regressions plus 22 adapter tests covering CSRF handling, response mapping,
-  error propagation, search-language resolution, and unsupported-operation
-  guards.
-- The adapter **and the Pinia stores** were driven against the live backend,
-  both directly and through the Vite dev proxy, for feed tree, headlines list,
-  read/unread toggling, star, publish, delete, search, labels, label
-  assignment, feed catch-up, category creation, and preference reads. All
-  returned the expected data.
-- The repository's own PHP integration suite runs unchanged (554 tests) and
-  shows the same pre-existing failures as the unmodified tree; no new failure
-  is attributable to this work.
+- `npm run test:vue` runs 39 Node tests: 6 renderer/scroll regressions, 26
+  adapter tests, and 7 headline-store cursor tests.
+- The adapter, the Pinia stores, **and the browser UI** were exercised against
+  the live backend: login, feed tree, headlines list, search, view modes,
+  sort orders, read/star/publish/delete, tags with autocomplete, scoring,
+  labels, and preferences.
 
-### Defect found and fixed by browser testing
+### Resolved: the "list-item click" blocker was a false alarm
 
-**Search silently returned nothing.** `Feeds/view` passes the stemming
-language to PostgreSQL `to_tsquery()`. When it is empty, PostgreSQL raises
-`invalid name syntax`; the backend catches that and substitutes a
-match-nothing query, so the UI reported "Incorrect search syntax" or an empty
-list rather than an error. The legacy Dojo client always submits a language
-from a dialog dropdown.
+The previous session recorded that `v-list-item` `@click` handlers never
+fired. Re-testing with a correctly targeted click showed they fire normally:
+selecting a feed loads its headlines (3 articles, 3 unread) and search works.
+The earlier observation came from the automation clicking a wrapping element
+rather than the clickable item. There is no known blocker here.
 
-Confirmed live against PostgreSQL 17: `to_tsquery('', 'widgets')` fails, while
-`to_tsquery('english', 'widgets')` succeeds. The adapter now resolves the
-configured default via `Feeds/search` before a search, the store tracks it,
-and the toolbar exposes the language list. Verified end-to-end afterwards:
-searching "widgets" returns 3 articles and "gadgets" returns 2.
+### Fixed this session
 
-### Browser interaction testing was inconclusive
+- **View modes were wrong.** The toolbar sent `list`/`grid`/`expanded`, none
+  of which `Feeds/view` recognises, so the control did nothing. It now offers
+  the backend's real set (`adaptive`, `all_articles`, `marked`, `published`,
+  `unread`, `has_note`), matching `<select name="view_mode">` in `index.php`.
+- **Sort was dropped.** The sort menu emitted a `sort` action that nothing
+  handled. It now sends `order_by` with the values `index.php` uses
+  (`default`, `feed_dates`, `date_reverse`, `title`).
+- **Keyboard shortcuts were dead code.** `useKeyboard` was fully implemented
+  but never mounted. It is now wired: `j`/`k` and arrows move a headline
+  cursor (highlighted in the list), `o`/Enter opens, `r` toggles read, `s`
+  stars, `f` publishes, `g` then `u` refreshes.
+- **Tags and scoring were missing.** Added `Article/setArticleTags`,
+  `Article/completeTags` and `Article/setScore`, with a chip combobox
+  (autocomplete included) and score buttons in the article panel.
 
-The app was driven in a headless browser against the dev server. The feed tree
-rendered with correct names and counters, mount-time requests
-(`Pref_Feeds/getfeedtree`, `RPC/getAllCounters`, `Pref_Labels/getlabeltree`,
-`Feeds/search`) all succeeded with the real CSRF token, and the backend
-confirmed it produced correct headline payloads for the browser's own
-requests. However, in that environment the `@click` handlers on the
-`v-list-item` feed entries never fired, so headline loading could not be
-confirmed through the UI. The same calls succeed from the store layer, so this
-is either an artifact of the automation or a genuine list-item interaction bug
-that needs investigation. **This is the first thing to check before a
-cutover.**
+All four were verified against the live backend, including that all six view
+modes and all four sort orders return correctly ordered results.
+
+### Still on Dojo
+
+These remain Dojo-only and are not yet reproduced in Vue:
+
+- **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
+  covers only a handful of user preferences, not feed preferences, filter
+  rule creation/editing, label colours, or plugin settings.
+- **Filter management.** Listing and deleting exist; creating and editing
+  rules do not.
+- **Feed editing.** Adding and removing work; editing an existing feed's
+  title, category, interval and purge settings does not.
+- **Drag and drop** reordering of feeds and categories.
+- **OPML import/export** and feed-icon upload.
+- **Plugin UI surfaces** (the `HOOK_*` render hooks the Dojo client consumes).
+- **Combined-display / grid modes** and the article toolbar's plugin buttons.
 
 ### How the adapter works
 
@@ -102,12 +112,11 @@ These were confirmed by calling the running backend, not by reading code:
 
 ### Next production gate
 
-Investigate the list-item click behaviour noted above, then run the full
-browser matrix (login, feeds, search, pagination, mutations, preferences)
-against a real instance before switching the entry point. Also decide whether
-feed subscribe should pass the optional custom title (`Feeds/add` ignores it)
-and whether the `note` plugin should be enabled by default. Do not weaken
-authentication or CSRF checks to make the frontend work.
+Removing Dojo requires the items listed under "Still on Dojo" above, in roughly
+this order: feed editing, filter creation/editing, the full preferences
+screens, then drag-and-drop and OPML. Until those exist, keep the Dojo UI as
+the entry point. Do not weaken authentication or CSRF checks to make the
+frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
@@ -364,13 +373,20 @@ For production build issues:
 
 ### рџљ§ Phase 3: Feature Parity (In Progress)
 - [x] All article actions (mark read/unread, star, publish, delete)
+- [x] Article tags (with autocomplete) and scoring
+- [x] View modes (adaptive/all/marked/published/unread/with note)
+- [x] Sort orders (default/newest first/oldest first/title)
+- [x] Keyboard shortcuts (j/k, arrows, o, r, s, f, g then u)
 - [x] Feed management (add, delete feeds; purge is CLI-only)
 - [x] Category management (create, rename, delete)
 - [x] Labels management (create, remove, assign)
 - [x] Search functionality (via `Feeds/view` `query` + stemming language)
 - [x] Filter listing and deletion
 - [x] User authentication/login flow
+- [ ] Feed editing (title, category, intervals)
+- [ ] Filter creation and editing
 - [ ] Drag and drop support
+- [ ] OPML import/export
 
 ### вќЊ Phase 4: Preferences (Not Started)
 - [x] User preferences (read via init-params, written via `RPC/setpref`)

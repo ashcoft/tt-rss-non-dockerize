@@ -388,6 +388,83 @@ test('setArticleScore sends a comma-delimited ids list and the score', async () 
   assert.ok(calls[0].body.includes('score=300'));
 });
 
+test('getFeedDetails maps the editfeed payload', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        feed: {
+          id: 4,
+          title: 'Alpha',
+          feed_url: 'http://example.com/a.xml',
+          site_url: 'http://example.com',
+          cat_id: null,
+          update_interval: 60,
+          purge_interval: 30,
+          auth_login: 'user',
+          auth_pass: 'secret',
+        },
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.deepEqual(await endpoints.getFeedDetails(backend, 4), {
+    id: 4,
+    title: 'Alpha',
+    feed_url: 'http://example.com/a.xml',
+    site_url: 'http://example.com',
+    cat_id: null,
+    update_interval: 60,
+    purge_interval: 30,
+    auth_login: 'user',
+    auth_pass: 'secret',
+  });
+});
+
+test('saveFeed merges over a fresh snapshot so omitted fields are preserved', async () => {
+  installGlobals();
+  // Regression: editSave writes every field it manages unconditionally, so
+  // sending only the changed field cleared feed_url/site_url/auth in the DB.
+  const calls = stubFetch([
+    {
+      text: JSON.stringify({
+        feed: {
+          id: 4,
+          title: 'Alpha',
+          feed_url: 'http://example.com/a.xml',
+          site_url: 'http://example.com',
+          cat_id: 2,
+          update_interval: 60,
+          purge_interval: 30,
+          auth_login: 'user',
+          auth_pass: 'secret',
+        },
+      }),
+    },
+    { text: '' },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFeed(backend, 4, { update_interval: 720 });
+
+  // First call reads the current record.
+  assert.ok(calls[0].body.includes('method=editfeed'));
+
+  // The save must carry the unchanged fields back verbatim.
+  const save = calls[1].body;
+  assert.ok(save.includes('method=editSave'));
+  assert.ok(save.includes('update_interval=720'), 'applies the change');
+  assert.ok(save.includes('feed_url=http%3A%2F%2Fexample.com%2Fa.xml'), 'preserves feed_url');
+  assert.ok(save.includes('site_url=http%3A%2F%2Fexample.com'), 'preserves site_url');
+  assert.ok(save.includes('title=Alpha'), 'preserves title');
+  assert.ok(save.includes('auth_login=user'), 'preserves auth_login');
+  assert.ok(save.includes('auth_pass=secret'), 'preserves auth_pass');
+  assert.ok(save.includes('cat_id=2'), 'preserves the category');
+});
+
 test('getSearchOptions never returns an empty language', async () => {
   installGlobals();
   const backend = new LegacyBackend();

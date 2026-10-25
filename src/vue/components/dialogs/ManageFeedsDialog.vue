@@ -9,6 +9,7 @@
       <v-card-text>
         <v-tabs v-model="tab" color="primary">
           <v-tab value="add">Add Feed</v-tab>
+          <v-tab value="edit">Edit Feed</v-tab>
           <v-tab value="remove">Remove / Purge</v-tab>
           <v-tab value="categories">Categories</v-tab>
         </v-tabs>
@@ -42,6 +43,47 @@
             >
               Subscribe
             </v-btn>
+          </v-window-item>
+
+          <!-- Edit feed -->
+          <v-window-item value="edit">
+            <v-select
+              v-model="editFeedId"
+              :items="feedStore.feeds"
+              label="Feed"
+              item-title="title"
+              item-value="id"
+              @update:model-value="loadFeedDetails"
+            />
+            <template v-if="editDetails">
+              <v-text-field v-model="editDetails.title" label="Title" />
+              <v-text-field v-model="editDetails.feed_url" label="Feed URL" />
+              <v-text-field v-model="editDetails.site_url" label="Site URL" />
+              <v-select
+                v-model="editDetails.cat_id"
+                :items="categoryOptions"
+                label="Category"
+                item-title="title"
+                item-value="id"
+                clearable
+              />
+              <v-select
+                v-model="editDetails.update_interval"
+                :items="updateIntervals"
+                label="Update interval"
+                item-title="title"
+                item-value="value"
+              />
+              <v-select
+                v-model="editDetails.purge_interval"
+                :items="purgeIntervals"
+                label="Purge articles"
+                item-title="title"
+                item-value="value"
+              />
+              <v-btn color="primary" :loading="busy" @click="saveFeedChanges">Save</v-btn>
+            </template>
+            <p v-else class="text-caption text-grey mt-2">Select a feed to edit.</p>
           </v-window-item>
 
           <!-- Remove / purge feed -->
@@ -111,6 +153,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useFeedsStore, type Category } from '../../stores';
+import {
+  FEED_PURGE_INTERVALS,
+  FEED_UPDATE_INTERVALS,
+  type FeedDetails,
+} from '../../api/legacyEndpoints';
 
 defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
@@ -126,6 +173,12 @@ const newFeedTitle = ref('');
 const newFeedCategory = ref<number | null>(null);
 const selectedFeedId = ref<number | null>(null);
 const newCategoryTitle = ref('');
+
+// Feed editing
+const editFeedId = ref<number | null>(null);
+const editDetails = ref<FeedDetails | null>(null);
+const updateIntervals = FEED_UPDATE_INTERVALS;
+const purgeIntervals = FEED_PURGE_INTERVALS;
 
 const categoryOptions = computed(() => feedStore.categories);
 
@@ -181,6 +234,31 @@ const createCategory = async () => {
   } else {
     notify(feedStore.error ?? 'Failed to create category', 'error');
   }
+};
+
+const loadFeedDetails = async (feedId: number | null) => {
+  editDetails.value = null;
+  if (feedId === null) return;
+  busy.value = true;
+  editDetails.value = await feedStore.loadFeedDetails(feedId);
+  busy.value = false;
+  if (!editDetails.value) notify(feedStore.error ?? 'Failed to load feed', 'error');
+};
+
+const saveFeedChanges = async () => {
+  if (!editDetails.value) return;
+  const details = editDetails.value;
+  busy.value = true;
+  const ok = await feedStore.saveFeed(details.id, {
+    title: details.title,
+    feed_url: details.feed_url,
+    site_url: details.site_url,
+    cat_id: details.cat_id,
+    update_interval: details.update_interval,
+    purge_interval: details.purge_interval,
+  });
+  busy.value = false;
+  notify(ok ? 'Feed saved' : feedStore.error ?? 'Failed to save feed', ok ? 'success' : 'error');
 };
 
 const renameCategory = async (cat: Category) => {
