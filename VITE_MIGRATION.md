@@ -1,21 +1,30 @@
 # Vite + Vue 3 + Vuetify Migration Guide for Tiny Tiny RSS
 
-## Verified status (2026-10-22)
+## Verified status (2026-10-25)
 
-**The Vue client is now feature-complete for the main reading flow, but the
-Dojo UI is still the production entry point.** The Dojo/dijit stack has not
-been removed: `index.php` and `prefs.php` still render Dojo markup, and the
-`js/*.js` AMD modules plus `lib/dojo` and `lib/dijit` (about 12.7 MB) are still
-shipped and loaded. Replacing all of that is a multi-session effort; this
-document records what is done and what is not.
+**`index.php` now serves the Vue app; the Dojo client is no longer the main
+entry point.** The reading flow (login, feed tree, headlines, search, view
+modes, sorting, article actions, tags, scoring, feed editing, labels) runs
+entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
+legacy adapter.
+
+The Dojo stack is **not yet deleted**. What remains:
+
+- `prefs.php` still renders Dojo markup. The preference screens are generated
+  server-side by `Pref_*.php` (~4,700 lines emitting 225 `dojoType` widgets)
+  and driven by ~2,000 lines of Dojo JS, so porting them is its own workstream.
+- `lib/dojo`, `lib/dijit` (~12.7 MB) and the `js/*.js` AMD modules are still
+  shipped; the legacy shell is reachable with `VUE_LEGACY_SHELL=1` for
+  comparison.
+- Plugin UI hooks (`HOOK_*`) still emit Dojo markup into the old shell.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
 instance):
 
 - `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
   all pass.
-- `npm run test:vue` runs 41 Node tests: 6 renderer/scroll regressions, 28
-  adapter tests, and 7 headline-store cursor tests.
+- `npm run test:vue` runs 43 Node tests: renderer/scroll regressions, adapter
+  tests, headline-store cursor tests, and FeedTree selection tests.
 - The adapter, the Pinia stores, **and the browser UI** were exercised against
   the live backend: login, feed tree, headlines list, search, view modes,
   sort orders, read/star/publish/delete, tags with autocomplete, scoring,
@@ -57,8 +66,6 @@ modes and all four sort orders return correctly ordered results.
 
 ### Still on Dojo
 
-These remain Dojo-only and are not yet reproduced in Vue:
-
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
   covers only a handful of user preferences, not feed preferences, filter
   rule creation/editing, label colours, or plugin settings.
@@ -66,8 +73,9 @@ These remain Dojo-only and are not yet reproduced in Vue:
   rules do not.
 - **Drag and drop** reordering of feeds and categories.
 - **OPML import/export** and feed-icon upload.
-- **Plugin UI surfaces** (the `HOOK_*` render hooks the Dojo client consumes).
+- **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
+- **Deleting the Dojo libraries themselves** (blocked on the above).
 
 ### How the adapter works
 
@@ -114,12 +122,26 @@ These were confirmed by calling the running backend, not by reading code:
   plugin is disabled the backend answers `E_UNKNOWN_PLUGIN`; the UI surfaces
   that as an error rather than silently discarding the note.
 
+### How index.php serves Vue
+
+`index.php` renders `include/vue_shell.php` whenever a production build exists
+(`dist/.vite/manifest.json`), which `VueAssets::tags()` uses to emit the hashed
+entry script and stylesheet. Set `VUE_LEGACY_SHELL=1` to fall back to the Dojo
+shell. Two details are easy to get wrong:
+
+- The shell is served with an ETag. After login the cached copy still holds the
+  pre-login (empty) CSRF token, so `fetchCsrfToken()` forces revalidation;
+  without that, a 304 leaves the client unauthenticated and login appears to do
+  nothing.
+- User-specific helpers (`print_user_stylesheet`, plugin CSS/JS) assume a
+  loaded user and throw when there is none, so they are emitted only when
+  authenticated.
+
 ### Next production gate
 
-Removing Dojo requires the items listed under "Still on Dojo" above, in roughly
-this order: filter creation/editing, the full preferences screens, then
-drag-and-drop and OPML. Until those exist, keep the Dojo UI as the entry
-point. Do not weaken authentication or CSRF checks to make the frontend work.
+Removing the Dojo libraries requires the items under "Still on Dojo", in this
+order: filter creation/editing, the preference screens, then drag-and-drop and
+OPML. Do not weaken authentication or CSRF checks to make the frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
