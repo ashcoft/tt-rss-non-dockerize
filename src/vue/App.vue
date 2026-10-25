@@ -31,6 +31,8 @@
             :feed-info="feedsStore.currentFeed"
             :search-languages="searchLanguages"
             :model-search-language="headlinesStore.searchLanguage"
+            :model-view-mode="headlinesStore.viewMode"
+            :model-order-by="headlinesStore.orderBy"
             @action="handleToolbarAction"
           />
 
@@ -51,6 +53,7 @@
             :loading="headlinesStore.loading"
             :loading-more="headlinesStore.loadingMore"
             :has-more="headlinesStore.hasMore"
+            :active-id="headlinesStore.cursorId"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
@@ -106,6 +109,7 @@ import LoginForm from './components/LoginForm.vue';
 import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
 import LabelsDialog from './components/dialogs/LabelsDialog.vue';
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
+import { useKeyboard } from './composables/useKeyboard';
 
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
@@ -254,7 +258,13 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       break;
     case 'viewMode':
       if (typeof payload === 'string') {
-        headlinesStore.setViewMode(payload as 'adaptive' | 'all_articles' | 'unread');
+        headlinesStore.setViewMode(payload);
+        await headlinesStore.loadHeadlines(feedId, isCat);
+      }
+      break;
+    case 'orderBy':
+      if (typeof payload === 'string') {
+        headlinesStore.setOrderBy(payload);
         await headlinesStore.loadHeadlines(feedId, isCat);
       }
       break;
@@ -320,6 +330,41 @@ const handleLoadMore = async () => {
   const isCat = feedsStore.currentIsCat;
   await headlinesStore.loadMore(feedId, isCat);
 };
+
+/** Open the headline under the cursor, if there is one. */
+const openCursorHeadline = async () => {
+  const headline = headlinesStore.cursorHeadline;
+  if (headline) await handleHeadlineSelect(headline);
+};
+
+/** Toggle the read state of the headline under the cursor. */
+const toggleCursorRead = async () => {
+  const headline = headlinesStore.cursorHeadline;
+  if (!headline) return;
+  await handleHeadlineAction(headline, 'toggle_read');
+};
+
+// Keyboard shortcuts. Mirrors the legacy Dojo hotkeys that map cleanly onto the
+// three-pane layout (see js/App.js get_hotkeys_map): j/k or arrows move the
+// cursor, o/Enter opens, r toggles read, s stars, f publishes, g then u
+// refreshes the current feed.
+useKeyboard({
+  onNext: () => headlinesStore.moveCursor(1),
+  onPrevious: () => headlinesStore.moveCursor(-1),
+  onSelect: () => void openCursorHeadline(),
+  onOpenArticle: () => void openCursorHeadline(),
+  onToggleRead: () => void toggleCursorRead(),
+  onToggleStar: async () => {
+    const headline = headlinesStore.cursorHeadline;
+    if (headline) await headlinesStore.toggleStar(headline.id);
+  },
+  onTogglePublish: async () => {
+    const headline = headlinesStore.cursorHeadline;
+    if (headline) await headlinesStore.togglePublish(headline.id);
+  },
+  onRefresh: () => void handleToolbarAction('refresh'),
+  onCatchup: () => void handleToolbarAction('catchup'),
+});
 
 // Lifecycle
 onMounted(async () => {

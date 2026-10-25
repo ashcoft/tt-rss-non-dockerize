@@ -46,26 +46,17 @@
     </div>
 
     <div class="toolbar-right">
-      <v-btn-toggle
-        :model-value="viewMode"
+      <!-- Values must match the backend's accepted view_mode set. -->
+      <v-select
+        v-model="viewMode"
+        :items="viewModeOptions"
+        label="Show"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="view-mode"
         @update:model-value="setViewMode"
-      >
-        <v-btn
-          value="list"
-          icon="mdi-view-list"
-          title="List view"
-        />
-        <v-btn
-          value="grid"
-          icon="mdi-view-grid"
-          title="Grid view"
-        />
-        <v-btn
-          value="expanded"
-          icon="mdi-view-sequential"
-          title="Expanded view"
-        />
-      </v-btn-toggle>
+      />
 
       <v-menu>
         <template #activator="{ props }">
@@ -116,11 +107,15 @@ interface Props {
   feedInfo: Feed | null;
   searchLanguages?: string[];
   modelSearchLanguage?: string;
+  modelViewMode?: string;
+  modelOrderBy?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   searchLanguages: () => [],
   modelSearchLanguage: 'english',
+  modelViewMode: 'adaptive',
+  modelOrderBy: 'default',
 });
 
 const emit = defineEmits<{
@@ -130,14 +125,25 @@ const emit = defineEmits<{
 // State
 const searchQuery = ref('');
 const searchLanguage = ref(props.modelSearchLanguage);
-const viewMode = ref<'list' | 'grid' | 'expanded'>('list');
-const sortBy = ref('date');
-const sortOrder = ref<'asc' | 'desc'>('desc');
+// These mirror the <select> values in index.php and the strings Feeds/view
+// understands; arbitrary values are silently ignored by the backend.
+const viewMode = ref(props.modelViewMode);
+const sortBy = ref(props.modelOrderBy);
+
+const viewModeOptions = [
+  { title: 'Adaptive', value: 'adaptive' },
+  { title: 'All Articles', value: 'all_articles' },
+  { title: 'Starred', value: 'marked' },
+  { title: 'Published', value: 'published' },
+  { title: 'Unread', value: 'unread' },
+  { title: 'With Note', value: 'has_note' },
+];
 
 const sortOptions = [
-  { title: 'Date', value: 'date' },
-  { title: 'Feed', value: 'feed' },
-  { title: 'Title', value: 'title' }
+  { title: 'Default', value: 'default' },
+  { title: 'Newest first', value: 'feed_dates' },
+  { title: 'Oldest first', value: 'date_reverse' },
+  { title: 'Title', value: 'title' },
 ];
 
 const actionOptions = [
@@ -148,12 +154,7 @@ const actionOptions = [
 
 // Computed
 const sortLabel = computed(() => {
-  const labels: Record<string, string> = {
-    date: 'Date',
-    feed: 'Feed',
-    title: 'Title'
-  };
-  return labels[sortBy.value] || 'Date';
+  return sortOptions.find(o => o.value === sortBy.value)?.title ?? 'Default';
 });
 
 // Methods
@@ -161,7 +162,7 @@ const sortLabel = computed(() => {
  * Sets the view mode and emits an action event.
  * @param mode - The view mode to set ('list', 'grid', or 'expanded').
  */
-const setViewMode = (mode: 'list' | 'grid' | 'expanded') => {
+const setViewMode = (mode: string) => {
   viewMode.value = mode;
   emit('action', 'viewMode', mode);
 };
@@ -172,7 +173,7 @@ const setViewMode = (mode: 'list' | 'grid' | 'expanded') => {
  */
 const handleSort = (command: string) => {
   sortBy.value = command;
-  emit('action', 'sort', { by: command, order: sortOrder.value });
+  emit('action', 'orderBy', command);
 };
 
 /**

@@ -334,6 +334,25 @@ test('a non-search request never resolves a search language', async () => {
   assert.ok(calls[0].body.includes('search_language='));
 });
 
+test('getHeadlines forwards the view mode and sort order verbatim', async () => {
+  installGlobals();
+  // Regression: the toolbar previously sent list/grid/expanded, none of which
+  // the backend recognises, and dropped the sort order entirely.
+  const calls = stubFetch([
+    { text: JSON.stringify({ headlines: { content: [] }, 'headlines-info': { count: 0 } }) },
+    { text: JSON.stringify({ headlines: { content: [] }, 'headlines-info': { count: 0 } }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.getHeadlines(backend, -4, { viewMode: 'marked' });
+  assert.ok(calls[0].body.includes('view_mode=marked'));
+
+  await endpoints.getHeadlines(backend, -4, { viewMode: 'all_articles', orderBy: 'date_reverse' });
+  assert.ok(calls[1].body.includes('view_mode=all_articles'));
+  assert.ok(calls[1].body.includes('order_by=date_reverse'));
+});
+
 test('getSearchOptions never returns an empty language', async () => {
   installGlobals();
   const backend = new LegacyBackend();

@@ -255,7 +255,9 @@ export async function getHeadlines(
   feedId: number | string,
   options: {
     isCat?: boolean;
-    viewMode?: 'adaptive' | 'all_articles' | 'unread';
+    // Feeds/view accepts adaptive, all_articles, marked, published, unread,
+    // has_note; see the <select name="view_mode"> options in index.php.
+    viewMode?: string;
     skip?: number;
     search?: string;
     searchLanguage?: string;

@@ -14,7 +14,10 @@
       <v-list-item
         v-for="headline in headlines"
         :key="headline.id"
-        :class="{ 'headline-read': headline.is_read }"
+        :class="{
+          'headline-read': headline.is_read,
+          'headline-active': headline.id === activeId,
+        }"
         @click="emit('select', headline)"
       >
         <template #prepend>
@@ -100,6 +103,8 @@ const props = defineProps<{
   loading: boolean;
   loadingMore?: boolean;
   hasMore?: boolean;
+  /** Id of the headline under the keyboard cursor, highlighted in the list. */
+  activeId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -154,6 +159,11 @@ const formatDate = (updated: string): string => updated;
 
 .headline-read {
   opacity: 0.6;
+}
+
+/* Keyboard cursor highlight; matches the legacy .hl.active treatment. */
+.headline-active {
+  background: rgba(37, 122, 167, 0.12);
 }
 
 .headline-title {

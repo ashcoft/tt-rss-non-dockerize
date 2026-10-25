@@ -60,7 +60,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const loading = ref(false);
   const loadingMore = ref(false);
   const error = ref<string | null>(null);
-  const viewMode = ref<'adaptive' | 'all_articles' | 'unread'>('adaptive');
+  const viewMode = ref<string>('adaptive');
+  /** Feeds/view `order_by`; must be one of default/feed_dates/date_reverse/title. */
+  const orderBy = ref<string>('default');
   const searchQuery = ref('');
   // Search needs a PostgreSQL text-search config name; the backend turns an
   // empty one into a query that matches nothing. Populated from Feeds/search.
@@ -68,6 +70,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const hasMore = ref(false);
   const skip = ref(0);
   const pageSize = 30;
+  /** Id of the headline under the keyboard cursor, if any. */
+  const cursorId = ref<number | null>(null);
 
   // Getters
   const unreadCount = computed(() => {
@@ -77,6 +81,33 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const selectedHeadline = computed(() => {
     return headlines.value.find(h => h.id === selectedArticle.value?.id);
   });
+
+  const cursorIndex = computed(() => {
+    if (cursorId.value === null) return -1;
+    return headlines.value.findIndex(h => h.id === cursorId.value);
+  });
+
+  const cursorHeadline = computed(() => {
+    if (cursorId.value === null) return null;
+    return headlines.value.find(h => h.id === cursorId.value) ?? null;
+  });
+
+  /** Move the keyboard cursor by `delta` entries, clamped to the list. */
+  function moveCursor(delta: number): Headline | null {
+    if (headlines.value.length === 0) return null;
+
+    const current = cursorIndex.value;
+    const next = current === -1
+      ? (delta > 0 ? 0 : headlines.value.length - 1)
+      : Math.min(headlines.value.length - 1, Math.max(0, current + delta));
+
+    cursorId.value = headlines.value[next]?.id ?? null;
+    return cursorHeadline.value;
+  }
+
+  function setCursor(articleId: number | null) {
+    cursorId.value = articleId;
+  }
 
   // Actions
   async function loadHeadlines(feedId: number | string, isCat: boolean = false) {
@@ -91,10 +122,13 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         skip: 0,
         search: searchQuery.value,
         searchLanguage: searchLanguage.value,
+        orderBy: orderBy.value,
       });
 
       if (response.status === 0) {
         headlines.value = response.content.headlines;
+        // A fresh page invalidates any previous cursor position.
+        cursorId.value = headlines.value[0]?.id ?? null;
         // Feeds/view hardcodes a page size of 30 and does not accept `limit`.
         hasMore.value = response.content.headlines.length >= pageSize;
         if (response.content.message) error.value = response.content.message;
@@ -122,6 +156,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         skip: skip.value,
         search: searchQuery.value,
         searchLanguage: searchLanguage.value,
+        orderBy: orderBy.value,
       });
 
       if (response.status === 0) {
@@ -316,8 +351,12 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     }
   }
 
-  function setViewMode(mode: 'adaptive' | 'all_articles' | 'unread') {
+  function setViewMode(mode: string) {
     viewMode.value = mode;
+  }
+
+  function setOrderBy(order: string) {
+    orderBy.value = order;
   }
 
   function setSearchQuery(query: string) {
@@ -391,6 +430,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     searchQuery.value = '';
     hasMore.value = false;
     skip.value = 0;
+    cursorId.value = null;
   }
 
   return {
@@ -403,11 +443,17 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     viewMode,
     searchQuery,
     searchLanguage,
+    orderBy,
     hasMore,
-    
+    cursorId,
+
     // Getters
     unreadCount,
     selectedHeadline,
+    cursorIndex,
+    cursorHeadline,
+    moveCursor,
+    setCursor,
     
     // Actions
     loadHeadlines,
@@ -420,6 +466,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     deleteArticle,
     updateNote,
     setViewMode,
+    setOrderBy,
     setSearchQuery,
     clearSelection,
     catchupAll,
