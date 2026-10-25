@@ -224,26 +224,28 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         return;
       }
 
-      selectedArticle.value = { ...headline };
+      const article: Article = { ...headline };
+      selectedArticle.value = article;
 
       if (!headline.is_read) {
         const feedsStore = useFeedsStore();
         // Optimistically update local state first
         headline.is_read = true;
-        selectedArticle.value.is_read = true;
+        article.is_read = true;
         feedsStore.updateFeedUnread(headline.feed_id, -1);
 
         try {
           await markAsRead([articleId]);
         } catch {
-          // Revert optimistic update if API fails
+          // Revert the optimistic update if the API rejects. Compare against
+          // the captured reference: the user may have opened another article
+          // while this request was in flight.
           headline.is_read = false;
 
-          if (selectedArticle.value !== null) {
-            if (selectedArticle.value.id === articleId) {
-              selectedArticle.value.is_read = false;
-            }
+          if (selectedArticle.value === article) {
+            article.is_read = false;
           }
+
           feedsStore.updateFeedUnread(headline.feed_id, 1);
         }
       }
