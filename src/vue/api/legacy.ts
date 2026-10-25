@@ -243,6 +243,7 @@ const encodeParams = (op: string, method: string, params: LegacyParams): URLSear
   return body;
 }
 
+/** Append one parameter, expanding arrays into repeated `key[]` entries. */
 const appendParam = (
   body: URLSearchParams,
   key: string,
