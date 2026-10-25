@@ -14,7 +14,7 @@ instance):
 
 - `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
   all pass.
-- `npm run test:vue` runs 39 Node tests: 6 renderer/scroll regressions, 26
+- `npm run test:vue` runs 41 Node tests: 6 renderer/scroll regressions, 28
   adapter tests, and 7 headline-store cursor tests.
 - The adapter, the Pinia stores, **and the browser UI** were exercised against
   the live backend: login, feed tree, headlines list, search, view modes,
@@ -45,6 +45,12 @@ rather than the clickable item. There is no known blocker here.
 - **Tags and scoring were missing.** Added `Article/setArticleTags`,
   `Article/completeTags` and `Article/setScore`, with a chip combobox
   (autocomplete included) and score buttons in the article panel.
+- **Feed editing was missing.** Added `Pref_Feeds/editfeed` and `editSave`
+  with an "Edit Feed" tab. `editSave` writes every field it manages
+  unconditionally, so a partial save clears the rest; verified live that a
+  title-only save wiped `feed_url` and `site_url`. `saveFeed` therefore
+  re-reads the record and merges, and round-trips `auth_login`/`auth_pass`
+  so per-feed HTTP auth survives.
 
 All four were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -58,8 +64,6 @@ These remain Dojo-only and are not yet reproduced in Vue:
   rule creation/editing, label colours, or plugin settings.
 - **Filter management.** Listing and deleting exist; creating and editing
   rules do not.
-- **Feed editing.** Adding and removing work; editing an existing feed's
-  title, category, interval and purge settings does not.
 - **Drag and drop** reordering of feeds and categories.
 - **OPML import/export** and feed-icon upload.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks the Dojo client consumes).
@@ -113,10 +117,9 @@ These were confirmed by calling the running backend, not by reading code:
 ### Next production gate
 
 Removing Dojo requires the items listed under "Still on Dojo" above, in roughly
-this order: feed editing, filter creation/editing, the full preferences
-screens, then drag-and-drop and OPML. Until those exist, keep the Dojo UI as
-the entry point. Do not weaken authentication or CSRF checks to make the
-frontend work.
+this order: filter creation/editing, the full preferences screens, then
+drag-and-drop and OPML. Until those exist, keep the Dojo UI as the entry
+point. Do not weaken authentication or CSRF checks to make the frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
@@ -383,7 +386,7 @@ For production build issues:
 - [x] Search functionality (via `Feeds/view` `query` + stemming language)
 - [x] Filter listing and deletion
 - [x] User authentication/login flow
-- [ ] Feed editing (title, category, intervals)
+- [x] Feed editing (title, URLs, category, intervals)
 - [ ] Filter creation and editing
 - [ ] Drag and drop support
 - [ ] OPML import/export
