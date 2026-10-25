@@ -1,5 +1,5 @@
 <template>
-  <div class="headlines-list">
+  <div ref="listRef" class="headlines-list">
     <div v-if="loading" class="headlines-loading">
       <v-progress-circular indeterminate color="primary" />
       <span>Loading headlines...</span>
@@ -14,8 +14,11 @@
       <v-list-item
         v-for="headline in headlines"
         :key="headline.id"
-        :class="{ 'headline-read': headline.is_read }"
-        @click="$emit('select', headline)"
+        :class="{
+          'headline-read': headline.is_read,
+          'headline-active': headline.id === activeId,
+        }"
+        @click="emit('select', headline)"
       >
         <template #prepend>
           <v-checkbox
@@ -47,56 +50,90 @@
               variant="text"
               size="small"
               :color="headline.is_marked ? 'amber' : 'grey'"
-              @click.stop="$emit('action', headline, 'toggle_star')"
+              @click.stop="emit('action', headline, 'toggle_star')"
             >
               <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+            </v-btn>
+
+                        <v-btn
+              icon
+              variant="text"
+              size="small"
+              :color="headline.is_published ? 'blue' : 'grey'"
+              @click.stop="emit('action', headline, 'toggle_publish')"
+            >
+              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
             </v-btn>
 
             <v-btn
               icon
               variant="text"
               size="small"
-              :color="headline.is_published ? 'blue' : 'grey'"
-              @click.stop="$emit('action', headline, 'toggle_publish')"
+              color="grey"
+              @click.stop="emit('action', headline, 'label')"
+              title="Assign labels"
             >
-              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
+              <v-icon>mdi-label</v-icon>
             </v-btn>
           </div>
         </template>
       </v-list-item>
-    </v-list>
+        </v-list>
+
+    <div v-if="hasMore && !loading" class="load-more">
+      <v-btn
+        color="primary"
+        variant="flat"
+        :loading="loadingMore"
+        @click="emit('load-more')"
+      >
+        Load more
+      </v-btn>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
 import type { Headline } from '@/types';
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
 
-defineProps<{
+const props = defineProps<{
   headlines: Headline[];
   loading: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  /** Id of the headline under the keyboard cursor, highlighted in the list. */
+  activeId?: number | null;
 }>();
 
 const emit = defineEmits<{
   select: [headline: Headline];
   action: [headline: Headline, action: string];
+  'load-more': [];
 }>();
+
+// Infinite scroll wiring (Phase 5)
+const listRef = ref<HTMLElement | null>(null);
+const { setupScrollListener } = useInfiniteScroll({
+  enabled: computed(() => Boolean(props.hasMore) && !props.loading && !props.loadingMore),
+  onLoadMore: () => {
+    emit('load-more');
+  },
+});
+
+onMounted(() => {
+  if (listRef.value) setupScrollListener(listRef.value);
+});
+
 
 const toggleRead = (headline: Headline) => {
   emit('action', headline, 'toggle_read');
 };
 
-const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(hours / 24);
-
-  if (hours < 1) return 'Just now';
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
-};
+// Feeds/view returns pre-localised date strings ("14:05", "Mar 03, 9:12",
+// "Never"), not Unix timestamps, so they are rendered as-is.
+const formatDate = (updated: string): string => updated;
 </script>
 
 <style scoped>
@@ -122,6 +159,11 @@ const formatDate = (timestamp: number): string => {
 
 .headline-read {
   opacity: 0.6;
+}
+
+/* Keyboard cursor highlight; matches the legacy .hl.active treatment. */
+.headline-active {
+  background: rgba(37, 122, 167, 0.12);
 }
 
 .headline-title {

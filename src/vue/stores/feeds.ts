@@ -30,7 +30,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const categories = ref<Category[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const currentFeedId = ref<number | string>(0);
+  /** null means nothing is selected; 0 is the valid Archived feed. */
+  const currentFeedId = ref<number | string | null>(null);
   const currentIsCat = ref(false);
 
   // Getters
@@ -81,13 +82,10 @@ export const useFeedsStore = defineStore('feeds', () => {
       const response = await api.getFeedTree();
       
       if (response.status === 0) {
-        // TypeScript type narrowing - content is guaranteed when status is 0
-        const content = response.content;
-        const feedData = (content as { feeds?: Feed[]; categories?: Category[] });
-        feeds.value = feedData.feeds ?? [];
-        categories.value = feedData.categories ?? [];
+        feeds.value = response.content.feeds;
+        categories.value = response.content.categories;
       } else {
-        error.value = 'Failed to load feeds';
+        error.value = response.error ?? 'Failed to load feeds';
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Unknown error';
@@ -128,9 +126,161 @@ export const useFeedsStore = defineStore('feeds', () => {
   function reset() {
     feeds.value = [];
     categories.value = [];
-    currentFeedId.value = 0;
+    currentFeedId.value = null;
     currentIsCat.value = false;
     error.value = null;
+  }
+
+  // ============================================
+  // Feed & category management (Phase 3)
+  // ============================================
+
+  async function addFeed(feedUrl: string, categoryId?: number): Promise<boolean> {
+    try {
+      // Feeds/add does not accept a custom title; the feed keeps its own title.
+      const response = await api.addFeed(feedUrl, categoryId ?? 0);
+      if (response.status === 0) {
+        await loadFeeds();
+        return true;
+      }
+      error.value = response.error ?? 'Failed to add feed';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to add feed';
+      return false;
+    }
+  }
+
+  async function removeFeed(feedId: number): Promise<boolean> {
+    try {
+      const response = await api.deleteFeed(feedId);
+      if (response.status === 0) {
+        feeds.value = feeds.value.filter(f => f.id !== feedId);
+        if (currentFeedId.value === feedId && !currentIsCat.value) {
+          currentFeedId.value = null;
+        }
+        return true;
+      }
+      error.value = response.error ?? 'Failed to delete feed';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to delete feed';
+      return false;
+    }
+  }
+
+  /** Load a single feed's editable settings. */
+  async function loadFeedDetails(feedId: number) {
+    try {
+      const response = await api.getFeedDetails(feedId);
+      return response.status === 0 ? response.content : null;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to load feed';
+      return null;
+    }
+  }
+
+  /** Persist changes to a feed's settings, then refresh the tree. */
+  async function saveFeed(
+    feedId: number,
+    changes: Partial<Omit<import('../api/legacyEndpoints').FeedDetails, 'id'>>
+  ): Promise<boolean> {
+    try {
+      const response = await api.saveFeed(feedId, changes);
+      if (response.status === 0) {
+        await loadFeeds();
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save feed';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save feed';
+      return false;
+    }
+  }
+
+  async function purgeFeed(): Promise<boolean> {
+    try {
+      // Purging is a scheduled/CLI operation; there is no backend.php method.
+      const response = await api.purgeFeed();
+      return response.status === 0;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to purge feed';
+      return false;
+    }
+  }
+
+  async function createCategory(title: string): Promise<boolean> {
+    try {
+      const response = await api.createCategory(title);
+      if (response.status === 0) {
+        await loadFeeds();
+        return true;
+      }
+      error.value = response.error ?? 'Failed to create category';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to create category';
+      return false;
+    }
+  }
+
+  async function deleteCategory(categoryId: number): Promise<boolean> {
+    try {
+      const response = await api.deleteCategory(categoryId);
+      if (response.status === 0) {
+        categories.value = categories.value.filter(c => c.id !== categoryId);
+        if (currentFeedId.value === categoryId && currentIsCat.value) {
+          currentFeedId.value = null;
+          currentIsCat.value = false;
+        }
+        return true;
+      }
+      error.value = response.error ?? 'Failed to delete category';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to delete category';
+      return false;
+    }
+  }
+
+  async function renameCategory(categoryId: number, title: string): Promise<boolean> {
+    try {
+      const response = await api.renameCategory(categoryId, title);
+      if (response.status === 0) {
+        const cat = categories.value.find(c => c.id === categoryId);
+        if (cat) cat.title = title;
+        return true;
+      }
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to rename category';
+      return false;
+    }
+  }
+
+  /**
+   * Mark everything in a feed/category as read.
+   */
+  async function catchupFeed(feedId: number | string, isCat: boolean = false): Promise<boolean> {
+    try {
+      const response = await api.catchupFeed(feedId, isCat);
+      if (response.status === 0) {
+        // Optimistically clear unread counters
+        if (isCat) {
+          const cat = categories.value.find(c => c.id === feedId);
+          if (cat) cat.unread = 0;
+        } else {
+          const feed = feeds.value.find(f => f.id === feedId);
+          if (feed) feed.unread = 0;
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to mark feed as read';
+      return false;
+    }
   }
 
   return {
@@ -152,6 +302,15 @@ export const useFeedsStore = defineStore('feeds', () => {
     selectFeed,
     updateFeedUnread,
     updateCategoryUnread,
+    addFeed,
+    loadFeedDetails,
+    saveFeed,
+    removeFeed,
+    purgeFeed,
+    createCategory,
+    deleteCategory,
+    renameCategory,
+    catchupFeed,
     reset,
   };
 });

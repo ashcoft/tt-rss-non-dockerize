@@ -23,8 +23,13 @@ const vuetify = createVuetify({
   },
 });
 
-// Initialize API client with CSRF token from backend
-api.initCsrfToken();
+// Initialize API client with CSRF token from backend. A failure here is not
+// fatal: the adapter fetches the token on demand before the first request.
+try {
+  await api.initCsrfToken();
+} catch (err) {
+  console.warn('[Vue 3] CSRF token unavailable; requests will retry on demand.', err);
+}
 
 // Create Vue app instance
 const app = createApp(App);

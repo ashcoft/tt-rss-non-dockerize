@@ -9,12 +9,23 @@
 
 	require_once __DIR__ . '/include/autoload.php';
 	require_once __DIR__ . '/include/sessions.php';
+	require_once __DIR__ . '/include/vue_assets.php';
 
 	Config::sanity_check();
 
 	if (!init_plugins()) return;
 
-	UserHelper::login_sequence();
+	// When a production Vue build is present it becomes the entry point. The
+	// Dojo shell below stays reachable (no build / VUE_LEGACY_SHELL=1) so the two
+	// can be compared during the transition.
+	$vue_build = VueAssets::is_built() === true && getenv('VUE_LEGACY_SHELL') === false;
+
+	UserHelper::login_sequence($vue_build === false);
+
+	if ($vue_build === true) {
+		VueAssets::serve_vue_shell();
+		return;
+	}
 
 	header('Content-Type: text/html; charset=utf-8');
 

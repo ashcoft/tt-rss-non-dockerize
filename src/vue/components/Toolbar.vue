@@ -4,12 +4,12 @@
       <v-btn-toggle>
         <v-btn
           icon="mdi-refresh"
-          @click="$emit('action', 'refresh')"
+          @click="handleAction('refresh')"
           title="Refresh"
         />
         <v-btn
           icon="mdi-check-all"
-          @click="$emit('action', 'catchup')"
+          @click="handleAction('catchup')"
           title="Mark all as read"
         />
       </v-btn-toggle>
@@ -22,7 +22,22 @@
         density="compact"
         hide-details
         class="search-input"
-        @keyup.enter="$emit('action', 'search', searchQuery)"
+        @keyup.enter="handleAction('search', searchQuery)"
+      />
+
+      <!-- Word stemming language. Required by the backend: an empty value
+           makes PostgreSQL reject the query and matches nothing. -->
+      <v-select
+        v-if="searchLanguages.length > 1"
+        v-model="searchLanguage"
+        :items="searchLanguages"
+        label="Language"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="search-language"
+        title="Used for word stemming"
+        @update:model-value="onLanguageChange"
       />
     </div>
 
@@ -31,26 +46,17 @@
     </div>
 
     <div class="toolbar-right">
-      <v-btn-toggle
-        :model-value="viewMode"
+      <!-- Values must match the backend's accepted view_mode set. -->
+      <v-select
+        v-model="viewMode"
+        :items="viewModeOptions"
+        label="Show"
+        density="compact"
+        variant="outlined"
+        hide-details
+        class="view-mode"
         @update:model-value="setViewMode"
-      >
-        <v-btn
-          value="list"
-          icon="mdi-view-list"
-          title="List view"
-        />
-        <v-btn
-          value="grid"
-          icon="mdi-view-grid"
-          title="Grid view"
-        />
-        <v-btn
-          value="expanded"
-          icon="mdi-view-sequential"
-          title="Expanded view"
-        />
-      </v-btn-toggle>
+      />
 
       <v-menu>
         <template #activator="{ props }">
@@ -99,9 +105,18 @@ import type { Feed } from '../types';
 
 interface Props {
   feedInfo: Feed | null;
+  searchLanguages?: string[];
+  modelSearchLanguage?: string;
+  modelViewMode?: string;
+  modelOrderBy?: string;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  searchLanguages: () => [],
+  modelSearchLanguage: 'english',
+  modelViewMode: 'adaptive',
+  modelOrderBy: 'default',
+});
 
 const emit = defineEmits<{
   (e: 'action', action: string, payload?: string | number | object): void;
@@ -109,14 +124,26 @@ const emit = defineEmits<{
 
 // State
 const searchQuery = ref('');
-const viewMode = ref<'list' | 'grid' | 'expanded'>('list');
-const sortBy = ref('date');
-const sortOrder = ref<'asc' | 'desc'>('desc');
+const searchLanguage = ref(props.modelSearchLanguage);
+// These mirror the <select> values in index.php and the strings Feeds/view
+// understands; arbitrary values are silently ignored by the backend.
+const viewMode = ref(props.modelViewMode);
+const sortBy = ref(props.modelOrderBy);
+
+const viewModeOptions = [
+  { title: 'Adaptive', value: 'adaptive' },
+  { title: 'All Articles', value: 'all_articles' },
+  { title: 'Starred', value: 'marked' },
+  { title: 'Published', value: 'published' },
+  { title: 'Unread', value: 'unread' },
+  { title: 'With Note', value: 'has_note' },
+];
 
 const sortOptions = [
-  { title: 'Date', value: 'date' },
-  { title: 'Feed', value: 'feed' },
-  { title: 'Title', value: 'title' }
+  { title: 'Default', value: 'default' },
+  { title: 'Newest first', value: 'feed_dates' },
+  { title: 'Oldest first', value: 'date_reverse' },
+  { title: 'Title', value: 'title' },
 ];
 
 const actionOptions = [
@@ -127,12 +154,7 @@ const actionOptions = [
 
 // Computed
 const sortLabel = computed(() => {
-  const labels: Record<string, string> = {
-    date: 'Date',
-    feed: 'Feed',
-    title: 'Title'
-  };
-  return labels[sortBy.value] || 'Date';
+  return sortOptions.find(o => o.value === sortBy.value)?.title ?? 'Default';
 });
 
 // Methods
@@ -140,7 +162,7 @@ const sortLabel = computed(() => {
  * Sets the view mode and emits an action event.
  * @param mode - The view mode to set ('list', 'grid', or 'expanded').
  */
-const setViewMode = (mode: 'list' | 'grid' | 'expanded') => {
+const setViewMode = (mode: string) => {
   viewMode.value = mode;
   emit('action', 'viewMode', mode);
 };
@@ -151,15 +173,29 @@ const setViewMode = (mode: 'list' | 'grid' | 'expanded') => {
  */
 const handleSort = (command: string) => {
   sortBy.value = command;
-  emit('action', 'sort', { by: command, order: sortOrder.value });
+  emit('action', 'orderBy', command);
 };
 
 /**
  * Handles a generic action by emitting an action event.
  * @param command - The action command to emit.
  */
-const handleAction = (command: string) => {
-  emit('action', command);
+const handleAction = (command: string, payload?: string | number | object) => {
+  // Searches must carry the stemming language, so pass it alongside the term.
+  if (command === 'search') {
+    emit('action', 'search', { query: payload, language: searchLanguage.value });
+    return;
+  }
+  emit('action', command, payload);
+};
+
+/**
+ * Notifies the parent when the stemming language changes so it can be stored.
+ * @param language - The newly selected language.
+ */
+const onLanguageChange = (language: string) => {
+  searchLanguage.value = language;
+  emit('action', 'searchLanguage', language);
 };
 </script>
 

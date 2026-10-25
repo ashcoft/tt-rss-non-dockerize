@@ -142,7 +142,16 @@ class UserHelper {
 		}
 	}
 
-	static function login_sequence(): void {
+	/**
+	 * Ensure a session is established.
+	 *
+	 * @param bool $render_login_form When true (legacy Dojo shell) an
+	 *   unauthenticated request renders the PHP login form and exits. When false
+	 *   the method returns with an empty $_SESSION['uid'] and lets the caller
+	 *   decide, which is what the Vue shell needs: it renders its own login
+	 *   component and authenticates through public.php?op=login.
+	 */
+	public static function login_sequence(bool $render_login_form = true): void {
 		$pdo = Db::pdo();
 
 		if (Config::get(Config::SINGLE_USER_MODE)) {
@@ -167,8 +176,12 @@ class UserHelper {
 				if (empty($_SESSION["uid"])) {
 					UserHelper::logout();
 
-					Handler_Public::_render_login_form();
-					exit;
+					if ($render_login_form === true) {
+						Handler_Public::_render_login_form();
+						exit;
+					}
+
+					return;
 				}
 
 			} else {
