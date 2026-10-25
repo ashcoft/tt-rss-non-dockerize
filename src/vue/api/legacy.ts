@@ -150,7 +150,7 @@ export class LegacyBackend {
     const response = await this.send(op, method, body);
     const raw = await response.text();
     const parsed = parseBody(raw);
-    throwIfBackendError(parsed, op, method);
+    throwIfBackendError(parsed);
 
     return { body: parsed, raw };
   }
@@ -232,19 +232,12 @@ function appendParam(body: URLSearchParams, key: string, value: LegacyParams[str
 }
 
 /** Turn a structured `{error: {...}}` body into a LegacyApiError. */
-function throwIfBackendError(
-  parsed: Record<string, unknown> | null,
-  op: string,
-  method: string
-): void {
+function throwIfBackendError(parsed: Record<string, unknown> | null): void {
   const error = parsed?.error;
 
   if (isErrorObject(error)) {
     throw new LegacyApiError(error.code, error.params);
   }
-
-  void op;
-  void method;
 }
 
 function parseBody(raw: string): Record<string, unknown> | null {

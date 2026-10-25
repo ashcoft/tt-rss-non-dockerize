@@ -195,6 +195,93 @@ test('getFeedTree flattens nested items and merges authoritative counters', asyn
   );
 });
 
+test('getFeedTree keeps feeds that appear at the root when categories are off', async () => {
+  installGlobals();
+  // With ENABLE_FEED_CATS off, getfeedtree returns feeds directly under the
+  // root instead of nesting them in category nodes; those feeds must survive.
+  const tree = {
+    items: [
+      { id: 'FEED:7', name: 'Root Feed', type: 'feed', bare_id: 7, unread: -1 },
+      { id: 'FEED:8', name: 'Other Feed', type: 'feed', bare_id: 8, unread: -1 },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(tree) }, { text: JSON.stringify({ counters: [] }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const { feeds, categories } = await endpoints.getFeedTree(backend);
+
+  assert.deepEqual(
+    feeds.map((f) => [f.id, f.title, f.cat_id]),
+    [[7, 'Root Feed', null], [8, 'Other Feed', null]]
+  );
+  assert.deepEqual(categories, []);
+});
+
+test('getFeedTree treats a type-less nested feed node as a feed', async () => {
+  installGlobals();
+  // Verified against the live backend: feeds nested inside a user category are
+  // built by get_category_items() and carry no `type` field at all, unlike the
+  // Special/Labels feeds. Classifying on `type` alone turned them into
+  // categories and lost the feed.
+  const tree = {
+    items: [
+      {
+        id: 'CAT:2',
+        name: 'Child Cat',
+        type: 'category',
+        bare_id: 2,
+        items: [
+          { id: 'FEED:1', bare_id: 1, name: 'Alpha Renamed', unread: -1 },
+        ],
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(tree) }, { text: JSON.stringify({ counters: [] }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const { feeds, categories } = await endpoints.getFeedTree(backend);
+
+  assert.deepEqual(feeds.map((f) => [f.id, f.title, f.cat_id]), [[1, 'Alpha Renamed', 2]]);
+  assert.deepEqual(categories.map((c) => [c.id, c.title]), [[2, 'Child Cat']]);
+});
+
+test('getFeedTree walks nested sub-categories', async () => {
+  installGlobals();
+  const tree = {
+    items: [
+      {
+        id: 'CAT:1',
+        name: 'Parent',
+        type: 'category',
+        bare_id: 1,
+        items: [
+          {
+            id: 'CAT:2',
+            name: 'Child',
+            type: 'category',
+            bare_id: 2,
+            parent_id: 1,
+            items: [{ id: 'FEED:9', name: 'Deep Feed', type: 'feed', bare_id: 9 }],
+          },
+        ],
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(tree) }, { text: JSON.stringify({ counters: [] }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const { feeds, categories } = await endpoints.getFeedTree(backend);
+
+  assert.deepEqual(feeds.map((f) => [f.id, f.cat_id]), [[9, 2]]);
+  assert.deepEqual(categories.map((c) => [c.id, c.title, c.parent_id]), [
+    [1, 'Parent', null],
+    [2, 'Child', 1],
+  ]);
+});
+
 test('getFeedTree does not duplicate the Special or Labels categories', async () => {
   installGlobals();
   const tree = {

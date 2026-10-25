@@ -151,7 +151,7 @@ class UserHelper {
 	 *   decide, which is what the Vue shell needs: it renders its own login
 	 *   component and authenticates through public.php?op=login.
 	 */
-	static function login_sequence(bool $render_login_form = true): void {
+	public static function login_sequence(bool $render_login_form = true): void {
 		$pdo = Db::pdo();
 
 		if (Config::get(Config::SINGLE_USER_MODE)) {

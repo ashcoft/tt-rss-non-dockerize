@@ -149,6 +149,107 @@ async function loadCounters(backend: LegacyBackend): Promise<LegacyCounters> {
  * entry per category (Special `-1`, Labels `-2`, user categories, and
  * Uncategorized `0`), each with a nested `items` array of feeds.
  */
+/**
+ * Whether a tree node is a feed.
+ *
+ * Node shape is not consistent: feeds emitted by `feedlist_init_feed` (the
+ * Special/Labels categories) carry `type: 'feed'`, while feeds nested inside a
+ * user category are built inline by `get_category_items` and carry no `type`
+ * at all. The `id` prefix is present in both, so classification uses that.
+ */
+function isFeedNode(node: Record<string, unknown>): boolean {
+  if (node.type === 'feed') {
+    return true;
+  }
+
+  return typeof node.id === 'string' && node.id.startsWith('FEED:');
+}
+
+/** Convert one `getfeedtree` feed node, or null when it is not a feed. */
+function adaptTreeNode(
+  raw: unknown,
+  catId: number | null,
+  counters: LegacyCounters
+): AdaptedFeed | null {
+  const node = expectObject(raw, 'Pref_Feeds/getfeedtree.feed');
+
+  if (!isFeedNode(node)) {
+    return null;
+  }
+
+  const feedId = asNumber(node.bare_id, Number.NaN);
+
+  if (!Number.isFinite(feedId)) {
+    return null;
+  }
+
+  return {
+    id: feedId,
+    title: asString(node.name),
+    unread: counters.feeds.get(feedId) ?? 0,
+    cat_id: catId,
+    // getfeedtree does not return feed_url/site_url; these are only available
+    // from Pref_Feeds/editfeed. Leave them empty rather than fabricating.
+    feed_url: '',
+    site_url: '',
+  };
+}
+
+/**
+ * Walk the tree, collecting feeds at every level.
+ *
+ * With categories enabled the root holds one node per category, each with a
+ * nested `items` array. With categories disabled the root holds the feeds
+ * directly, so a root entry may itself be a feed.
+ */
+function collectTree(
+  items: unknown[],
+  catId: number | null,
+  counters: LegacyCounters,
+  feeds: AdaptedFeed[],
+  categories: AdaptedCategory[]
+): void {
+  for (const raw of items) {
+    const node = expectObject(raw, 'Pref_Feeds/getfeedtree.node');
+
+    if (isFeedNode(node)) {
+      const feed = adaptTreeNode(node, catId, counters);
+
+      if (feed) {
+        feeds.push(feed);
+      }
+
+      continue;
+    }
+
+    const categoryId = asNumber(node.bare_id, Number.NaN);
+
+    if (!Number.isFinite(categoryId)) {
+      continue;
+    }
+
+    // Special and Labels are rendered from dedicated sources (hardcoded
+    // special feeds, labels store); skip them to avoid duplicates.
+    if (categoryId === CATEGORY_SPECIAL || categoryId === CATEGORY_LABELS) {
+      continue;
+    }
+
+    if (categoryId !== CATEGORY_UNCATEGORIZED) {
+      categories.push({
+        id: categoryId,
+        title: asString(node.name),
+        unread: counters.categories.get(categoryId) ?? 0,
+        parent_id: node.parent_id === undefined ? null : asNumber(node.parent_id, 0),
+      });
+    }
+
+    const childItems = Array.isArray(node.items) ? node.items : [];
+    const childCatId = categoryId === CATEGORY_UNCATEGORIZED ? null : categoryId;
+
+    collectTree(childItems, childCatId, counters, feeds, categories);
+  }
+}
+
 export async function getFeedTree(
   backend: LegacyBackend
 ): Promise<{ feeds: AdaptedFeed[]; categories: AdaptedCategory[] }> {
@@ -163,49 +264,7 @@ export async function getFeedTree(
   const feeds: AdaptedFeed[] = [];
   const categories: AdaptedCategory[] = [];
 
-  for (const rawCategory of rootItems) {
-    const category = expectObject(rawCategory, 'Pref_Feeds/getfeedtree.category');
-    const categoryId = asNumber(category.bare_id, Number.NaN);
-    if (!Number.isFinite(categoryId)) continue;
-
-    const childItems = Array.isArray(category.items)
-      ? category.items
-      : [];
-
-    // Special and Labels are rendered from dedicated sources (hardcoded
-    // special feeds, labels store); skip them here to avoid duplicates.
-    if (categoryId === CATEGORY_SPECIAL || categoryId === CATEGORY_LABELS) {
-      continue;
-    }
-
-    if (categoryId !== CATEGORY_UNCATEGORIZED) {
-      categories.push({
-        id: categoryId,
-        title: asString(category.name),
-        unread: counters.categories.get(categoryId) ?? 0,
-        parent_id: category.parent_id === undefined ? null : asNumber(category.parent_id, 0),
-      });
-    }
-
-    for (const rawFeed of childItems) {
-      const feed = expectObject(rawFeed, 'Pref_Feeds/getfeedtree.feed');
-      if (feed.type !== 'feed') continue;
-      const feedId = asNumber(feed.bare_id, Number.NaN);
-      if (!Number.isFinite(feedId)) continue;
-
-      feeds.push({
-        id: feedId,
-        title: asString(feed.name),
-        unread: counters.feeds.get(feedId) ?? 0,
-        cat_id: categoryId === CATEGORY_UNCATEGORIZED ? null : categoryId,
-        // getfeedtree does not return feed_url/site_url; these are only
-        // available from Pref_Feeds/editfeed. Leave them empty rather than
-        // fabricating values.
-        feed_url: '',
-        site_url: '',
-      });
-    }
-  }
+  collectTree(rootItems, null, counters, feeds, categories);
 
   return { feeds, categories };
 }
