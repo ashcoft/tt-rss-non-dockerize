@@ -17,9 +17,14 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   // Project root (where index.html is located)
   root: '.',
+
+  // The PHP shell emits `dist/...` paths and the app must work from a
+  // subdirectory install, so built assets use relative URLs. Vite dev still
+  // needs a root base.
+  base: command === 'build' ? './' : '/',
 
   // Static assets are handled through explicit imports and Vite's asset pipeline.
   publicDir: false,
@@ -237,4 +242,4 @@ export default defineConfig({
       'top-level-await': true,
     },
   },
-});
+}));
