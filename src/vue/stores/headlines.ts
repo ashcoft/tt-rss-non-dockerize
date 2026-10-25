@@ -130,7 +130,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
     const next = resolveCursorTarget(cursorIndex.value, delta, headlines.value.length);
 
-    cursorId.value = headlines.value[next]?.id ?? null;
+    cursorId.value = headlines.value[next].id;
     return cursorHeadline.value;
   }
 

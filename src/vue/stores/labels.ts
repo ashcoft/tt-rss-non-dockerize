@@ -20,7 +20,7 @@ export const useLabelsStore = defineStore('labels', () => {
   const error = ref<string | null>(null);
 
   const unreadCount = computed(() =>
-    labels.value.reduce((sum, l) => sum + (l.unread ?? 0), 0)
+    labels.value.reduce((sum, l) => sum + l.unread, 0)
   );
 
   async function loadLabels(): Promise<void> {

@@ -143,7 +143,7 @@ export class LegacyBackend {
   async call(op: string, method: string, params: LegacyParams = {}): Promise<LegacyResponse> {
     const body = encodeParams(op, method, params);
 
-    if (this.requiresCsrf(op, method)) {
+    if (LegacyBackend.requiresCsrf(op, method)) {
       body.set('csrf_token', await this.resolveCsrfToken(op, method));
     }
 
@@ -156,7 +156,7 @@ export class LegacyBackend {
   }
 
   /** Methods listed in CSRF_IGNORED may be called before a session exists. */
-  private requiresCsrf(op: string, method: string): boolean {
+  private static requiresCsrf(op: string, method: string): boolean {
     return !CSRF_IGNORED.has(`${op}/${method}`.toLowerCase());
   }
 
@@ -177,6 +177,7 @@ export class LegacyBackend {
     return token;
   }
 
+  /** POST the encoded request and surface transport/HTTP failures. */
   private async send(op: string, method: string, body: URLSearchParams): Promise<Response> {
     let response: Response;
 
@@ -201,7 +202,7 @@ export class LegacyBackend {
 }
 
 /** Encode op/method/params the way backend.php expects. */
-function encodeParams(op: string, method: string, params: LegacyParams): URLSearchParams {
+const encodeParams = (op: string, method: string, params: LegacyParams): URLSearchParams => {
   const body = new URLSearchParams();
   body.set('op', op);
 
@@ -216,7 +217,11 @@ function encodeParams(op: string, method: string, params: LegacyParams): URLSear
   return body;
 }
 
-function appendParam(body: URLSearchParams, key: string, value: LegacyParams[string]): void {
+const appendParam = (
+  body: URLSearchParams,
+  key: string,
+  value: LegacyParams[string]
+): void => {
   if (value === undefined) {
     return;
   }

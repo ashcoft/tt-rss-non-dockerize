@@ -134,8 +134,8 @@ class ApiClient {
     }, false);
   }
 
-  async purgeFeed(): Promise<ApiResponse<boolean>> {
-    // Always throws: purging is a CLI operation (see legacyEndpoints.purgeFeed).
+  purgeFeed(): Promise<ApiResponse<boolean>> {
+    // Always rejects: purging is a CLI operation (see legacyEndpoints.purgeFeed).
     return this.wrap(() => Promise.resolve(endpoints.purgeFeed()), false);
   }
 

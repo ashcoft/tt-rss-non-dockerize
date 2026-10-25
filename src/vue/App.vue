@@ -245,44 +245,6 @@ function asSearchPayload(payload: unknown): SearchPayload {
   return payload as SearchPayload;
 }
 
-const handleToolbarAction = async (action: string, payload?: string | number | object) => {
-  const feedId = feedsStore.currentFeedId;
-  const isCat = feedsStore.currentIsCat;
-
-  switch (action) {
-    case 'refresh':
-      await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
-      break;
-    case 'catchup':
-      await catchupCurrentFeed(feedId, isCat);
-      break;
-    case 'search':
-      await runSearch(payload, feedId, isCat);
-      break;
-    case 'searchLanguage':
-      if (typeof payload === 'string') headlinesStore.searchLanguage = payload;
-      break;
-    case 'viewMode':
-      if (typeof payload === 'string') {
-        headlinesStore.setViewMode(payload);
-        await headlinesStore.loadHeadlines(feedId, isCat);
-      }
-      break;
-    case 'orderBy':
-      if (typeof payload === 'string') {
-        headlinesStore.setOrderBy(payload);
-        await headlinesStore.loadHeadlines(feedId, isCat);
-      }
-      break;
-    case 'edit':
-    case 'delete':
-      feedsDialogOpen.value = true;
-      break;
-    default:
-      showMessage(`Unknown action: ${action}`, 'warning');
-  }
-};
-
 /** Mark the current feed (or category) as read and refresh the list. */
 const catchupCurrentFeed = async (feedId: number | string, isCat: boolean) => {
   showMessage('Marking feed as read...', 'info');
@@ -383,6 +345,44 @@ const toggleCursorRead = async () => {
   const headline = headlinesStore.cursorHeadline;
   if (!headline) return;
   await handleHeadlineAction(headline, 'toggle_read');
+};
+
+const handleToolbarAction = async (action: string, payload?: string | number | object) => {
+  const feedId = feedsStore.currentFeedId;
+  const isCat = feedsStore.currentIsCat;
+
+  switch (action) {
+    case 'refresh':
+      await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
+      break;
+    case 'catchup':
+      await catchupCurrentFeed(feedId, isCat);
+      break;
+    case 'search':
+      await runSearch(payload, feedId, isCat);
+      break;
+    case 'searchLanguage':
+      if (typeof payload === 'string') headlinesStore.searchLanguage = payload;
+      break;
+    case 'viewMode':
+      if (typeof payload === 'string') {
+        headlinesStore.setViewMode(payload);
+        await headlinesStore.loadHeadlines(feedId, isCat);
+      }
+      break;
+    case 'orderBy':
+      if (typeof payload === 'string') {
+        headlinesStore.setOrderBy(payload);
+        await headlinesStore.loadHeadlines(feedId, isCat);
+      }
+      break;
+    case 'edit':
+    case 'delete':
+      feedsDialogOpen.value = true;
+      break;
+    default:
+      showMessage(`Unknown action: ${action}`, 'warning');
+  }
 };
 
 // Keyboard shortcuts. Mirrors the legacy Dojo hotkeys that map cleanly onto the

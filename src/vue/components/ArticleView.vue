@@ -46,7 +46,7 @@ const saveTags = async (value: unknown) => {
 
 /** Fetch autocomplete suggestions as the user types. */
 const onTagSearch = async (query: string) => {
-  const search = (query ?? '').trim();
+  const search = query.trim();
   if (search.length < 1) {
     tagSuggestions.value = [];
     return;
