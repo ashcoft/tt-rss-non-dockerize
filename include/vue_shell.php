@@ -74,7 +74,7 @@ if ($authenticated === true) {
 		foreach (PluginHost::getInstance()->get_plugins() as $p) {
 			$css = $p->get_css();
 
-			if ($css) {
+			if ($css !== "") {
 				echo $css;
 			}
 		}
@@ -140,7 +140,7 @@ if ($authenticated === true) {
 	foreach (PluginHost::getInstance()->get_plugins() as $n => $p) {
 		$script = $p->get_js();
 
-		if ($script) {
+		if ($script !== "") {
 			echo "<script type='text/javascript'>try {\n$script\n} catch (e) {\n"
 				. "console.warn('failed to initialize plugin JS: " . $n . "', e);\n}</script>";
 		}
