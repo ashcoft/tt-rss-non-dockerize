@@ -135,22 +135,6 @@ const CSRF_IGNORED = new Set([
   'pref_filters/getfiltertree',
 ]);
 
-/** Encode op/method/params the way backend.php expects. */
-const encodeParams = (op: string, method: string, params: LegacyParams): URLSearchParams => {
-  const body = new URLSearchParams();
-  body.set('op', op);
-
-  if (method) {
-    body.set('method', method);
-  }
-
-  for (const [key, value] of Object.entries(params)) {
-    appendParam(body, key, value);
-  }
-
-  return body;
-}
-
 /** Append one parameter, expanding arrays into repeated `key[]` entries. */
 const appendParam = (
   body: URLSearchParams,
@@ -261,6 +245,22 @@ export class LegacyBackend {
 
     return response;
   }
+}
+
+/** Encode op/method/params the way backend.php expects. */
+const encodeParams = (op: string, method: string, params: LegacyParams): URLSearchParams => {
+  const body = new URLSearchParams();
+  body.set('op', op);
+
+  if (method) {
+    body.set('method', method);
+  }
+
+  for (const [key, value] of Object.entries(params)) {
+    appendParam(body, key, value);
+  }
+
+  return body;
 }
 
 /** Turn a structured `{error: {...}}` body into a LegacyApiError. */
