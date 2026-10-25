@@ -1,15 +1,12 @@
 /**
  * Vite Configuration for Tiny Tiny RSS
- * 
- * This configuration enables Vite to work alongside the existing Dojo build system.
- * It provides:
- * - Vue dependency optimization (legacy Dojo retains its AMD loader)
- * - Dev server with HMR for faster development
+ *
+ * This builds the production client loaded by the PHP shell
+ * (include/app_shell.php via classes/ViteAssets.php):
+ * - Vue + Vuetify dependency optimization
+ * - Dev server with HMR for development against the PHP backend
  * - Proxy to PHP backend for API calls
- * - Asset handling for CSS, fonts, and images
- * - Vue 3 + Vuetify support for new UI components
- * 
- * The old build system remains functional as a fallback.
+ * - Manifest output so PHP can emit the entry script/style tags
  */
 
 import { defineConfig } from 'vite';
@@ -24,8 +21,7 @@ export default defineConfig({
   // Project root (where index.html is located)
   root: '.',
 
-  // Disable publicDir since js/ contains modules that are part of the module graph
-  // Static assets are handled through explicit imports and Vite's asset pipeline
+  // Static assets are handled through explicit imports and Vite's asset pipeline.
   publicDir: false,
   
   // Plugins
