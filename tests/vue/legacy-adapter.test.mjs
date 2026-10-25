@@ -15,6 +15,24 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
+
+// Only the modules the compiled sources import are resolvable; an explicit
+// allowlist avoids a dynamic require() of an arbitrary specifier.
+const ALLOWED_MODULES = {
+  typescript: () => require('typescript'),
+  vue: () => require('vue'),
+  pinia: () => require('pinia'),
+};
+
+function requireModule(id) {
+  const loader = ALLOWED_MODULES[id];
+
+  if (loader === undefined) {
+    throw new Error(`Refusing to require unexpected module: ${id}`);
+  }
+
+  return loader();
+}
 const SRC_VUE = fileURLToPath(new URL('../../src/vue/', import.meta.url));
 
 /** Load a TypeScript module as CommonJS, resolving relative `.ts` imports. */
@@ -37,7 +55,7 @@ function loadTsModule(specifier, cache = new Map()) {
       const target = fileURLToPath(new URL(id, new URL(`file://${resolved}`)));
       return loadTsModule(target, cache);
     }
-    return require(id);
+    return requireModule(id);
   };
 
   // Executes the compiled local module, not remote or user-supplied code.
@@ -114,6 +132,30 @@ test('fetchCsrfToken parses the token embedded by index.php', async () => {
   stubFetch([{ text: 'const __csrf_token = "abc123";\nconst x = 1;' }]);
 
   assert.equal(await fetchCsrfToken(), 'abc123');
+});
+
+test('fetchCsrfToken reads the token from a realistic shell document', async () => {
+  installGlobals({ csrf: null });
+  // The token declaration sits among other scripts; the parser must find the
+  // quoted value rather than assume it is the first quoted string on the page.
+  const html = [
+    '<!DOCTYPE html><html><head>',
+    '<meta name="viewport" content="initial-scale=1,width=device-width" />',
+    '<script type="text/javascript">',
+    '  const __csrf_token = "deadbeef";',
+    '  const __default_light_theme = "themes/light.css";',
+    '</script></head><body></body></html>',
+  ].join('\n');
+  stubFetch([{ text: html }]);
+
+  assert.equal(await fetchCsrfToken(), 'deadbeef');
+});
+
+test('fetchCsrfToken returns empty when the declaration is absent', async () => {
+  installGlobals({ csrf: null });
+  stubFetch([{ text: '<html><body>no token here</body></html>' }]);
+
+  await assert.rejects(() => fetchCsrfToken(), LegacyProtocolError);
 });
 
 test('a structured error body becomes a LegacyApiError', async () => {

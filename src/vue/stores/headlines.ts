@@ -129,8 +129,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     if (headlines.value.length === 0) return null;
 
     const next = resolveCursorTarget(cursorIndex.value, delta, headlines.value.length);
-
-    const target = headlines.value[next];
+    const target = headlines.value.at(next);
 
     if (target === undefined) {
       return null;
@@ -240,7 +239,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
           // Revert optimistic update if API fails
           headline.is_read = false;
 
-          if (selectedArticle.value !== null && selectedArticle.value.id === articleId) {
+          if (selectedArticle.value?.id === articleId) {
             selectedArticle.value.is_read = false;
           }
           feedsStore.updateFeedUnread(headline.feed_id, 1);

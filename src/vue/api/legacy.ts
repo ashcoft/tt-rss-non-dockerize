@@ -89,8 +89,7 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
   }
 
   const html = await response.text();
-  const match = /const\s+__csrf_token\s*=\s*"([^"]*)"/.exec(html);
-  const token = match?.[1] ?? '';
+  const token = extractCsrfToken(html);
 
   if (token === '' || token === CSRF_PLACEHOLDER) {
     throw new LegacyProtocolError(
@@ -99,6 +98,31 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
   }
 
   return token;
+}
+
+/**
+ * Pull the token out of the shell's `const __csrf_token = "..."` declaration.
+ *
+ * Parsed by scanning rather than with a regex: the input is a whole HTML
+ * document, and a pattern over it both invites backtracking concerns and
+ * obscures that only one exact declaration is being read.
+ */
+function extractCsrfToken(html: string): string {
+  const marker = '__csrf_token';
+  const at = html.indexOf(marker);
+
+  if (at === -1) {
+    return '';
+  }
+
+  const quote = html.indexOf('"', at);
+  const end = quote === -1 ? -1 : html.indexOf('"', quote + 1);
+
+  if (quote === -1 || end === -1) {
+    return '';
+  }
+
+  return html.slice(quote + 1, end);
 }
 
 /** Methods the backend accepts without a valid CSRF token. */

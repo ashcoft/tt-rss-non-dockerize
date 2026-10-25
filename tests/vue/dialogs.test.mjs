@@ -9,6 +9,24 @@ import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
 
+// Only the modules the compiled sources import are resolvable; an explicit
+// allowlist avoids a dynamic require() of an arbitrary specifier.
+const ALLOWED_MODULES = {
+  typescript: () => require('typescript'),
+  vue: () => require('vue'),
+  pinia: () => require('pinia'),
+};
+
+function requireModule(id) {
+  const loader = ALLOWED_MODULES[id];
+
+  if (loader === undefined) {
+    throw new Error(`Refusing to require unexpected module: ${id}`);
+  }
+
+  return loader();
+}
+
 function compileComponent(relativePath) {
   const filename = fileURLToPath(new URL(relativePath, import.meta.url));
   const { descriptor, errors } = parse(readFileSync(filename, 'utf8'), { filename });
@@ -29,7 +47,7 @@ function compileComponent(relativePath) {
       new Function('require', 'exports', compiled)(require, exports);
       return exports;
     }
-    return require(id);
+    return requireModule(id);
   };
   // Execute the compiled local component, not remote or user-supplied code.
   new Function('require', 'module', 'exports', outputText)(localRequire, module, module.exports);
