@@ -7,52 +7,53 @@
  * tags so index.php/prefs.php do not have to hardcode hashes.
  */
 class VueAssets {
-        const BUILD_DIR = 'dist';
-        const MANIFEST = 'dist/.vite/manifest.json';
-        const ENTRY = 'src/vue/index.html';
+        public const BUILD_DIR = 'dist';
+        /** Derived from BUILD_DIR so the two cannot drift apart. */
+        public const MANIFEST = self::BUILD_DIR . '/.vite/manifest.json';
+        public const ENTRY = 'src/vue/index.html';
 
         /** @var array<string, array<string, mixed>>|null */
         private static ?array $manifest = null;
 
-        /** @return array<string, array<string, mixed>>|null */
-        private static function manifest(): ?array {
-                if (self::$manifest !== null) {
-                        return self::$manifest ?: null;
+        /**
+         * The decoded manifest, cached. An empty array means "no usable build".
+         *
+         * @return array<string, array<string, mixed>>
+         */
+        private static function manifest(): array {
+                if (self::$manifest === null) {
+                        self::$manifest = self::load_manifest();
                 }
-
-                $path = dirname(__DIR__) . '/' . self::MANIFEST;
-
-                if (!is_file($path)) {
-                        self::$manifest = [];
-                        return null;
-                }
-
-                $decoded = json_decode((string)file_get_contents($path), true);
-
-                if (!is_array($decoded)) {
-                        self::$manifest = [];
-                        return null;
-                }
-
-                self::$manifest = $decoded;
 
                 return self::$manifest;
         }
 
+        /**
+         * Read and decode the build manifest, returning an empty array when the
+         * build is missing or malformed (both mean "serve the legacy shell").
+         *
+         * @return array<string, array<string, mixed>>
+         */
+        private static function load_manifest(): array {
+                $path = dirname(__DIR__) . '/' . self::MANIFEST;
+
+                if (!is_file($path)) {
+                        return [];
+                }
+
+                $decoded = json_decode((string)file_get_contents($path), true);
+
+                return is_array($decoded) ? $decoded : [];
+        }
+
         /** Whether a production build is present and usable. */
-        static function is_built(): bool {
+        public static function is_built(): bool {
                 return self::entry() !== null;
         }
 
         /** @return array<string, mixed>|null */
         private static function entry(): ?array {
-                $manifest = self::manifest();
-
-                if ($manifest === null) {
-                        return null;
-                }
-
-                return $manifest[self::ENTRY] ?? null;
+                return self::manifest()[self::ENTRY] ?? null;
         }
 
         /**
@@ -62,7 +63,7 @@ class VueAssets {
          * session's CSRF token and stylesheets, so it must not be stored by a
          * shared cache but should stay eligible for the back/forward cache.
          */
-        static function serve_vue_shell(): void {
+        public static function serve_vue_shell(): void {
                 header('Content-Type: text/html; charset=utf-8');
                 header('Cache-Control: private, no-cache');
 
@@ -73,7 +74,7 @@ class VueAssets {
                 $csrf_token = $_SESSION['csrf_token'] ?? '';
 
                 ob_start();
-                require __DIR__ . '/vue_shell.php';
+                require_once __DIR__ . '/vue_shell.php';
                 $html = (string)ob_get_clean();
 
                 sendConditionalHtml($html);
@@ -90,7 +91,7 @@ class VueAssets {
          * The stylesheet is emitted before the script so the page does not flash
          * unstyled content while the module graph loads.
          */
-        static function tags(): string {
+        public static function tags(): string {
                 $entry = self::entry();
 
                 if ($entry === null) {

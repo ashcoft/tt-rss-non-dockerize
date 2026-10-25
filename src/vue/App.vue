@@ -222,6 +222,21 @@ const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   await headlinesStore.loadHeadlines(feedId, isCat);
 };
 
+/** The toolbar's search payload, when the action carries one. */
+interface SearchPayload {
+  query?: string;
+  language?: string;
+}
+
+/** Narrow the toolbar payload to the search shape it sends. */
+function asSearchPayload(payload: unknown): SearchPayload {
+  if (typeof payload !== 'object' || payload === null) {
+    return { query: typeof payload === 'string' ? payload : undefined };
+  }
+
+  return payload as SearchPayload;
+}
+
 const handleToolbarAction = async (action: string, payload?: string | number | object) => {
   const feedId = feedsStore.currentFeedId;
   const isCat = feedsStore.currentIsCat;
@@ -231,28 +246,11 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
       break;
     case 'catchup':
-      showMessage('Marking feed as read...', 'info');
-      if (await feedsStore.catchupFeed(feedId, isCat)) {
-        await headlinesStore.loadHeadlines(feedId, isCat);
-        showMessage('Feed marked as read', 'success');
-      } else {
-        showMessage('Failed to mark feed as read', 'error');
-      }
+      await catchupCurrentFeed(feedId, isCat);
       break;
-    case 'search': {
-      // The toolbar sends {query, language} so the stemming language always
-      // reaches the backend (an empty one matches nothing).
-      const query = typeof payload === 'string' ? payload : payload?.query;
-      const language = typeof payload === 'object' && payload !== null ? payload.language : undefined;
-      if (typeof query === 'string' && query.trim()) {
-        await headlinesStore.search(query.trim(), feedId, isCat, language);
-        showMessage(`Searching for "${query}"`, 'info');
-      } else {
-        headlinesStore.setSearchQuery('');
-        await headlinesStore.loadHeadlines(feedId, isCat);
-      }
+    case 'search':
+      await runSearch(payload, feedId, isCat);
       break;
-    }
     case 'searchLanguage':
       if (typeof payload === 'string') headlinesStore.searchLanguage = payload;
       break;
@@ -275,6 +273,41 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
   }
+};
+
+/** Mark the current feed (or category) as read and refresh the list. */
+const catchupCurrentFeed = async (feedId: number | string, isCat: boolean) => {
+  showMessage('Marking feed as read...', 'info');
+
+  if (!(await feedsStore.catchupFeed(feedId, isCat))) {
+    showMessage('Failed to mark feed as read', 'error');
+    return;
+  }
+
+  await headlinesStore.loadHeadlines(feedId, isCat);
+  showMessage('Feed marked as read', 'success');
+};
+
+/**
+ * Run a search. The toolbar sends {query, language} so the stemming language
+ * always reaches the backend (an empty one matches nothing); an empty query
+ * clears the search instead.
+ */
+const runSearch = async (
+  payload: string | number | object | undefined,
+  feedId: number | string,
+  isCat: boolean
+) => {
+  const { query, language } = asSearchPayload(payload);
+
+  if (typeof query === 'string' && query.trim()) {
+    await headlinesStore.search(query.trim(), feedId, isCat, language);
+    showMessage(`Searching for "${query}"`, 'info');
+    return;
+  }
+
+  headlinesStore.setSearchQuery('');
+  await headlinesStore.loadHeadlines(feedId, isCat);
 };
 
 const handleHeadlineSelect = async (headline: Headline) => {

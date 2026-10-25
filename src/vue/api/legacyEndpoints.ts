@@ -90,7 +90,11 @@ interface LegacyCounters {
 
 function asString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback;
-  return typeof value === 'string' ? value : String(value);
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  // Objects/arrays have no meaningful string form; the backend sometimes sends
+  // null-ish placeholders for absent fields, which fall back instead.
+  return fallback;
 }
 
 function asNumber(value: unknown, fallback = 0): number {
@@ -309,7 +313,7 @@ export async function getHeadlines(
 }
 
 function stripTags(html: string): string {
-  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return html.replace(/<[^<>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /**

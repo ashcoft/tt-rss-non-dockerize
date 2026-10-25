@@ -141,33 +141,45 @@ export class LegacyBackend {
    *   method that requires one, or when the HTTP request fails.
    */
   async call(op: string, method: string, params: LegacyParams = {}): Promise<LegacyResponse> {
-    const body = new URLSearchParams();
-    body.set('op', op);
-    if (method) body.set('method', method);
+    const body = encodeParams(op, method, params);
 
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined) continue;
-      if (Array.isArray(value)) {
-        for (const entry of value) body.append(`${key}[]`, String(entry));
-      } else {
-        body.set(key, String(value));
-      }
+    if (this.requiresCsrf(op, method)) {
+      body.set('csrf_token', await this.resolveCsrfToken(op, method));
     }
 
-    const requiresCsrf = !CSRF_IGNORED.has(`${op}/${method}`.toLowerCase());
-    if (requiresCsrf) {
-      const token = this.csrfToken ?? (await this.ensureCsrfToken());
-      // Guard the invariant that broke the previous client: never send a token
-      // that `validate_csrf()` cannot match.
-      if (token === '' || token === CSRF_PLACEHOLDER) {
-        throw new LegacyProtocolError(
-          `Refusing to call ${op}->${method} without a real CSRF token.`
-        );
-      }
-      body.set('csrf_token', token);
+    const response = await this.send(op, method, body);
+    const raw = await response.text();
+    const parsed = parseBody(raw);
+    throwIfBackendError(parsed, op, method);
+
+    return { body: parsed, raw };
+  }
+
+  /** Methods listed in CSRF_IGNORED may be called before a session exists. */
+  private requiresCsrf(op: string, method: string): boolean {
+    return !CSRF_IGNORED.has(`${op}/${method}`.toLowerCase());
+  }
+
+  /**
+   * Return a token the backend will accept, or refuse to send the request.
+   * Guarding here is what keeps the previous client's bug from returning: an
+   * empty or literal "auto" token can never pass `validate_csrf()`.
+   */
+  private async resolveCsrfToken(op: string, method: string): Promise<string> {
+    const token = this.csrfToken ?? (await this.ensureCsrfToken());
+
+    if (token === '' || token === CSRF_PLACEHOLDER) {
+      throw new LegacyProtocolError(
+        `Refusing to call ${op}->${method} without a real CSRF token.`
+      );
     }
 
+    return token;
+  }
+
+  private async send(op: string, method: string, body: URLSearchParams): Promise<Response> {
     let response: Response;
+
     try {
       response = await fetch(this.baseUrl, {
         method: 'POST',
@@ -176,25 +188,63 @@ export class LegacyBackend {
         body: body.toString(),
       });
     } catch (cause) {
-      throw new LegacyProtocolError(
-        `${op}->${method} request failed: ${cause instanceof Error ? cause.message : String(cause)}`
-      );
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      throw new LegacyProtocolError(`${op}->${method} request failed: ${detail}`);
     }
 
     if (!response.ok) {
       throw new LegacyProtocolError(`${op}->${method} returned HTTP ${response.status}.`);
     }
 
-    const raw = await response.text();
-    const parsed = parseBody(raw);
-
-    const error = parsed?.error;
-    if (isErrorObject(error)) {
-      throw new LegacyApiError(error.code, error.params);
-    }
-
-    return { body: parsed, raw };
+    return response;
   }
+}
+
+/** Encode op/method/params the way backend.php expects. */
+function encodeParams(op: string, method: string, params: LegacyParams): URLSearchParams {
+  const body = new URLSearchParams();
+  body.set('op', op);
+
+  if (method) {
+    body.set('method', method);
+  }
+
+  for (const [key, value] of Object.entries(params)) {
+    appendParam(body, key, value);
+  }
+
+  return body;
+}
+
+function appendParam(body: URLSearchParams, key: string, value: LegacyParams[string]): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      body.append(`${key}[]`, String(entry));
+    }
+    return;
+  }
+
+  body.set(key, String(value));
+}
+
+/** Turn a structured `{error: {...}}` body into a LegacyApiError. */
+function throwIfBackendError(
+  parsed: Record<string, unknown> | null,
+  op: string,
+  method: string
+): void {
+  const error = parsed?.error;
+
+  if (isErrorObject(error)) {
+    throw new LegacyApiError(error.code, error.params);
+  }
+
+  void op;
+  void method;
 }
 
 function parseBody(raw: string): Record<string, unknown> | null {

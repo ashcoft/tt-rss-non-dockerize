@@ -53,6 +53,38 @@ export interface Article {
   note: string;
 }
 
+/**
+ * Where the cursor should land. With no current position, a forward move starts
+ * at the first entry and a backward move at the last; otherwise it is clamped
+ * to the list bounds.
+ */
+function resolveCursorTarget(current: number, delta: number, length: number): number {
+  if (current === -1) {
+    return delta > 0 ? 0 : length - 1;
+  }
+
+  return Math.min(length - 1, Math.max(0, current + delta));
+}
+
+/**
+ * Tag autocomplete suggestions for the tag editor. Stateless, so it lives
+ * outside the store.
+ */
+async function suggestTags(search: string): Promise<string[]> {
+  const response = await api.completeTags(search);
+  return response.status === 0 ? response.content : [];
+}
+
+/** Assign or unassign a label on a single article. Stateless. */
+async function assignLabel(labelId: number, articleId: number, assign: 0 | 1): Promise<void> {
+  try {
+    await api.setLabelForArticles(labelId, [articleId], assign);
+  } catch (err) {
+    console.error('Failed to assign label:', err);
+    throw err;
+  }
+}
+
 export const useHeadlinesStore = defineStore('headlines', () => {
   // State
   const headlines = ref<Headline[]>([]);
@@ -96,10 +128,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   function moveCursor(delta: number): Headline | null {
     if (headlines.value.length === 0) return null;
 
-    const current = cursorIndex.value;
-    const next = current === -1
-      ? (delta > 0 ? 0 : headlines.value.length - 1)
-      : Math.min(headlines.value.length - 1, Math.max(0, current + delta));
+    const next = resolveCursorTarget(cursorIndex.value, delta, headlines.value.length);
 
     cursorId.value = headlines.value[next]?.id ?? null;
     return cursorHeadline.value;
@@ -430,12 +459,6 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     }
   }
 
-  /** Tag autocomplete suggestions for the tag editor. */
-  async function suggestTags(search: string): Promise<string[]> {
-    const response = await api.completeTags(search);
-    return response.status === 0 ? response.content : [];
-  }
-
   /** Set the score for an article. */
   async function setScore(articleId: number, score: number): Promise<void> {
     try {
@@ -445,15 +468,6 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value?.id === articleId) selectedArticle.value.score = score;
     } catch (err) {
       console.error('Failed to set score:', err);
-      throw err;
-    }
-  }
-
-  async function assignLabel(labelId: number, articleId: number, assign: 0 | 1): Promise<void> {
-    try {
-      await api.setLabelForArticles(labelId, [articleId], assign);
-    } catch (err) {
-      console.error('Failed to assign label:', err);
       throw err;
     }
   }

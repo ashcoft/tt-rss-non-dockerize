@@ -135,10 +135,8 @@ class ApiClient {
   }
 
   async purgeFeed(): Promise<ApiResponse<boolean>> {
-    return this.wrap(async () => {
-      endpoints.purgeFeed();
-      return true;
-    }, false);
+    // Always throws: purging is a CLI operation (see legacyEndpoints.purgeFeed).
+    return this.wrap(() => Promise.resolve(endpoints.purgeFeed()), false);
   }
 
   async catchupFeed(feedId: number | string, isCat = false): Promise<ApiResponse<boolean>> {
