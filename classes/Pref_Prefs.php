@@ -848,7 +848,7 @@ class Pref_Prefs extends Handler_Protected {
 			$options = self::_options_from_map($themes);
 		} else if ($pref_name === Prefs::DEFAULT_UPDATE_INTERVAL) {
 			$type = "select";
-			$options = self::_options_from_map(Feeds::_get_update_intervals(with_default: false));
+			$options = self::_options_from_map(Feeds::_get_update_intervals());
 		} else if ($pref_name === Prefs::DEFAULT_SEARCH_LANGUAGE) {
 			$type = "select";
 			$options = self::_options_from_list(Pref_Feeds::get_ts_languages());

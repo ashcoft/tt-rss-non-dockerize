@@ -104,6 +104,10 @@
 
 <body class="flat ttrss_utility ttrss_login css_loading">
 
+<noscript>
+	<style type="text/css">body.css_loading * { display : revert !important; }</style>
+</noscript>
+
 <?php $return = urlencode(!empty($_REQUEST['return']) ? $_REQUEST['return'] : with_trailing_slash(Config::get_self_url())) ?>
 
 <div class="container">

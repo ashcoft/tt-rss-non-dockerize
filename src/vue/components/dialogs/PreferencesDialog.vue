@@ -57,7 +57,7 @@
                         :disabled="item.disabled"
                         hide-details
                         density="compact"
-                        @update:model-value="savePref(item.name)"
+                        @update:model-value="(value: string | boolean) => savePref(item.name, value)"
                       />
                       <template v-else>
                         <div class="pref-label">
@@ -74,7 +74,7 @@
                           hide-details
                           :disabled="item.disabled"
                           class="pref-control"
-                          @update:model-value="savePref(item.name)"
+                          @update:model-value="(value: string | boolean) => savePref(item.name, value)"
                         />
                         <v-textarea
                           v-else-if="item.type === 'textarea'"
@@ -475,8 +475,8 @@ async function loadPrefs() {
   }
 }
 
-async function savePref(name: string) {
-  const raw = prefValues[name];
+async function savePref(name: string, value_override?: string | boolean) {
+  const raw = value_override === undefined ? prefValues[name] : value_override;
   const value = typeof raw === 'boolean' ? (raw ? '1' : '0') : String(raw ?? '');
   try {
     const response = await api.setPref(name, value);

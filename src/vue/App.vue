@@ -293,6 +293,7 @@ const handleMoveFeed = async (feedId: number, categoryId: number) => {
 // Handlers
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
+  selectedIndex.value = -1;
   feedsStore.selectFeed(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
 };

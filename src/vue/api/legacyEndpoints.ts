@@ -367,7 +367,7 @@ export async function getFilters(backend: LegacyBackend): Promise<AdaptedFilter[
       filters.push({
         id: asNumber(filter.bare_id),
         title: asString(filter.bare_name, asString(filter.name)),
-        enabled: filter.enabled !== false,
+        enabled: asBoolean(filter.enabled ?? true),
         last_triggered: filter.last_triggered ? asString(filter.last_triggered) : null,
         // `_get_rules_list()` returns a <ul> of <li> lines. Turn it into plain
         // text lines so the client never has to render backend HTML.
