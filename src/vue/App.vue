@@ -110,6 +110,7 @@ import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
 import LabelsDialog from './components/dialogs/LabelsDialog.vue';
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
+import { runDetached } from './utils/runDetached';
 
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
@@ -162,12 +163,13 @@ const refreshCurrentFeed = async () => {
   await feedsStore.loadFeeds();
 };
 
+/** Start the periodic refresh of the current feed and its counters. */
 const startPolling = () => {
   stopPolling();
   pollTimer = setInterval(() => {
     // currentFeedId is null when nothing is selected; 0 is the Archived feed.
     if (feedsStore.currentFeedId === null) return;
-    void refreshCurrentFeed();
+    runDetached(refreshCurrentFeed(), 'polling refresh');
   }, POLL_INTERVAL_MS);
 };
 
@@ -347,6 +349,7 @@ const toggleCursorRead = async () => {
   await handleHeadlineAction(headline, 'toggle_read');
 };
 
+/** Dispatch a toolbar action (refresh, catchup, search, view mode, sort). */
 const handleToolbarAction = async (action: string, payload?: string | number | object) => {
   const feedId = feedsStore.currentFeedId;
   const isCat = feedsStore.currentIsCat;
@@ -392,19 +395,19 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
 useKeyboard({
   onNext: () => headlinesStore.moveCursor(1),
   onPrevious: () => headlinesStore.moveCursor(-1),
-  onSelect: () => void openCursorHeadline(),
-  onOpenArticle: () => void openCursorHeadline(),
-  onToggleRead: () => void toggleCursorRead(),
+  onSelect: () => runDetached(openCursorHeadline(), 'open headline'),
+  onOpenArticle: () => runDetached(openCursorHeadline(), 'open headline'),
+  onToggleRead: () => runDetached(toggleCursorRead(), 'toggle read'),
   onToggleStar: () => {
     const headline = headlinesStore.cursorHeadline;
-    if (headline) void headlinesStore.toggleStar(headline.id);
+    if (headline) runDetached(headlinesStore.toggleStar(headline.id), 'toggle star');
   },
   onTogglePublish: () => {
     const headline = headlinesStore.cursorHeadline;
-    if (headline) void headlinesStore.togglePublish(headline.id);
+    if (headline) runDetached(headlinesStore.togglePublish(headline.id), 'toggle publish');
   },
-  onRefresh: () => void handleToolbarAction('refresh'),
-  onCatchup: () => void handleToolbarAction('catchup'),
+  onRefresh: () => runDetached(handleToolbarAction('refresh'), 'refresh'),
+  onCatchup: () => runDetached(handleToolbarAction('catchup'), 'catchup'),
 });
 
 // Lifecycle

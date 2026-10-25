@@ -250,6 +250,12 @@ function collectTree(
   }
 }
 
+/**
+ * Build the feed tree and category list from `Pref_Feeds/getfeedtree`.
+ *
+ * Counters are merged in from `RPC/getAllCounters`, because the tree itself
+ * reports `unread: -1` for every entry.
+ */
 export async function getFeedTree(
   backend: LegacyBackend
 ): Promise<{ feeds: AdaptedFeed[]; categories: AdaptedCategory[] }> {

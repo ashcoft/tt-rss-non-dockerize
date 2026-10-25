@@ -58,6 +58,9 @@ export interface LegacyResponse {
 
 const CSRF_PLACEHOLDER = 'auto';
 
+/** The declaration the PHP shell embeds the session token in. */
+const CSRF_MARKER = '__csrf_token';
+
 /**
  * Locates the session CSRF token.
  *
@@ -124,9 +127,6 @@ function readTokenDeclaration(shell: string): string {
   return shell.slice(open + 1, close);
 }
 
-/** The declaration the PHP shell embeds the session token in. */
-const CSRF_MARKER = '__csrf_token';
-
 /** Methods the backend accepts without a valid CSRF token. */
 const CSRF_IGNORED = new Set([
   'feeds/index',
@@ -134,6 +134,42 @@ const CSRF_IGNORED = new Set([
   'pref_labels/getlabeltree',
   'pref_filters/getfiltertree',
 ]);
+
+/** Encode op/method/params the way backend.php expects. */
+const encodeParams = (op: string, method: string, params: LegacyParams): URLSearchParams => {
+  const body = new URLSearchParams();
+  body.set('op', op);
+
+  if (method) {
+    body.set('method', method);
+  }
+
+  for (const [key, value] of Object.entries(params)) {
+    appendParam(body, key, value);
+  }
+
+  return body;
+}
+
+/** Append one parameter, expanding arrays into repeated `key[]` entries. */
+const appendParam = (
+  body: URLSearchParams,
+  key: string,
+  value: LegacyParams[string]
+): void => {
+  if (value === undefined) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      body.append(`${key}[]`, String(entry));
+    }
+    return;
+  }
+
+  body.set(key, String(value));
+}
 
 export class LegacyBackend {
   private readonly baseUrl: string;
@@ -225,42 +261,6 @@ export class LegacyBackend {
 
     return response;
   }
-}
-
-/** Encode op/method/params the way backend.php expects. */
-const encodeParams = (op: string, method: string, params: LegacyParams): URLSearchParams => {
-  const body = new URLSearchParams();
-  body.set('op', op);
-
-  if (method) {
-    body.set('method', method);
-  }
-
-  for (const [key, value] of Object.entries(params)) {
-    appendParam(body, key, value);
-  }
-
-  return body;
-}
-
-/** Append one parameter, expanding arrays into repeated `key[]` entries. */
-const appendParam = (
-  body: URLSearchParams,
-  key: string,
-  value: LegacyParams[string]
-): void => {
-  if (value === undefined) {
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      body.append(`${key}[]`, String(entry));
-    }
-    return;
-  }
-
-  body.set(key, String(value));
 }
 
 /** Turn a structured `{error: {...}}` body into a LegacyApiError. */

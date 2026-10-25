@@ -19,7 +19,7 @@
                   hide-details
                   density="compact"
                   :model-value="assignedLabelIds.has(label.id)"
-                  @update:model-value="(checked: boolean) => void toggleAssignment(label.id, checked)"
+                  @update:model-value="(checked: boolean) => runDetached(toggleAssignment(label.id, checked), 'toggle label')"
                 />
               </template>
               <v-chip
@@ -38,7 +38,7 @@
         <p class="text-subtitle-2 mb-2">Create new label:</p>
         <div class="d-flex align-center gap-2">
           <v-text-field v-model="newCaption" label="Caption" density="compact" hide-details />
-          <v-btn color="primary" :disabled="!newCaption" :loading="busy" @click="void create()">
+          <v-btn color="primary" :disabled="!newCaption" :loading="busy" @click="runDetached(create(), 'create label')">
             Create
           </v-btn>
         </div>
@@ -59,7 +59,7 @@
                 size="small"
                 variant="text"
                 color="error"
-                @click="void removeLabel(label)"
+                @click="runDetached(removeLabel(label), 'remove label')"
               />
             </template>
           </v-list-item>
@@ -79,6 +79,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
+import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 
 interface LabelInfo {
@@ -114,7 +115,7 @@ watch(
     message.value = '';
     // loadLabels() reports its own failures through `message`; the explicit
     // void makes that clear and keeps the watcher callback synchronous.
-    void loadLabels();
+    runDetached(loadLabels(), 'load labels');
   }
 );
 

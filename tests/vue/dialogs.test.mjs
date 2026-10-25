@@ -26,6 +26,12 @@ function requireModule(id) {
   }
 }
 
+// Local modules the components under test import, mapped to their sources.
+const LOCAL_SOURCES = {
+  '@/composables/useInfiniteScroll': '../../src/vue/composables/useInfiniteScroll.ts',
+  '../../utils/runDetached': '../../src/vue/utils/runDetached.ts',
+};
+
 function compileComponent(relativePath) {
   const filename = fileURLToPath(new URL(relativePath, import.meta.url));
   const { descriptor, errors } = parse(readFileSync(filename, 'utf8'), { filename });
@@ -37,8 +43,11 @@ function compileComponent(relativePath) {
   const module = { exports: {} };
   const localRequire = (id) => {
     if (id.includes('api/client')) return { default: {} };
-    if (id === '@/composables/useInfiniteScroll') {
-      const source = readFileSync(new URL('../../src/vue/composables/useInfiniteScroll.ts', import.meta.url), 'utf8');
+    // Local .ts sources the components import are compiled on demand; the
+    // allowlist in requireModule only covers third-party packages.
+    const local = LOCAL_SOURCES[id];
+    if (local !== undefined) {
+      const source = readFileSync(new URL(local, import.meta.url), 'utf8');
       const compiled = ts.transpileModule(source, {
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
       }).outputText;

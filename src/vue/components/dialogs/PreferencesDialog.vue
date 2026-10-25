@@ -57,7 +57,7 @@
                     size="small"
                     variant="text"
                     color="error"
-                    @click="void deleteFilter(filter)"
+                    @click="runDetached(deleteFilter(filter), 'delete filter')"
                   />
                 </template>
               </v-list-item>
@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -128,7 +129,7 @@ watch(
     tab.value = 'general';
     // Both loaders report failures through `message`; the explicit void keeps
     // the watcher callback synchronous.
-    void Promise.all([loadPrefs(), loadFilters()]);
+    runDetached(Promise.all([loadPrefs(), loadFilters()]), 'load preferences');
   }
 );
 
