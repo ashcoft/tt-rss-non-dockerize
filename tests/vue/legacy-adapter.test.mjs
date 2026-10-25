@@ -16,22 +16,21 @@ import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
 
-// Only the modules the compiled sources import are resolvable; an explicit
-// allowlist avoids a dynamic require() of an arbitrary specifier.
-const ALLOWED_MODULES = {
-  typescript: () => require('typescript'),
-  vue: () => require('vue'),
-  pinia: () => require('pinia'),
-};
-
+/**
+ * Resolve the modules the compiled sources import. A switch (rather than a
+ * keyed lookup) keeps every require() argument a literal.
+ */
 function requireModule(id) {
-  const loader = ALLOWED_MODULES[id];
-
-  if (loader === undefined) {
-    throw new Error(`Refusing to require unexpected module: ${id}`);
+  switch (id) {
+    case 'typescript':
+      return require('typescript');
+    case 'vue':
+      return require('vue');
+    case 'pinia':
+      return require('pinia');
+    default:
+      throw new Error(`Refusing to require unexpected module: ${id}`);
   }
-
-  return loader();
 }
 const SRC_VUE = fileURLToPath(new URL('../../src/vue/', import.meta.url));
 

@@ -239,8 +239,10 @@ export const useHeadlinesStore = defineStore('headlines', () => {
           // Revert optimistic update if API fails
           headline.is_read = false;
 
-          if (selectedArticle.value?.id === articleId) {
-            selectedArticle.value.is_read = false;
+          if (selectedArticle.value !== null) {
+            if (selectedArticle.value.id === articleId) {
+              selectedArticle.value.is_read = false;
+            }
           }
           feedsStore.updateFeedUnread(headline.feed_id, 1);
         }
