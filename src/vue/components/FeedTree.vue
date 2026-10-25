@@ -87,7 +87,13 @@
         :value="'cat-' + category.id"
       >
         <template #activator="{ props }">
-                    <v-list-item v-bind="props" :title="category.title">
+          <!-- Clicking the category row selects it (is_cat=1); the group toggle
+               is handled by v-list-group's own activator binding. -->
+          <v-list-item
+            v-bind="props"
+            :title="category.title"
+            @click="handleSelect('cat-' + category.id)"
+          >
             <template #prepend>
               <v-icon>mdi-folder</v-icon>
             </template>

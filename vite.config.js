@@ -45,7 +45,11 @@ export default defineConfig({
     
     // Empty outDir before build
     emptyOutDir: true,
-    
+
+    // Emit .vite/manifest.json so PHP can resolve the hashed entry names
+    // without hardcoding them (see include/vue_assets.php).
+    manifest: true,
+
     // Rollup options for better AMD handling
     rollupOptions: {
       // Entry point for the application

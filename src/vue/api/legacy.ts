@@ -73,9 +73,13 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
     return embedded;
   }
 
+  // The shell is served with an ETag and answers 304 when the client already
+  // has a copy. After logging in the previous copy is stale (it embeds an empty
+  // token), so the revalidation must be bypassed to get the authenticated body.
   const response = await fetch(shellPath, {
     credentials: 'include',
-    headers: { Accept: 'text/html' },
+    cache: 'no-store',
+    headers: { Accept: 'text/html', 'Cache-Control': 'no-cache' },
   });
 
   if (!response.ok) {
