@@ -19,7 +19,7 @@
                   hide-details
                   density="compact"
                   :model-value="assignedLabelIds.has(label.id)"
-                  @update:model-value="(checked: boolean) => toggleAssignment(label.id, checked)"
+                  @update:model-value="(checked: boolean) => void toggleAssignment(label.id, checked)"
                 />
               </template>
               <v-chip
@@ -38,7 +38,7 @@
         <p class="text-subtitle-2 mb-2">Create new label:</p>
         <div class="d-flex align-center gap-2">
           <v-text-field v-model="newCaption" label="Caption" density="compact" hide-details />
-          <v-btn color="primary" :disabled="!newCaption" :loading="busy" @click="create">
+          <v-btn color="primary" :disabled="!newCaption" :loading="busy" @click="void create()">
             Create
           </v-btn>
         </div>
@@ -59,7 +59,7 @@
                 size="small"
                 variant="text"
                 color="error"
-                @click="removeLabel(label)"
+                @click="void removeLabel(label)"
               />
             </template>
           </v-list-item>

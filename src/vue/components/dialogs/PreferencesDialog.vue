@@ -57,7 +57,7 @@
                     size="small"
                     variant="text"
                     color="error"
-                    @click="deleteFilter(filter)"
+                    @click="void deleteFilter(filter)"
                   />
                 </template>
               </v-list-item>

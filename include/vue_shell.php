@@ -41,10 +41,10 @@ if ($authenticated === true) {
 
 	<?php
 	if ($authenticated === true) {
-		if (empty($_SESSION["safe_mode"])) {
+		if (empty($_SESSION["safe_mode"]) === true) {
 			$theme = Prefs::get(Prefs::USER_CSS_THEME, $_SESSION['uid'], $_SESSION['profile'] ?? null);
 
-			if ($theme && theme_exists("$theme")) {
+			if ($theme !== "" && theme_exists("$theme") === true) {
 				echo stylesheet_tag(get_theme_path($theme), ['id' => 'theme_css']);
 			}
 		}

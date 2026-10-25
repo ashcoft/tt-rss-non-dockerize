@@ -130,7 +130,13 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
     const next = resolveCursorTarget(cursorIndex.value, delta, headlines.value.length);
 
-    cursorId.value = headlines.value[next].id;
+    const target = headlines.value[next];
+
+    if (target === undefined) {
+      return null;
+    }
+
+    cursorId.value = target.id;
     return cursorHeadline.value;
   }
 
@@ -233,7 +239,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         } catch {
           // Revert optimistic update if API fails
           headline.is_read = false;
-          if (selectedArticle.value?.id === articleId) {
+
+          if (selectedArticle.value !== null && selectedArticle.value.id === articleId) {
             selectedArticle.value.is_read = false;
           }
           feedsStore.updateFeedUnread(headline.feed_id, 1);
