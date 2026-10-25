@@ -395,9 +395,15 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
 useKeyboard({
   onNext: () => headlinesStore.moveCursor(1),
   onPrevious: () => headlinesStore.moveCursor(-1),
-  onSelect: () => runDetached(openCursorHeadline(), 'open headline'),
-  onOpenArticle: () => runDetached(openCursorHeadline(), 'open headline'),
-  onToggleRead: () => runDetached(toggleCursorRead(), 'toggle read'),
+  onSelect: () => {
+    runDetached(openCursorHeadline(), 'open headline');
+  },
+  onOpenArticle: () => {
+    runDetached(openCursorHeadline(), 'open headline');
+  },
+  onToggleRead: () => {
+    runDetached(toggleCursorRead(), 'toggle read');
+  },
   onToggleStar: () => {
     const headline = headlinesStore.cursorHeadline;
     if (headline) runDetached(headlinesStore.toggleStar(headline.id), 'toggle star');
@@ -406,8 +412,12 @@ useKeyboard({
     const headline = headlinesStore.cursorHeadline;
     if (headline) runDetached(headlinesStore.togglePublish(headline.id), 'toggle publish');
   },
-  onRefresh: () => runDetached(handleToolbarAction('refresh'), 'refresh'),
-  onCatchup: () => runDetached(handleToolbarAction('catchup'), 'catchup'),
+  onRefresh: () => {
+    runDetached(handleToolbarAction('refresh'), 'refresh');
+  },
+  onCatchup: () => {
+    runDetached(handleToolbarAction('catchup'), 'catchup');
+  },
 });
 
 // Lifecycle
