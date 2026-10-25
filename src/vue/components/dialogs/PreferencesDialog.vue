@@ -148,7 +148,8 @@ async function loadPrefs() {
       type: def.type,
       value: params[def.name] === undefined ? '' : String(params[def.name]),
     }));
-  } catch {
+  } catch (err) {
+    console.error('Failed to load preferences:', err);
     notify('Failed to load preferences', 'error');
   } finally {
     loadingPrefs.value = false;
@@ -162,7 +163,8 @@ async function savePref(name: string, value: string) {
       response.status === 0 ? 'Preference saved' : response.error ?? 'Failed to save preference',
       response.status === 0 ? 'success' : 'error'
     );
-  } catch {
+  } catch (err) {
+    console.error('Failed to save preference:', err);
     notify('Failed to save preference', 'error');
   }
 }
@@ -176,7 +178,8 @@ async function loadFilters() {
     } else {
       notify(response.error ?? 'Failed to load filters', 'error');
     }
-  } catch {
+  } catch (err) {
+    console.error('Failed to load filters:', err);
     notify('Failed to load filters', 'error');
   } finally {
     loadingFilters.value = false;
@@ -197,7 +200,8 @@ async function deleteFilter(filter: Record<string, unknown>) {
     } else {
       notify('Failed to delete filter', 'error');
     }
-  } catch {
+  } catch (err) {
+    console.error('Failed to delete filter:', err);
     notify('Failed to delete filter', 'error');
   }
 }

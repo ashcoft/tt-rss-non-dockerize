@@ -148,7 +148,8 @@ async function create() {
     } else {
       notify(response.error ?? 'Failed to create label', 'error');
     }
-  } catch {
+  } catch (err) {
+    console.error('Failed to create label:', err);
     notify('Failed to create label', 'error');
   } finally {
     busy.value = false;
@@ -164,7 +165,8 @@ async function removeLabel(label: LabelInfo) {
     } else {
       notify(response.error ?? 'Failed to remove label', 'error');
     }
-  } catch {
+  } catch (err) {
+    console.error('Failed to remove label:', err);
     notify('Failed to remove label', 'error');
   }
 }
@@ -174,7 +176,8 @@ async function toggleAssignment(labelId: number, checked: boolean) {
   try {
     await api.setLabelForArticles(labelId, [props.articleId], checked ? 1 : 0);
     notify(checked ? 'Label assigned' : 'Label unassigned');
-  } catch {
+  } catch (err) {
+    console.error('Failed to update assignment:', err);
     notify('Failed to update assignment', 'error');
   }
 }
