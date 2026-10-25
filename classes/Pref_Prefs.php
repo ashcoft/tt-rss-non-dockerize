@@ -735,6 +735,162 @@ class Pref_Prefs extends Handler_Protected {
 		print \Controls\hidden_tag("boolean_prefs", htmlspecialchars(join(",", $listed_boolean_prefs)));
 	}
 
+	/**
+	 * JSON description of the preferences form for the Vue client.
+	 *
+	 * The legacy page renders the same list server-side with dijit widgets.
+	 * Returning the metadata instead lets the Vuetify UI build the form and
+	 * write single values through `RPC/setpref`, so neither the page nor its
+	 * form needs Dojo.
+	 */
+	function getprefs(): void {
+		$profile = $_SESSION["profile"] ?? null;
+
+		/** @var array<string, array{type_hint: Config::T_*, value: bool|int|string|null, help_text: string, short_desc: string}> */
+		$available = [];
+
+		foreach (Prefs::get_all($_SESSION["uid"], $profile) as $pref) {
+			$pref_name = $pref["pref_name"];
+
+			if (in_array($pref_name, $this->pref_blacklist, true)) {
+				continue;
+			}
+
+			if ($profile && in_array($pref_name, Prefs::_PROFILE_BLACKLIST, true)) {
+				continue;
+			}
+
+			$short_desc = $this->_get_short_desc($pref_name);
+
+			if (!$short_desc) {
+				continue;
+			}
+
+			$available[$pref_name] = [
+				"type_hint" => $pref["type_hint"],
+				"value" => $pref["value"],
+				"help_text" => $this->_get_help_text($pref_name),
+				"short_desc" => $short_desc,
+			];
+		}
+
+		$sections = [];
+
+		foreach ($this->pref_item_map as $section_title => $pref_names) {
+			$items = [];
+
+			foreach ($pref_names as $pref_name) {
+				if ($pref_name === self::BLOCK_SEPARATOR) {
+					$items[] = ["type" => "separator"];
+					continue;
+				}
+
+				if (!isset($available[$pref_name])) {
+					continue;
+				}
+
+				$item = $available[$pref_name];
+				[$type, $options] = $this->_describe_pref($pref_name, $item["type_hint"]);
+
+				$items[] = [
+					"name" => $pref_name,
+					"type" => $type,
+					"value" => $item["value"],
+					"label" => $item["short_desc"],
+					"help" => $item["help_text"],
+					"options" => $options,
+					// FORCE_ARTICLE_PURGE overrides the per-user purge setting.
+					"disabled" => $pref_name === Prefs::PURGE_UNREAD_ARTICLES
+						&& (int) Config::get(Config::FORCE_ARTICLE_PURGE) !== 0,
+				];
+			}
+
+			$sections[] = [
+				"title" => $section_title,
+				"items" => $items,
+			];
+		}
+
+		print json_encode([
+			"profile" => $profile ? (int) $profile : null,
+			"sections" => $sections,
+		]);
+	}
+
+	/**
+	 * Map a preference onto the control the form should render.
+	 *
+	 * @return array{0: string, 1: list<array{value: string, title: string}>|null}
+	 */
+	private function _describe_pref(string $pref_name, int $type_hint): array {
+		$options = null;
+
+		if ($pref_name === Prefs::USER_LANGUAGE) {
+			$type = "select";
+			$options = self::_options_from_map(get_translations());
+		} else if ($pref_name === Prefs::USER_TIMEZONE) {
+			$type = "select";
+			$timezones = DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC);
+			array_unshift($timezones, "Automatic");
+			$options = self::_options_from_list($timezones);
+		} else if ($pref_name === Prefs::USER_CSS_THEME) {
+			$type = "select";
+			$theme_files = array_map(basename(...), [
+				...glob('themes/*.php') ?: [],
+				...glob('themes/*.css') ?: [],
+				...glob(Config::get(Config::LOCAL_THEMES_DIR) . '/*.css') ?: [],
+			]);
+			asort($theme_files);
+			$themes = ["" => __("default")];
+			foreach ($theme_files as $file) {
+				$themes[$file] = basename($file, ".css");
+			}
+			$options = self::_options_from_map($themes);
+		} else if ($pref_name === Prefs::DEFAULT_UPDATE_INTERVAL) {
+			$type = "select";
+			$options = self::_options_from_map(Feeds::_get_update_intervals(with_default: false));
+		} else if ($pref_name === Prefs::DEFAULT_SEARCH_LANGUAGE) {
+			$type = "select";
+			$options = self::_options_from_list(Pref_Feeds::get_ts_languages());
+		} else if ($pref_name === Prefs::BLACKLISTED_TAGS) {
+			$type = "textarea";
+		} else if ($pref_name === Prefs::DIGEST_PREFERRED_TIME) {
+			$type = "time";
+		} else if ($type_hint === Config::T_BOOL) {
+			$type = "bool";
+		} else if ($type_hint === Config::T_INT) {
+			$type = "int";
+		} else {
+			$type = "string";
+		}
+
+		return [$type, $options];
+	}
+
+	/**
+	 * @param array<int|string, string> $map value => label
+	 * @return list<array{value: string, title: string}>
+	 */
+	private static function _options_from_map(array $map): array {
+		$options = [];
+		foreach ($map as $value => $title) {
+			$options[] = ["value" => (string) $value, "title" => $title];
+		}
+		return $options;
+	}
+
+	/**
+	 * @param list<string> $values
+	 * @return list<array{value: string, title: string}>
+	 */
+	private static function _options_from_list(array $values): array {
+		$options = [];
+		foreach ($values as $value) {
+			$options[] = ["value" => $value, "title" => $value];
+		}
+		return $options;
+	}
+
 	private function index_prefs(): void {
 		?>
 		<form dojoType='dijit.form.Form' id='changeSettingsForm'>

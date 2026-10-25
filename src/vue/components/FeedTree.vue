@@ -85,9 +85,17 @@
         v-for="category in categories"
         :key="'cat-' + category.id"
         :value="'cat-' + category.id"
+        @dragover.prevent
+        @drop="dropOnCategory($event, category.id)"
       >
         <template #activator="{ props }">
-                    <v-list-item v-bind="props" :title="category.title">
+          <v-list-item
+            v-bind="props"
+            :title="category.title"
+            @click="handleSelect('cat-' + category.id)"
+            @dragover.prevent
+            @drop="dropOnCategory($event, category.id)"
+          >
             <template #prepend>
               <v-icon>mdi-folder</v-icon>
             </template>
@@ -109,7 +117,9 @@
           :key="feed.id"
           :title="feed.title"
           :value="String(feed.id)"
+          draggable="true"
           @click="handleSelect(String(feed.id))"
+          @dragstart="dragStart($event, feed.id)"
         >
           <template #append>
             <v-chip
@@ -120,14 +130,42 @@
             >
               {{ feed.unread }}
             </v-chip>
+            <v-menu location="end">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  icon="mdi-dots-vertical"
+                  size="x-small"
+                  variant="text"
+                  class="feed-menu"
+                  @click.stop
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed...</v-list-item>
+                <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
+                <v-list-item @click="emit('feed-action', 'delete', feed.id)">Unsubscribe</v-list-item>
+              </v-list>
+            </v-menu>
           </template>
         </v-list-item>
       </v-list-group>
 
       <!-- Uncategorized Feeds -->
-      <v-list-group value="uncategorized" v-if="filteredUncategorizedFeeds.length > 0">
+      <v-list-group
+        value="uncategorized"
+        v-if="filteredUncategorizedFeeds.length > 0"
+        @dragover.prevent
+        @drop="dropOnCategory($event, 0)"
+      >
         <template #activator="{ props }">
-          <v-list-item v-bind="props" title="Feeds">
+          <v-list-item
+            v-bind="props"
+            title="Feeds"
+            @click="handleSelect('0')"
+            @dragover.prevent
+            @drop="dropOnCategory($event, 0)"
+          >
             <template #prepend>
               <v-icon>mdi-rss</v-icon>
             </template>
@@ -139,7 +177,9 @@
           :key="feed.id"
           :title="feed.title"
           :value="String(feed.id)"
+          draggable="true"
           @click="handleSelect(String(feed.id))"
+          @dragstart="dragStart($event, feed.id)"
         >
           <template #append>
             <v-chip
@@ -150,6 +190,23 @@
             >
               {{ feed.unread }}
             </v-chip>
+            <v-menu location="end">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  icon="mdi-dots-vertical"
+                  size="x-small"
+                  variant="text"
+                  class="feed-menu"
+                  @click.stop
+                />
+              </template>
+              <v-list density="compact">
+                <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed...</v-list-item>
+                <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
+                <v-list-item @click="emit('feed-action', 'delete', feed.id)">Unsubscribe</v-list-item>
+              </v-list>
+            </v-menu>
           </template>
         </v-list-item>
       </v-list-group>
@@ -174,7 +231,26 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'select', feedId: number | string, isCat: boolean): void;
   (e: 'feed-action', action: string, feedId: number): void;
+  (e: 'move-feed', feedId: number, categoryId: number): void;
 }>();
+
+/**
+ * Feeds can be dragged onto a category to move them. The backend call happens
+ * in the parent (it needs the full feed record to save).
+ */
+const dragStart = (event: DragEvent, feedId: number) => {
+  if (!event.dataTransfer) return;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', String(feedId));
+};
+
+const dropOnCategory = (event: DragEvent, categoryId: number) => {
+  const raw = event.dataTransfer?.getData('text/plain') ?? '';
+  const feedId = Number.parseInt(raw, 10);
+  if (!Number.isFinite(feedId)) return;
+  event.stopPropagation();
+  emit('move-feed', feedId, categoryId);
+};
 
 // State
 const searchQuery = ref('');

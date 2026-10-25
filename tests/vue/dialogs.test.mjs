@@ -20,6 +20,18 @@ function compileComponent(relativePath) {
   const module = { exports: {} };
   const localRequire = (id) => {
     if (id.includes('api/client')) return { default: {} };
+    if (id.includes('stores')) {
+      return {
+        useFeedsStore: () => ({
+          feeds: [],
+          categories: [],
+          error: null,
+          loadFeeds: async () => {},
+          removeFeed: async () => true,
+        }),
+        useLabelsStore: () => ({ labels: [], loadLabels: async () => {} }),
+      };
+    }
     if (id === '@/composables/useInfiniteScroll') {
       const source = readFileSync(new URL('../../src/vue/composables/useInfiniteScroll.ts', import.meta.url), 'utf8');
       const compiled = ts.transpileModule(source, {

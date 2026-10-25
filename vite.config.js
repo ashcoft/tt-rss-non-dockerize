@@ -39,6 +39,11 @@ export default defineConfig({
     // Output directory for production builds
     outDir: 'dist',
 
+    // classes/ViteAssets.php reads dist/.vite/manifest.json to emit the tags
+    // for the PHP shell (the shell cannot be the Vite HTML entry because it
+    // embeds the session CSRF token and the user's theme).
+    manifest: true,
+
     // Transpile target: Vuetify 4 emits destructuring that esbuild's default
     // target cannot rewrite, so target a modern baseline
     target: 'es2022',
@@ -74,15 +79,8 @@ export default defineConfig({
   // Resolve configuration for module aliases
   resolve: {
     alias: {
-      // Dojo module aliases - point to the existing Dojo AMD modules
-      'dojo': path.resolve(__dirname, 'lib/dojo'),
-      'dijit': path.resolve(__dirname, 'lib/dijit'),
-      'fox': path.resolve(__dirname, 'js'),
-      
-      // Legacy module paths
-      'lib': path.resolve(__dirname, 'lib'),
-      
-      // Vue 3 aliases
+      // Vue 3 aliases (no Dojo/dijit aliases: the client no longer imports
+      // AMD modules; the legacy files stay on disk for plugins only).
       '@': path.resolve(__dirname, 'src/vue'),
       '@/components': path.resolve(__dirname, 'src/vue/components'),
       '@/composables': path.resolve(__dirname, 'src/vue/composables'),

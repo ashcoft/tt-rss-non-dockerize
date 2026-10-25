@@ -44,6 +44,8 @@ const mountPoint = document.getElementById('vue-app');
 
 if (mountPoint) {
   app.mount('#vue-app');
+  // The shell hides #vue-app until the bundle boots (see app_shell.php).
+  document.body.classList.remove('css_loading');
 } else {
   console.warn('[Vue 3] Mount point #vue-app not found. Vue components will be available for lazy loading.');
 }

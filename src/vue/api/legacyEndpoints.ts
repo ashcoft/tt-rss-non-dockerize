@@ -338,14 +338,24 @@ export async function getLabels(backend: LegacyBackend): Promise<AdaptedLabel[]>
 }
 
 /**
- * `Pref_Filters/getfiltertree` returns `{items: [{items: [{bare_id, name, ...}]}]}`.
+ * `Pref_Filters/getfiltertree` returns `{items: [{items: [{bare_id, name,
+ * rules, ...}]}]}`.
  */
-export async function getFilters(backend: LegacyBackend): Promise<Array<Record<string, unknown>>> {
+export interface AdaptedFilter {
+  id: number;
+  title: string;
+  enabled: boolean;
+  last_triggered: string | null;
+  /** Human-readable rules, one per line. */
+  rules: string[];
+}
+
+export async function getFilters(backend: LegacyBackend): Promise<AdaptedFilter[]> {
   const response = await backend.call('Pref_Filters', 'getfiltertree');
   const body = requireBody(response, 'Pref_Filters/getfiltertree');
   const roots = expectArray(body.items, 'Pref_Filters/getfiltertree.items');
 
-  const filters: Array<Record<string, unknown>> = [];
+  const filters: AdaptedFilter[] = [];
   for (const rawRoot of roots) {
     const root = expectObject(rawRoot, 'Pref_Filters/getfiltertree.root');
     if (!Array.isArray(root.items)) continue;
@@ -355,13 +365,274 @@ export async function getFilters(backend: LegacyBackend): Promise<Array<Record<s
         id: asNumber(filter.bare_id),
         title: asString(filter.bare_name, asString(filter.name)),
         enabled: filter.enabled !== false,
+        last_triggered: filter.last_triggered ? asString(filter.last_triggered) : null,
+        // `_get_rules_list()` returns a <ul> of <li> lines. Turn it into plain
+        // text lines so the client never has to render backend HTML.
+        rules: asString(filter.rules)
+          .replace(/<li[^>]*>/gi, '')
+          .replace(/<\/li>/gi, '\n')
+          .replace(/<[^>]*>/g, '')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== ''),
       });
     }
   }
   return filters;
 }
 
-/** `Pref_Prefs/getProfiles` returns a top-level JSON array. */
+export interface PrefOption {
+  value: string;
+  title: string;
+}
+
+export interface PrefItem {
+  /** Absent on separators. */
+  name?: string;
+  type: 'separator' | 'bool' | 'int' | 'string' | 'select' | 'textarea' | 'time';
+  value?: string | number | boolean | null;
+  label?: string;
+  help?: string;
+  options?: PrefOption[] | null;
+  disabled?: boolean;
+}
+
+export interface PrefSection {
+  title: string;
+  items: PrefItem[];
+}
+
+export interface PrefsSchema {
+  profile: number | null;
+  sections: PrefSection[];
+}
+
+/**
+ * `Pref_Prefs/getprefs` (added for the Vue client) returns the same preference
+ * definitions the legacy page renders, as JSON. Returning metadata rather than
+ * markup is what removes the dijit form from the preferences page.
+ */
+export async function getPrefsSchema(backend: LegacyBackend): Promise<PrefsSchema> {
+  const response = await backend.call('Pref_Prefs', 'getprefs');
+  const body = requireBody(response, 'Pref_Prefs/getprefs');
+  const sections = expectArray(body.sections, 'Pref_Prefs/getprefs.sections');
+
+  return {
+    profile: body.profile === null || body.profile === undefined ? null : asNumber(body.profile),
+    sections: sections.map((rawSection) => {
+      const section = expectObject(rawSection, 'Pref_Prefs/getprefs.section');
+      const items = Array.isArray(section.items) ? section.items : [];
+      return {
+        title: asString(section.title),
+        items: items.map((rawItem) => {
+          const item = expectObject(rawItem, 'Pref_Prefs/getprefs.item');
+          return {
+            name: item.name === undefined ? undefined : asString(item.name),
+            type: asString(item.type, 'string') as PrefItem['type'],
+            value: (item.value ?? null) as PrefItem['value'],
+            label: asString(item.label),
+            help: asString(item.help),
+            options: Array.isArray(item.options)
+              ? item.options.map((rawOption) => {
+                  const option = expectObject(rawOption, 'Pref_Prefs/getprefs.option');
+                  return { value: asString(option.value), title: asString(option.title) };
+                })
+              : null,
+            disabled: item.disabled === true,
+          };
+        }),
+      };
+    }),
+  };
+}
+
+export interface FeedDetails {
+  id: number;
+  title: string;
+  feed_url: string;
+  site_url: string;
+  cat_id: number | null;
+  update_interval: number;
+  purge_interval: number;
+  auth_login: string;
+  /** Decrypted by `Pref_Feeds/editfeed`; empty when unset. */
+  auth_pass: string;
+  private: boolean;
+  include_in_digest: boolean;
+  cache_images: boolean;
+  hide_images: boolean;
+  always_display_enclosures: boolean;
+  mark_unread_on_update: boolean;
+  feed_language: string;
+  /** interval id => label */
+  update_intervals: Record<string, string>;
+  purge_intervals: Record<string, string>;
+  force_purge: number;
+  default_search_language: string;
+  search_languages: string[];
+}
+
+function intervalMap(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    result[key] = asString(raw);
+  }
+  return result;
+}
+
+/**
+ * `Pref_Feeds/editfeed` returns the feed row plus interval/language lists. Its
+ * `cats.select` field is legacy dijit HTML and is deliberately ignored: the
+ * Vue client already has the category tree.
+ */
+export async function getFeedDetails(backend: LegacyBackend, feedId: number): Promise<FeedDetails> {
+  const response = await backend.call('Pref_Feeds', 'editfeed', { id: feedId });
+  const body = requireBody(response, 'Pref_Feeds/editfeed');
+  const feed = expectObject(body.feed, 'Pref_Feeds/editfeed.feed');
+  const intervals = expectObject(body.intervals ?? {}, 'Pref_Feeds/editfeed.intervals');
+  const lang = expectObject(body.lang ?? {}, 'Pref_Feeds/editfeed.lang');
+
+  return {
+    id: asNumber(feed.id, feedId),
+    title: asString(feed.title),
+    feed_url: asString(feed.feed_url),
+    site_url: asString(feed.site_url),
+    cat_id: feed.cat_id === null || feed.cat_id === undefined ? null : asNumber(feed.cat_id),
+    update_interval: asNumber(feed.update_interval),
+    purge_interval: asNumber(feed.purge_interval),
+    auth_login: asString(feed.auth_login),
+    auth_pass: asString(feed.auth_pass),
+    private: asBoolean(feed.private),
+    include_in_digest: asBoolean(feed.include_in_digest),
+    cache_images: asBoolean(feed.cache_images),
+    hide_images: asBoolean(feed.hide_images),
+    always_display_enclosures: asBoolean(feed.always_display_enclosures),
+    mark_unread_on_update: asBoolean(feed.mark_unread_on_update),
+    feed_language: asString(feed.feed_language),
+    update_intervals: intervalMap(intervals.update),
+    purge_intervals: intervalMap(intervals.purge),
+    force_purge: asNumber(body.force_purge),
+    default_search_language: asString(lang.default),
+    search_languages: Array.isArray(lang.all) ? lang.all.map((item) => asString(item)) : [],
+  };
+}
+
+export interface FeedUpdate {
+  title: string;
+  feed_url: string;
+  site_url: string;
+  cat_id: number | null;
+  update_interval: number;
+  purge_interval: number;
+  auth_login: string;
+  auth_pass: string;
+  private: boolean;
+  include_in_digest: boolean;
+  cache_images: boolean;
+  hide_images: boolean;
+  always_display_enclosures: boolean;
+  mark_unread_on_update: boolean;
+  feed_language: string;
+}
+
+/**
+ * `Pref_Feeds/editSave` reads checkboxes as the literal string `on` (see
+ * `checkbox_to_sql_bool()`), so unchecked boxes send an empty value rather
+ * than `false`/`0`.
+ */
+export async function saveFeedDetails(
+  backend: LegacyBackend,
+  feedId: number,
+  update: FeedUpdate
+): Promise<void> {
+  await backend.call('Pref_Feeds', 'editSave', {
+    id: feedId,
+    title: update.title,
+    feed_url: update.feed_url,
+    site_url: update.site_url,
+    cat_id: update.cat_id ?? 0,
+    update_interval: update.update_interval,
+    purge_interval: update.purge_interval,
+    auth_login: update.auth_login,
+    auth_pass: update.auth_pass,
+    private: update.private ? 'on' : '',
+    include_in_digest: update.include_in_digest ? 'on' : '',
+    cache_images: update.cache_images ? 'on' : '',
+    hide_images: update.hide_images ? 'on' : '',
+    always_display_enclosures: update.always_display_enclosures ? 'on' : '',
+    mark_unread_on_update: update.mark_unread_on_update ? 'on' : '',
+    feed_language: update.feed_language,
+  });
+}
+
+/** `Pref_Labels/colorset` with both colours stored in one request. */
+export async function setLabelColors(
+  backend: LegacyBackend,
+  labelId: number,
+  fg: string,
+  bg: string
+): Promise<void> {
+  await backend.call('Pref_Labels', 'colorset', {
+    kind: 'both',
+    ids: labelId,
+    fg,
+    bg,
+    color: '',
+  });
+}
+
+export async function resetLabelColors(backend: LegacyBackend, labelId: number): Promise<void> {
+  await backend.call('Pref_Labels', 'colorreset', { ids: labelId });
+}
+
+export interface PluginRecord {
+  name: string;
+  is_local: boolean;
+  system_enabled: boolean;
+  user_enabled: boolean;
+  is_system: boolean;
+  has_data: boolean;
+  version: string;
+  author: string;
+  description: string;
+  more_info: string;
+}
+
+/** `Pref_Prefs/getPluginsList` already answers JSON (`{plugins, is_admin}`). */
+export async function getPlugins(
+  backend: LegacyBackend
+): Promise<{ plugins: PluginRecord[]; isAdmin: boolean }> {
+  const response = await backend.call('Pref_Prefs', 'getPluginsList');
+  const body = requireBody(response, 'Pref_Prefs/getPluginsList');
+  const plugins = expectArray(body.plugins, 'Pref_Prefs/getPluginsList.plugins');
+
+  return {
+    isAdmin: body.is_admin === true,
+    plugins: plugins.map((rawPlugin) => {
+      const plugin = expectObject(rawPlugin, 'Pref_Prefs/getPluginsList.plugin');
+      return {
+        name: asString(plugin.name),
+        is_local: plugin.is_local === true,
+        system_enabled: plugin.system_enabled === true,
+        user_enabled: plugin.user_enabled === true,
+        is_system: plugin.is_system === true,
+        has_data: plugin.has_data === true,
+        version: asString(plugin.version),
+        author: asString(plugin.author),
+        description: asString(plugin.description),
+        more_info: asString(plugin.more_info),
+      };
+    }),
+  };
+}
+
+/** `Pref_Prefs/setplugins` expects the full list of user-enabled plugins. */
+export async function setPlugins(backend: LegacyBackend, pluginNames: string[]): Promise<void> {
+  await backend.call('Pref_Prefs', 'setplugins', { plugins: pluginNames });
+}
+
+/** Pref_Prefs/getProfiles returns a top-level JSON array. */
 export async function getProfiles(
   backend: LegacyBackend
 ): Promise<Array<{ id: number; title: string; active: boolean }>> {

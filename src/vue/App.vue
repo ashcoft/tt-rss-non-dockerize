@@ -10,7 +10,8 @@
         <v-spacer />
         <span class="subtitle">{{ authStore.username }}</span>
         <v-btn icon="mdi-theme-light-dark" variant="text" @click="toggleTheme" title="Toggle light/dark theme" />
-        <v-btn icon="mdi-cog" variant="text" @click="prefsOpen = true" title="Preferences" />
+        <v-btn icon="mdi-keyboard" variant="text" @click="helpOpen = true" title="Keyboard shortcuts" />
+        <v-btn icon="mdi-cog" variant="text" @click="openPreferences" title="Preferences" />
         <v-btn icon="mdi-plus-box" variant="text" @click="feedsDialogOpen = true" title="Manage feeds" />
         <v-btn icon="mdi-logout" variant="text" @click="onLogout" title="Log out" />
       </header>
@@ -23,6 +24,7 @@
             :labels="labelsStore.labels"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
+            @move-feed="handleMoveFeed"
           />
         </aside>
 
@@ -77,7 +79,12 @@
     <!-- Dialogs (Phase 3/4) -->
     <ManageFeedsDialog v-model="feedsDialogOpen" />
     <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
-    <PreferencesDialog v-model="prefsOpen" />
+    <PreferencesDialog
+      v-model="prefsOpen"
+      :initial-tab="prefsTab"
+      :initial-feed-id="prefsFeedId"
+    />
+    <HotkeysHelpDialog v-model="helpOpen" />
 
     <v-snackbar
       v-model="snackbar"
@@ -106,6 +113,9 @@ import LoginForm from './components/LoginForm.vue';
 import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
 import LabelsDialog from './components/dialogs/LabelsDialog.vue';
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
+import HotkeysHelpDialog from './components/dialogs/HotkeysHelpDialog.vue';
+import { useKeyboard } from './composables/useKeyboard';
+import type { FeedDetails } from './api/legacyEndpoints';
 
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
@@ -121,8 +131,12 @@ const sidebarOpen = ref(false);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
+const prefsTab = ref('general');
+const prefsFeedId = ref<number | null>(null);
+const helpOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
+const selectedIndex = ref(-1);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -203,11 +217,76 @@ const handleFeedAction = async (action: string, feedId: number) => {
       // Starred/published special views use the normal mark-read path
       const ids = headlinesStore.headlines.map(h => h.id);
       await headlinesStore.markAsRead(ids);
+    } else if (feedId > 0) {
+      if (await feedsStore.catchupFeed(feedId, false)) {
+        await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
+        showMessage('Feed marked as read', 'success');
+      } else {
+        showMessage('Failed to mark feed as read', 'error');
+      }
     }
   } else if (action === 'edit') {
-    feedsDialogOpen.value = true;
+    openPreferences('feeds', feedId);
   } else if (action === 'delete') {
-    feedsDialogOpen.value = true;
+    const title = feedsStore.feeds.find((feed) => feed.id === feedId)?.title ?? `feed ${feedId}`;
+    if (!window.confirm(`Unsubscribe from ${title}?`)) return;
+    if (await feedsStore.removeFeed(feedId)) {
+      showMessage('Feed removed', 'success');
+      if (feedsStore.currentFeedId === feedId) {
+        feedsStore.selectFeed(0, false);
+        headlinesStore.reset();
+      }
+    } else {
+      showMessage(feedsStore.error ?? 'Failed to remove feed', 'error');
+    }
+  }
+};
+
+/** Open the preferences dialog on a given tab (and optionally a feed). */
+const openPreferences = (tab = 'general', feedId: number | null = null) => {
+  prefsTab.value = tab;
+  prefsFeedId.value = feedId;
+  prefsOpen.value = true;
+};
+
+/**
+ * Drag and drop feed -> category. `Pref_Feeds/editSave` updates the whole feed
+ * row, so read it first and only change `cat_id`.
+ */
+const handleMoveFeed = async (feedId: number, categoryId: number) => {
+  try {
+    const response = await api.getFeedDetails(feedId);
+    if (response.status !== 0 || !response.content) {
+      showMessage(response.error ?? 'Failed to load feed', 'error');
+      return;
+    }
+    const details: FeedDetails = response.content;
+    if ((details.cat_id ?? 0) === categoryId) return;
+    const saved = await api.saveFeedDetails(feedId, {
+      title: details.title,
+      feed_url: details.feed_url,
+      site_url: details.site_url,
+      cat_id: categoryId === 0 ? null : categoryId,
+      update_interval: details.update_interval,
+      purge_interval: details.purge_interval,
+      auth_login: details.auth_login,
+      auth_pass: details.auth_pass,
+      private: details.private,
+      include_in_digest: details.include_in_digest,
+      cache_images: details.cache_images,
+      hide_images: details.hide_images,
+      always_display_enclosures: details.always_display_enclosures,
+      mark_unread_on_update: details.mark_unread_on_update,
+      feed_language: details.feed_language,
+    });
+    if (saved.status === 0) {
+      await feedsStore.loadFeeds();
+      showMessage('Feed moved', 'success');
+    } else {
+      showMessage(saved.error ?? 'Failed to move feed', 'error');
+    }
+  } catch {
+    showMessage('Failed to move feed', 'error');
   }
 };
 
@@ -268,10 +347,62 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
 };
 
 const handleHeadlineSelect = async (headline: Headline) => {
+  selectedIndex.value = headlinesStore.headlines.findIndex((entry) => entry.id === headline.id);
   // loadArticle promotes the loaded headline and persists the read state,
   // updating feed counters itself.
   await headlinesStore.loadArticle(headline.id);
 };
+
+/** Keyboard navigation over the currently loaded headlines. */
+const currentHeadline = computed<Headline | null>(
+  () => headlinesStore.headlines[selectedIndex.value] ?? null
+);
+
+const moveSelection = (delta: number) => {
+  const count = headlinesStore.headlines.length;
+  if (count === 0) return;
+  const next = Math.min(count - 1, Math.max(0, selectedIndex.value + delta));
+  selectedIndex.value = next;
+};
+
+const focusSearch = () => {
+  const input = document.querySelector<HTMLInputElement>('.toolbar .search-input input');
+  input?.focus();
+  input?.select();
+};
+
+const openCurrent = async () => {
+  const headline = currentHeadline.value;
+  if (headline) await handleHeadlineSelect(headline);
+};
+
+const toggleCurrent = async (action: 'read' | 'star' | 'publish') => {
+  const headline = currentHeadline.value;
+  if (!headline) return;
+  if (action === 'read') {
+    await handleHeadlineAction(headline, 'toggle_read');
+  } else if (action === 'star') {
+    await handleHeadlineAction(headline, 'toggle_star');
+  } else {
+    await handleHeadlineAction(headline, 'toggle_publish');
+  }
+};
+
+useKeyboard({
+  onNext: () => moveSelection(1),
+  onPrevious: () => moveSelection(-1),
+  onSelect: () => void openCurrent(),
+  onOpenArticle: () => void openCurrent(),
+  onToggleRead: () => void toggleCurrent('read'),
+  onToggleStar: () => void toggleCurrent('star'),
+  onTogglePublish: () => void toggleCurrent('publish'),
+  onRefresh: () => void handleToolbarAction('refresh'),
+  onSearch: focusSearch,
+  onCatchup: () => void handleToolbarAction('catchup'),
+  onHelp: () => {
+    helpOpen.value = true;
+  },
+});
 
 const handleHeadlineAction = async (headline: Headline, action: string) => {
   switch (action) {
@@ -323,13 +454,18 @@ const handleLoadMore = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  // The legacy shell only serves this page to an authenticated session, so a
-  // readable CSRF token means we are already logged in.
+  // The PHP shell only serves this page to an authenticated session, so a
+  // readable CSRF token means we are already logged in. The shell also passes
+  // the login name and the requested view (index.php vs prefs.php).
   const authenticated = await api.checkSession();
   if (authenticated) {
-    authStore.setLoggedIn(true);
+    authStore.setLoggedIn(true, window.__ttrss_user ?? '');
     await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
     startPolling();
+
+    if (window.__ttrss_view === 'preferences') {
+      openPreferences(window.__ttrss_prefs_tab || 'general');
+    }
   }
 });
 

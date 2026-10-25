@@ -416,8 +416,77 @@ test('getFilters reads the nested filter tree', async () => {
   backend.setCsrfToken('t');
 
   assert.deepEqual(await endpoints.getFilters(backend), [
-    { id: 3, title: 'My Filter', enabled: true },
+    { id: 3, title: 'My Filter', enabled: true, last_triggered: null, rules: [] },
   ]);
+});
+
+test('getFilters flattens backend rule markup into text lines', async () => {
+  installGlobals();
+  const payload = {
+    items: [
+      {
+        id: 'root',
+        items: [
+          {
+            id: 'FILTER:4',
+            bare_id: 4,
+            bare_name: 'Rules',
+            enabled: false,
+            last_triggered: '2026-10-24 10:00',
+            rules: "<li>foo on Title in All feeds</li><li>bar on Link in All feeds (inverse)</li>",
+          },
+        ],
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.deepEqual(await endpoints.getFilters(backend), [
+    {
+      id: 4,
+      title: 'Rules',
+      enabled: false,
+      last_triggered: '2026-10-24 10:00',
+      rules: ['foo on Title in All feeds', 'bar on Link in All feeds (inverse)'],
+    },
+  ]);
+});
+
+test('getPrefsSchema keeps sections, options and separators', async () => {
+  installGlobals();
+  const payload = {
+    profile: null,
+    sections: [
+      {
+        title: 'General',
+        items: [
+          {
+            name: 'USER_LANGUAGE',
+            type: 'select',
+            value: 'en_US',
+            label: 'Language',
+            help: '',
+            options: [{ value: 'en_US', title: 'English' }],
+            disabled: false,
+          },
+          { type: 'separator' },
+          { name: 'HIDE_READ_FEEDS', type: 'bool', value: false, label: 'Hide read feeds' },
+        ],
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const schema = await endpoints.getPrefsSchema(backend);
+  assert.equal(schema.sections[0].title, 'General');
+  assert.deepEqual(schema.sections[0].items[0].options, [{ value: 'en_US', title: 'English' }]);
+  assert.equal(schema.sections[0].items[1].type, 'separator');
+  assert.equal(schema.sections[0].items[2].type, 'bool');
+  assert.equal(schema.sections[0].items[2].disabled, false);
 });
 
 test('getProfiles unwraps the top-level array body', async () => {
@@ -494,3 +563,119 @@ test('operations without a legacy endpoint fail loudly', () => {
   assert.throws(() => endpoints.getPref(), /preference/i);
   assert.throws(() => endpoints.getArticle(), /article/i);
 });
+
+test('getFeedDetails maps the editfeed payload and ignores dijit category HTML', async () => {
+  installGlobals();
+  const payload = {
+    feed: {
+      id: 12,
+      title: 'Feed',
+      feed_url: 'https://example.com/rss',
+      site_url: 'https://example.com/',
+      cat_id: 3,
+      update_interval: 30,
+      purge_interval: 0,
+      auth_login: 'user',
+      auth_pass: 'secret',
+      private: false,
+      include_in_digest: true,
+      cache_images: false,
+      hide_images: false,
+      always_display_enclosures: false,
+      mark_unread_on_update: true,
+      feed_language: 'english',
+    },
+    cats: { enabled: true, select: "<select dojoType='dijit.form.Select'></select>" },
+    force_purge: 0,
+    intervals: { update: { 0: 'Default', 30: '30 minutes' }, purge: { 0: 'Default' } },
+    lang: { enabled: true, default: 'english', all: ['english', 'simple'] },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFeedDetails(backend, 12);
+  assert.equal(details.title, 'Feed');
+  assert.deepEqual(details.update_intervals, { 0: 'Default', 30: '30 minutes' });
+  assert.deepEqual(details.search_languages, ['english', 'simple']);
+  assert.equal(details.cat_id, 3);
+});
+
+test('saveFeedDetails encodes checkboxes the way checkbox_to_sql_bool expects', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFeedDetails(backend, 12, {
+    title: 'Feed',
+    feed_url: 'https://example.com/rss',
+    site_url: 'https://example.com/',
+    cat_id: null,
+    update_interval: 30,
+    purge_interval: 0,
+    auth_login: '',
+    auth_pass: '',
+    private: true,
+    include_in_digest: false,
+    cache_images: true,
+    hide_images: false,
+    always_display_enclosures: false,
+    mark_unread_on_update: false,
+    feed_language: '',
+  });
+
+  const body = calls[0].body.replaceAll('+', ' ');
+  assert.ok(body.includes('method=editSave'));
+  assert.ok(body.includes('private=on'));
+  assert.ok(body.includes('cache_images=on'));
+  assert.ok(body.includes('include_in_digest=&'));
+  assert.ok(body.includes('cat_id=0'));
+});
+
+test('label colour helpers call colorset and colorreset with the label id', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }, { text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.setLabelColors(backend, 7, '#111111', '#eeeeee');
+  assert.ok(calls[0].body.includes('method=colorset'));
+  assert.ok(calls[0].body.includes('kind=both'));
+  assert.ok(calls[0].body.includes('fg=%23111111'));
+  assert.ok(calls[0].body.includes('bg=%23eeeeee'));
+
+  await endpoints.resetLabelColors(backend, 7);
+  assert.ok(calls[1].body.includes('method=colorreset'));
+  assert.ok(calls[1].body.includes('ids=7'));
+});
+
+test('getPlugins maps the JSON plugin list and splits system plugins', async () => {
+  installGlobals();
+  const payload = {
+    is_admin: true,
+    plugins: [
+      {
+        name: 'note',
+        is_local: false,
+        system_enabled: false,
+        user_enabled: true,
+        is_system: false,
+        has_data: false,
+        version: 'v1.0',
+        author: 'tt-rss',
+        description: 'Notes',
+        more_info: '',
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getPlugins(backend);
+  assert.equal(result.isAdmin, true);
+  assert.equal(result.plugins[0].name, 'note');
+  assert.equal(result.plugins[0].user_enabled, true);
+});
+

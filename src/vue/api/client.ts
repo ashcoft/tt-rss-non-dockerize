@@ -262,7 +262,7 @@ class ApiClient {
   // Filters
   // ============================================
 
-  async getFilters(): Promise<ApiResponse<Array<Record<string, unknown>>>> {
+  async getFilters(): Promise<ApiResponse<endpoints.AdaptedFilter[]>> {
     return this.wrap(() => endpoints.getFilters(legacyBackend), []);
   }
 
@@ -274,8 +274,63 @@ class ApiClient {
   }
 
   // ============================================
+  // Feed preferences
+  // ============================================
+
+  async getFeedDetails(feedId: number): Promise<ApiResponse<endpoints.FeedDetails | null>> {
+    return this.wrap(() => endpoints.getFeedDetails(legacyBackend, feedId), null);
+  }
+
+  async saveFeedDetails(
+    feedId: number,
+    update: endpoints.FeedUpdate
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFeedDetails(legacyBackend, feedId, update);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Label colours
+  // ============================================
+
+  async setLabelColors(labelId: number, fg: string, bg: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.setLabelColors(legacyBackend, labelId, fg, bg);
+      return true;
+    }, false);
+  }
+
+  async resetLabelColors(labelId: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetLabelColors(legacyBackend, labelId);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Plugins
+  // ============================================
+
+  async getPlugins(): Promise<ApiResponse<{ plugins: endpoints.PluginRecord[]; isAdmin: boolean }>> {
+    return this.wrap(() => endpoints.getPlugins(legacyBackend), { plugins: [], isAdmin: false });
+  }
+
+  async setPlugins(pluginNames: string[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.setPlugins(legacyBackend, pluginNames);
+      return true;
+    }, false);
+  }
+
+  // ============================================
   // Preferences
   // ============================================
+
+  async getPrefsSchema(): Promise<ApiResponse<endpoints.PrefsSchema>> {
+    return this.wrap(() => endpoints.getPrefsSchema(legacyBackend), { profile: null, sections: [] });
+  }
 
   async getInitParams(): Promise<ApiResponse<Record<string, unknown>>> {
     return this.wrap(() => endpoints.getInitParams(legacyBackend), {});
