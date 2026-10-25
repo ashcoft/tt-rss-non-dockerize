@@ -80,7 +80,8 @@ success, and backend/transport errors come back as `status === 1` with an
 - `Pref_Prefs::getprefs()` exposes the preference fields the legacy page
   rendered; plugin-specific preference sections are not included.
 - The legacy Dojo sources remain on disk for archival and plugin reference but
-  are not loaded by any entry point.
+  are not loaded by any entry point. The old server-rendered preference tab
+  methods in `classes/Pref_*.php` are dead code: no entry point calls them.
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
 
