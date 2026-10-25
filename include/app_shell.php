@@ -34,6 +34,7 @@
 		const __ttrss_user = <?= json_encode((string)($_SESSION["name"] ?? "")) ?>;
 		const __ttrss_view = <?= json_encode($ttrss_view ?? "main") ?>;
 		const __ttrss_prefs_tab = <?= json_encode($ttrss_prefs_tab ?? "") ?>;
+		const __ttrss_prefs_feed = <?= json_encode((int)($_GET["feed"] ?? 0)) ?>;
 
 		const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
 		const __default_dark_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_DARK_THEME), 'themes/night.css') ?>";

@@ -679,3 +679,59 @@ test('getPlugins maps the JSON plugin list and splits system plugins', async () 
   assert.equal(result.plugins[0].user_enabled, true);
 });
 
+
+test('getFilterDetails maps rules, actions and type option lists', async () => {
+  installGlobals();
+  const payload = {
+    id: 5,
+    enabled: '1',
+    match_any_rule: '0',
+    inverse: false,
+    title: 'My filter',
+    rules: [
+      { reg_exp: 'foo', filter_type: '1', feed_id: ['0'], name: 'foo on Title' },
+    ],
+    actions: [{ action_id: '7', action_param: 'Important', action_param_label: 'Important' }],
+    filter_types: { 1: 'Title', 2: 'Content' },
+    action_types: { 7: 'Assign label', 8: 'Stop' },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFilterDetails(backend, 5);
+  assert.equal(details.enabled, true);
+  assert.equal(details.match_any_rule, false);
+  assert.deepEqual(details.rules[0].feed_id, ['0']);
+  assert.equal(details.filter_types['1'], 'Title');
+  assert.equal(details.actions[0].action_id, 7);
+});
+
+test('saveFilter sends JSON-encoded rule and action arrays', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFilter(backend, 5, {
+    title: 'My filter',
+    enabled: true,
+    match_any_rule: true,
+    inverse: false,
+    rules: [
+      { reg_exp: 'foo', filter_type: 1, feed_id: ['CAT:3'], inverse: true },
+    ],
+    actions: [{ action_id: 7, action_param: 'Important', action_param_label: 'Important' }],
+  });
+
+  const body = calls[0].body.replaceAll('+', ' ');
+  assert.ok(body.includes('method=editSave'));
+  assert.ok(body.includes('id=5'));
+  assert.ok(body.includes('enabled=on'));
+  assert.ok(body.includes('match_any_rule=on'));
+  assert.ok(body.includes('inverse=&') || body.endsWith('inverse='));
+  assert.ok(body.includes('rule%5B%5D='));
+  assert.ok(body.includes('action%5B%5D='));
+  assert.ok(body.includes(encodeURIComponent('"filter_type":1')));
+  assert.ok(body.includes(encodeURIComponent('"feed_id":["CAT:3"]')));
+});

@@ -23,8 +23,9 @@
       <v-divider />
 
       <v-card-text class="prefs-body">
+        <v-window v-model="tab">
         <!-- General: built from Pref_Prefs/getprefs metadata. -->
-        <v-window v-if="tab === 'general'" v-model="tab">
+        <v-window-item value="general">
           <div v-if="loadingPrefs" class="text-center py-6">
             <v-progress-circular indeterminate color="primary" />
           </div>
@@ -110,10 +111,10 @@
               Changes are saved immediately.
             </p>
           </template>
-        </v-window>
+        </v-window-item>
 
         <!-- Per-feed preferences. -->
-        <v-window v-if="tab === 'feeds'" v-model="tab">
+        <v-window-item value="feeds">
           <v-select
             v-model="selectedFeedId"
             :items="feedStore.feeds"
@@ -227,10 +228,15 @@
             </div>
           </template>
           <p v-else class="text-caption text-medium-emphasis">Select a feed to edit its preferences.</p>
-        </v-window>
+        </v-window-item>
 
-        <!-- Filters: listing and deletion. -->
-        <v-window v-if="tab === 'filters'" v-model="tab">
+        <!-- Filters. -->
+        <v-window-item value="filters">
+          <div class="d-flex mb-2">
+            <v-btn variant="tonal" size="small" prepend-icon="mdi-plus" @click="openFilterEditor(null)">
+              New filter
+            </v-btn>
+          </div>
           <div v-if="loadingFilters" class="text-center py-6">
             <v-progress-circular indeterminate color="primary" />
           </div>
@@ -248,6 +254,13 @@
                 <span v-if="filter.last_triggered" class="text-caption text-medium-emphasis mr-2">
                   {{ filter.last_triggered }}
                 </span>
+                <v-btn
+                  icon="mdi-pencil"
+                  size="small"
+                  variant="text"
+                  title="Edit filter"
+                  @click="openFilterEditor(filter.id)"
+                />
                 <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="deleteFilter(filter)" />
               </template>
             </v-list-item>
@@ -255,10 +268,10 @@
               <v-list-item-title>No filters defined</v-list-item-title>
             </v-list-item>
           </v-list>
-        </v-window>
+        </v-window-item>
 
         <!-- Labels and their colours. -->
-        <v-window v-if="tab === 'labels'" v-model="tab">
+        <v-window-item value="labels">
           <div class="d-flex align-center gap-2 mb-4">
             <v-text-field v-model="newLabelCaption" label="New label" density="compact" variant="outlined" hide-details />
             <v-btn color="primary" :disabled="!newLabelCaption" :loading="busy" @click="createLabel">Create</v-btn>
@@ -303,10 +316,10 @@
               <v-list-item-title>No labels defined</v-list-item-title>
             </v-list-item>
           </v-list>
-        </v-window>
+        </v-window-item>
 
         <!-- Plugins. -->
-        <v-window v-if="tab === 'plugins'" v-model="tab">
+        <v-window-item value="plugins">
           <div v-if="loadingPlugins" class="text-center py-6">
             <v-progress-circular indeterminate color="primary" />
           </div>
@@ -332,17 +345,24 @@
             </v-list>
             <v-btn color="primary" class="mt-2" :loading="busy" @click="savePlugins">Save plugins</v-btn>
           </template>
-        </v-window>
+        </v-window-item>
 
         <v-alert v-if="message" :type="messageType" variant="tonal" density="compact" class="mt-4">
           {{ message }}
         </v-alert>
+        </v-window>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
         <v-btn @click="closeDialog">Close</v-btn>
       </v-card-actions>
+
+      <FilterEditorDialog
+        v-model="filterEditorOpen"
+        :filter-id="filterEditorId"
+        @saved="loadFilters"
+      />
     </v-card>
   </v-dialog>
 </template>
@@ -351,6 +371,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import api from '../../api/client';
 import { useFeedsStore, useLabelsStore } from '../../stores/index';
+import FilterEditorDialog from './FilterEditorDialog.vue';
 import type { AdaptedFilter, FeedDetails, PluginRecord, PrefsSchema } from '../../api/legacyEndpoints';
 
 const props = withDefaults(defineProps<{
@@ -395,6 +416,8 @@ const feed = ref<FeedDetails | null>(null);
 // Filters
 const loadingFilters = ref(false);
 const filters = ref<AdaptedFilter[]>([]);
+const filterEditorOpen = ref(false);
+const filterEditorId = ref<number | null>(null);
 
 // Labels
 const newLabelCaption = ref('');
@@ -475,7 +498,9 @@ async function loadFeed(feedId: number | null) {
   try {
     const response = await api.getFeedDetails(feedId);
     if (response.status === 0 && response.content) {
-      feed.value = response.content;
+      // `cat_id` is null for uncategorized feeds; the select uses 0 for that
+      // item so the current value is visible.
+      feed.value = { ...response.content, cat_id: response.content.cat_id ?? 0 };
     } else {
       notify(response.error ?? 'Failed to load feed', 'error');
     }
@@ -553,6 +578,11 @@ async function loadFilters() {
   } finally {
     loadingFilters.value = false;
   }
+}
+
+function openFilterEditor(filterId: number | null) {
+  filterEditorId.value = filterId;
+  filterEditorOpen.value = true;
 }
 
 async function deleteFilter(filter: AdaptedFilter) {

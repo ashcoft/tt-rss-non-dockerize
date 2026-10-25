@@ -307,7 +307,16 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       break;
     case 'catchup':
       showMessage('Marking feed as read...', 'info');
-      if (await feedsStore.catchupFeed(feedId, isCat)) {
+      if (!isCat && (feedId === -4 || feedId === -3)) {
+        // Virtual feeds have no per-feed catch-up; use the global handler.
+        try {
+          await headlinesStore.catchupAll();
+          await headlinesStore.loadHeadlines(feedId, isCat);
+          showMessage('All headlines marked as read', 'success');
+        } catch {
+          showMessage('Failed to mark headlines as read', 'error');
+        }
+      } else if (await feedsStore.catchupFeed(feedId, isCat)) {
         await headlinesStore.loadHeadlines(feedId, isCat);
         showMessage('Feed marked as read', 'success');
       } else {
@@ -463,8 +472,17 @@ onMounted(async () => {
     await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
     startPolling();
 
+    // Legacy opened on "All articles" when nothing else was selected.
+    if (window.__ttrss_view !== 'preferences' && feedsStore.currentFeedId === 0) {
+      feedsStore.selectFeed(-4, false);
+      await headlinesStore.loadHeadlines(-4, false);
+    }
+
     if (window.__ttrss_view === 'preferences') {
-      openPreferences(window.__ttrss_prefs_tab || 'general');
+      openPreferences(
+        window.__ttrss_prefs_tab || 'general',
+        window.__ttrss_prefs_feed || null
+      );
     }
   }
 });
@@ -481,14 +499,17 @@ onUnmounted(stopPolling);
 }
 
 .app-header {
-  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
   background: var(--ttrss-header-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: var(--ttrss-primary, #1976d2);
 }
 
@@ -499,9 +520,14 @@ onUnmounted(stopPolling);
 }
 
 .app-main {
+  position: relative;
   display: flex;
   flex: 1;
   overflow: hidden;
+}
+
+.nav-toggle {
+  display: none;
 }
 
 .sidebar {
@@ -534,5 +560,33 @@ onUnmounted(stopPolling);
 
 .status {
   color: #666;
+}
+
+@media (max-width: 900px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: 80%;
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-in-out;
+    box-shadow: 2px 0 8px rgb(0 0 0 / 25%);
+  }
+
+  .sidebar.open {
+    transform: none;
+  }
+
+  .article-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    width: 100%;
+  }
 }
 </style>

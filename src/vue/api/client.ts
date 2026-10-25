@@ -273,6 +273,34 @@ class ApiClient {
     }, false);
   }
 
+  async getFilterDetails(filterId = 0): Promise<ApiResponse<endpoints.FilterDetails>> {
+    return this.wrap(() => endpoints.getFilterDetails(legacyBackend, filterId), {
+      id: filterId,
+      enabled: true,
+      match_any_rule: false,
+      inverse: false,
+      title: '',
+      rules: [],
+      actions: [],
+      filter_types: {},
+      action_types: {},
+    });
+  }
+
+  async saveFilter(filterId: number, payload: endpoints.FilterPayload): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFilter(legacyBackend, filterId, payload);
+      return true;
+    }, false);
+  }
+
+  async createFilter(payload: endpoints.FilterPayload): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.createFilter(legacyBackend, payload);
+      return true;
+    }, false);
+  }
+
   // ============================================
   // Feed preferences
   // ============================================

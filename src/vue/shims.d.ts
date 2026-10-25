@@ -20,6 +20,7 @@ interface Window {
   __ttrss_user?: string;
   __ttrss_view?: string;
   __ttrss_prefs_tab?: string;
+  __ttrss_prefs_feed?: number;
   __default_light_theme?: string;
   __default_dark_theme?: string;
 }

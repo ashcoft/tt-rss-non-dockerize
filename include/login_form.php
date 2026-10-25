@@ -6,17 +6,10 @@
 	<link rel="shortcut icon" type="image/png" href="images/favicon.png">
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<meta name="viewport" content="initial-scale=1,width=device-width" />
-	<?php
-	foreach (["lib/dojo/dojo.js",
-				"lib/dojo/tt-rss-layer.js",
-			 	"js/common.js",
-				"js/utility.js"] as $jsfile) {
-
-		echo javascript_tag($jsfile);
-
-	} ?>
 
 	<?= Config::get_override_links() ?>
+
+	<?= stylesheet_tag("themes/light.css") ?>
 
 	<style type="text/css">
 		@media (prefers-color-scheme: dark) {
@@ -31,82 +24,85 @@
 	</style>
 
 	<script type="text/javascript">
-		require({cache:{}});
-	</script>
-
-	<script type="text/javascript">
 		const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
 		const __default_dark_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_DARK_THEME), 'themes/night.css') ?>";
-	</script>
 
-	<script type="text/javascript">
-	/* exported Plugins */
-	const Plugins = {};
+		/** Minimal cookie helper (the Dojo utility bundle is no longer loaded). */
+		const Cookie = {
+			set: function (name, value, lifetime) {
+				const d = new Date();
+				d.setTime(d.getTime() + lifetime * 1000);
+				document.cookie = name + "=" + encodeURIComponent(value) + "; expires=" + d.toUTCString();
+			},
+			get: function (name) {
+				const prefix = name + "=";
+				for (const part of document.cookie.split(";")) {
+					const entry = part.trim();
+					if (entry.indexOf(prefix) === 0) return decodeURIComponent(entry.substring(prefix.length));
+				}
+				return "";
+			},
+		};
 
-	<?php
-		foreach (PluginHost::getInstance()->get_plugins() as $n => $p) {
-			$script = $p->get_login_js();
+		/**
+			 * Profile lookup and the bandwidth cookie used to be driven by dijit.
+			 * The form is plain HTML now, so this is the only JavaScript the page
+			 * needs and it does not load Dojo at all.
+			 */
+		const LoginPage = {
+			previousLogin: "",
 
-			if ($script) {
-				echo "try {
-						$script
-				} catch (e) {
-											console.warn('failed to initialize plugin JS: $n', e);
-									}";
-			}
-		}
-	?>
+			init: function () {
+				document.body.classList.remove("css_loading");
+
+				const bwLimit = document.getElementById("bw_limit");
+				if (bwLimit)
+					bwLimit.checked = Cookie.get("ttrss_bwlimit") === "true";
+
+				const login = document.getElementById("login");
+				if (login) login.focus();
+			},
+
+			fetchProfiles: function () {
+				const login = document.getElementById("login");
+				const profile = document.getElementById("profile");
+				if (!login || !profile || !login.value || login.value === this.previousLogin) return;
+
+				this.previousLogin = login.value;
+
+				const body = new URLSearchParams({ op: "getprofiles", login: login.value });
+
+				fetch("public.php", {
+					method: "POST",
+					credentials: "include",
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: body.toString(),
+				})
+					.then((response) => response.ok ? response.json() : Promise.reject(new Error(String(response.status))))
+					.then((profiles) => {
+						profile.replaceChildren();
+						for (const entry of profiles) {
+							const option = document.createElement("option");
+							option.value = String(entry.value);
+							option.textContent = entry.label;
+							profile.append(option);
+						}
+						profile.disabled = profiles.length === 0;
+					})
+					.catch((error) => console.warn("failed to load profiles", error));
+			},
+
+			bwLimitChange: function (element) {
+				Cookie.set("ttrss_bwlimit", element.checked,
+					<?php print (int) Config::get(Config::SESSION_COOKIE_LIFETIME) ?>);
+			},
+		};
+
+		document.addEventListener("DOMContentLoaded", () => LoginPage.init());
 	</script>
 </head>
 
 <body class="flat ttrss_utility ttrss_login css_loading">
-
-<script type="text/javascript">
-	const UtilityApp = {
-        previousLogin: "",
-	    init: function() { /* invoked by UtilityJS */
-            require(['dojo/parser', "dojo/ready", 'dijit/form/Button','dijit/form/CheckBox', 'dijit/form/Form',
-                'dijit/form/Select','dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-                ready(function() {
-					parser.parse();
-
-					dijit.byId("bw_limit").attr("checked", Cookie.get("ttrss_bwlimit") == 'true');
-					dijit.byId("login").focus();
-                });
-            });
-		},
-        fetchProfiles: function() {
-	        const login = dijit.byId("login").attr('value');
-
-	        if (login && login != this.previousLogin) {
-                this.previousLogin = login;
-
-                xhr.json("public.php", {op: "getprofiles", login: login},
-                    (reply) => {
-                        const profile = dijit.byId('profile');
-
-                        profile.removeOption(profile.getOptions());
-
-                        reply.forEach((p) => {
-                            profile
-                                .attr("disabled", false)
-                                .addOption(p);
-                        });
-                    });
-            }
-	    },
-        gotoRegForm: function() {
-        	window.location.href = "register.php";
-        	return false;
-    	},
-        bwLimitChange: function(elem) {
-        	Cookie.set("ttrss_bwlimit", elem.checked,
-				<?php print Config::get(Config::SESSION_COOKIE_LIFETIME) ?>);
-	    }
-    };
-
-
-</script>
 
 <?php $return = urlencode(!empty($_REQUEST['return']) ? $_REQUEST['return'] : with_trailing_slash(Config::get_self_url())) ?>
 
@@ -114,8 +110,7 @@
 
 	<h1><?= "Authentication" ?></h1>
 	<div class="content">
-		<form action="public.php?return=<?= $return ?>"
-			  dojoType="dijit.form.Form" method="POST">
+		<form action="public.php?return=<?= $return ?>" method="POST">
 
 			<?= \Controls\hidden_tag("op", "login"); ?>
 
@@ -125,26 +120,25 @@
 			<?php } ?>
 
 			<fieldset>
-				<label><?= __("Login:") ?></label>
-				<input name="login" id="login" dojoType="dijit.form.TextBox" type="text"
+				<label for="login"><?= __("Login:") ?></label>
+				<input name="login" id="login" type="text"
 					autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
-					onchange="UtilityApp.fetchProfiles()"
-					onfocus="UtilityApp.fetchProfiles()"
-					onblur="UtilityApp.fetchProfiles()"
+					onchange="LoginPage.fetchProfiles()"
+					onfocus="LoginPage.fetchProfiles()"
+					onblur="LoginPage.fetchProfiles()"
 					<?= Config::get(Config::DISABLE_LOGIN_FORM) ? 'disabled="disabled"' : '' ?>
 					required="1" value="<?= $_SESSION["fake_login"] ?? "" ?>" />
 			</fieldset>
 
 			<fieldset>
-				<label><?= __("Password:") ?></label>
+				<label for="password"><?= __("Password:") ?></label>
 
-				<input type="password" name="password" required="1"
+				<input type="password" name="password" id="password" required="1"
 					autocomplete="current-password"
-					dojoType="dijit.form.TextBox"
 					class="input input-text"
-					onchange="UtilityApp.fetchProfiles()"
-					onfocus="UtilityApp.fetchProfiles()"
-					onblur="UtilityApp.fetchProfiles()"
+					onchange="LoginPage.fetchProfiles()"
+					onfocus="LoginPage.fetchProfiles()"
+					onblur="LoginPage.fetchProfiles()"
 					<?= Config::get(Config::DISABLE_LOGIN_FORM) ? 'disabled="disabled"' : '' ?>
 					value="<?= $_SESSION["fake_password"] ?? "" ?>"/>
 			</fieldset>
@@ -156,38 +150,30 @@
 
 			<?php if (!Config::get(Config::DISABLE_LOGIN_FORM)) { ?>
 				<fieldset>
-					<label><?= __("Profile:") ?></label>
+					<label for="profile"><?= __("Profile:") ?></label>
 
-					<select disabled='disabled' name="profile" id="profile" dojoType='dijit.form.Select'>
-						<option><?= __("Default profile") ?></option>
+					<select name="profile" id="profile">
+						<option value="0"><?= __("Default profile") ?></option>
 					</select>
 				</fieldset>
 
 				<fieldset class="narrow">
 					<label> </label>
 
-					<label id="bw_limit_label">
+					<label id="bw_limit_label" title="<?= __("Does not display images in articles, reduces automatic refreshes."); ?>">
 						<?= \Controls\checkbox_tag("bw_limit", false, "",
-								["onchange" => 'UtilityApp.bwLimitChange(this)'], 'bw_limit') ?>
+								["onchange" => 'LoginPage.bwLimitChange(this)'], 'bw_limit') ?>
 						<?= __("Use less traffic") ?></label>
 				</fieldset>
-
-				<div dojoType="dijit.Tooltip" connectId="bw_limit_label" position="below" style="display:none">
-					<?= __("Does not display images in articles, reduces automatic refreshes."); ?>
-				</div>
 
 				<fieldset class="narrow">
 					<label> </label>
 
-					<label id="safe_mode_label">
+					<label id="safe_mode_label" title="<?= __("Uses default theme and prevents all plugins from loading."); ?>">
 						<?= \Controls\checkbox_tag("safe_mode") ?>
 						<?= __("Safe mode") ?>
 					</label>
 				</fieldset>
-
-				<div dojoType="dijit.Tooltip" connectId="safe_mode_label" position="below" style="display:none">
-					<?= __("Uses default theme and prevents all plugins from loading."); ?>
-				</div>
 
 				<?php if (Config::get(Config::SESSION_COOKIE_LIFETIME) > 0) { ?>
 					<fieldset class="narrow">

@@ -46,12 +46,9 @@ class Auth_Internal extends Auth_Base implements IAuthModule2 {
 						<head>
 							<title>Tiny Tiny RSS</title>
 							<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-							<?php foreach (["lib/dojo/dojo.js",
-								"lib/dojo/tt-rss-layer.js",
-								"js/common.js",
-								"js/utility.js"] as $jsfile) {
-									echo javascript_tag($jsfile);
-								} ?>
+							<?php foreach (["js/common.js", "js/utility.js"] as $jsfile) {
+								echo javascript_tag($jsfile);
+							} ?>
 								<style type="text/css">
 									@media (prefers-color-scheme: dark) {
 										body {
@@ -65,26 +62,17 @@ class Auth_Internal extends Auth_Base implements IAuthModule2 {
 								</style>
 
 								<script type="text/javascript">
-									require({cache:{}});
-
-									const UtilityApp = {
-										init: function() {
-											require(['dojo/parser', "dojo/ready", 'dijit/form/Button', 'dijit/form/Form',
-													'dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-	                						ready(function() {
-													parser.parse();
-													dijit.byId("otp").focus();
-												});
-											});
-										},
-									};
-								</script>
+								const UtilityApp = {
+									init: function() {
+										document.getElementById("otp")?.focus();
+									},
+								};
 								<?= Config::get_override_links() ?>
 							</head>
 							<body class="flat ttrss_utility otp css_loading">
 								<h1><?= __("Authentication") ?></h1>
 								<div class="content">
-									<form dojoType="dijit.form.Form" action="public.php?return=<?= $return ?>" method="post" class="otpform">
+									<form action="public.php?return=<?= $return ?>" method="post" class="otpform">
 
 										<?php foreach (["login", "password", "bw_limit", "safe_mode", "remember_me", "profile"] as $key) {
 											print \Controls\hidden_tag($key, $_POST[$key] ?? "");
@@ -94,7 +82,7 @@ class Auth_Internal extends Auth_Base implements IAuthModule2 {
 
 										<fieldset>
 											<label><?= __("Please enter verification code (OTP):") ?></label>
-											<input id="otp" dojoType="dijit.form.ValidationTextBox" required="1" autocomplete="off" size="6" name="otp" value=""/>
+											<input id="otp" required="1" autocomplete="off" size="6" name="otp" value=""/>
 											<?= \Controls\submit_tag(__("Continue")) ?>
 										</fieldset>
 									</form>

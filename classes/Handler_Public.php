@@ -443,8 +443,6 @@ class Handler_Public extends Handler {
 			<link rel="icon" type="image/png" sizes="72x72" href="images/favicon-72px.png">
 			<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 			<?php
-				echo javascript_tag("lib/dojo/dojo.js");
-				echo javascript_tag("lib/dojo/tt-rss-layer.js");
 				echo javascript_tag("js/common.js");
 				echo javascript_tag("js/utility.js");
 			?>
@@ -456,15 +454,6 @@ class Handler_Public extends Handler {
 		<script type="text/javascript">
 			const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
 			const __default_dark_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_DARK_THEME), 'themes/night.css') ?>";
-		</script>
-
-		<script type="text/javascript">
-		require(['dojo/parser', "dojo/ready", 'dijit/form/Button','dijit/form/CheckBox', 'dijit/form/Form',
-    		'dijit/form/Select','dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-			ready(function() {
-				parser.parse();
-			});
-		});
 		</script>
 
 		<style type="text/css">
@@ -530,12 +519,12 @@ class Handler_Public extends Handler {
 
 				<fieldset>
 				<label>".__("Login:")."</label>
-				<input dojoType='dijit.form.TextBox' type='text' name='login' value='' required>
+				<input type='text' name='login' value='' required>
 				</fieldset>
 
 				<fieldset>
 				<label>".__("Email:")."</label>
-				<input dojoType='dijit.form.TextBox' type='email' name='email' value='' required>
+				<input type='email' name='email' value='' required>
 				</fieldset>";
 
 			$_SESSION["pwdreset:testvalue1"] = random_int(1,10);
@@ -543,12 +532,12 @@ class Handler_Public extends Handler {
 
 			print "<fieldset>
 				<label>".T_sprintf("How much is %d + %d:", $_SESSION["pwdreset:testvalue1"], $_SESSION["pwdreset:testvalue2"])."</label>
-				<input dojoType='dijit.form.TextBox' type='text' name='test' value='' required>
+				<input type='text' name='test' value='' required>
 				</fieldset>
 
 				<hr/>
 				<fieldset>
-				<button dojoType='dijit.form.Button' type='submit' class='alt-danger'>".__("Reset password")."</button>
+				<button type='submit' class='alt-danger'>".__("Reset password")."</button>
 				<a href='index.php'>".__("Return to Tiny Tiny RSS")."</a>
 				</fieldset>
 
@@ -564,7 +553,7 @@ class Handler_Public extends Handler {
 
 				print "<form method='GET' action='public.php'>
 					<input type='hidden' name='op' value='forgotpass'>
-					<button dojoType='dijit.form.Button' type='submit' class='alt-primary'>".__("Go back")."</button>
+					<button type='submit' class='alt-primary'>".__("Go back")."</button>
 					</form>";
 			} else {
 				// prevent submitting this form multiple times
@@ -616,7 +605,7 @@ class Handler_Public extends Handler {
 
 					print "<form method='GET' action='public.php'>
 						<input type='hidden' name='op' value='forgotpass'>
-						<button dojoType='dijit.form.Button' type='submit'>".__("Go back")."</button>
+						<button type='submit'>".__("Go back")."</button>
 						</form>";
 				}
 			}
@@ -655,13 +644,8 @@ class Handler_Public extends Handler {
 			<link rel="shortcut icon" type="image/png" href="images/favicon.png">
 			<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 			<?php
-			foreach (["lib/dojo/dojo.js",
-						"lib/dojo/tt-rss-layer.js",
-						"js/common.js",
-						"js/utility.js"] as $jsfile) {
-
+			foreach (["js/common.js", "js/utility.js"] as $jsfile) {
 				echo javascript_tag($jsfile);
-
 			} ?>
 
 			<?= Config::get_override_links() ?>
@@ -678,21 +662,14 @@ class Handler_Public extends Handler {
 				}
 			</style>
 
-			<script type="text/javascript">
-				require({cache:{}});
-			</script>
 		</head>
 		<body class="flat ttrss_utility css_loading">
 
 			<script type="text/javascript">
 				const UtilityApp = {
 					init: function() {
-						require(['dojo/parser', "dojo/ready", 'dijit/form/Button','dijit/form/CheckBox', 'dijit/form/Form',
-							'dijit/form/Select','dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-							ready(function() {
-								parser.parse();
-							});
-						});
+						// The updater uses plain HTML controls; utility.js calls this once the
+						// theme stylesheet has loaded and the loading class is removed.
 					}
 				}
 

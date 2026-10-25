@@ -20,6 +20,7 @@ function compileComponent(relativePath) {
   const module = { exports: {} };
   const localRequire = (id) => {
     if (id.includes('api/client')) return { default: {} };
+    if (id.endsWith('.vue')) return { default: { name: 'StubDialog', render: () => null } };
     if (id.includes('stores')) {
       return {
         useFeedsStore: () => ({

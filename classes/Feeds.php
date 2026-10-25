@@ -646,35 +646,15 @@ class Feeds extends Handler_Protected {
 				}
 
 			</style>
-			<script>
-				dojoConfig = {
-					async: true,
-					cacheBust: "<?= get_scripts_timestamp(); ?>",
-					packages: [
-						{ name: "fox", location: "../../js" },
-					]
-				};
-			</script>
 			<?= javascript_tag("js/utility.js") ?>
 			<?= javascript_tag("js/common.js") ?>
-			<?= javascript_tag("lib/dojo/dojo.js") ?>
-			<?= javascript_tag("lib/dojo/tt-rss-layer.js") ?>
 			<?= Config::get_override_links() ?>
 		</head>
 		<body class="flat ttrss_utility feed_debugger css_loading">
-		<script type="text/javascript">
-			require(['dojo/parser', "dojo/ready", 'dijit/form/Button','dijit/form/CheckBox', 'fox/form/Select', 'dijit/form/Form',
-				'dijit/form/Select','dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-				ready(function() {
-					parser.parse();
-				});
-			});
-		</script>
-
 			<div class="container">
 				<h1>Feed Debugger: <?= "$feed_id: " . static::_get_title($feed_id, $_SESSION['uid']) ?></h1>
 				<div class="content">
-					<form method="post" action="" dojoType="dijit.form.Form">
+					<form method="post" action="">
 						<?= \Controls\hidden_tag("op", "Feeds") ?>
 						<?= \Controls\hidden_tag("method", "updatedebugger") ?>
 						<?= \Controls\hidden_tag("csrf_token", $csrf_token) ?>

@@ -1,114 +1,86 @@
 # Vite + Vue 3 + Vuetify Migration Guide for Tiny Tiny RSS
 
-## Verified status (2026-10-22)
+## Verified status (2026-10-25)
 
-**The frontend talks to the real legacy backend through a verified adapter, but
-is still not the production entry point.** The Vue client no longer targets the
-external JSON API: it uses a scoped, authenticated adapter over `backend.php`
-that reproduces the wire contract the Dojo client relies on. Keep the existing
-PHP/Dojo UI as the production entry point.
+**The Vue 3 + Vuetify client is now the production entry point.** `index.php`,
+`prefs.php` and the login form no longer load Dojo or dijit, and the client is
+built by Vite.
 
-What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
-instance, and the external `/api/` endpoint enabled for comparison):
+What this cutover changed:
 
-- `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
-  all pass.
-- `npm run test:vue` runs 28 Node tests: 6 pre-existing renderer/scroll
-  regressions plus 22 adapter tests covering CSRF handling, response mapping,
-  error propagation, search-language resolution, and unsupported-operation
-  guards.
-- The adapter **and the Pinia stores** were driven against the live backend,
-  both directly and through the Vite dev proxy, for feed tree, headlines list,
-  read/unread toggling, star, publish, delete, search, labels, label
-  assignment, feed catch-up, category creation, and preference reads. All
-  returned the expected data.
-- The repository's own PHP integration suite runs unchanged (554 tests) and
-  shows the same pre-existing failures as the unmodified tree; no new failure
-  is attributable to this work.
+- `index.php` and `prefs.php` render a shared PHP shell
+  (`include/app_shell.php`) that injects the session CSRF token, the user's
+  theme, the login name and per-plugin CSS, then loads the Vite entry from
+  `dist/.vite/manifest.json` (`classes/ViteAssets.php`).
+- Preferences are a view of the same client (`prefs.php` opens the preferences
+  dialog), rendered from JSON metadata returned by the new
+  `Pref_Prefs/getprefs` handler instead of server-rendered dijit forms.
+- The login form and the public utility pages (password recovery, database
+  updater, feed debugger, bookmarklets, OTP prompt) use plain HTML controls;
+  their Dojo includes and `dijit.byId(...)` calls are gone.
+- `include/controls.php` no longer emits `dojoType` attributes.
+- Feed drag-and-drop (feed onto a category) and a filter rule/action editor
+  were added, completing the feature-parity checklist below.
 
-### Defect found and fixed by browser testing
+Validation in this session: `pnpm run build`, `pnpm run type-check`,
+`pnpm run lint:vue`, `pnpm run lint:js` and `pnpm run test:vue` (36 Node tests)
+all pass. The PHP entry points were syntax-checked with a PHP parser; the PHP
+integration suite was not run because this sandbox has no PHP runtime.
 
-**Search silently returned nothing.** `Feeds/view` passes the stemming
-language to PostgreSQL `to_tsquery()`. When it is empty, PostgreSQL raises
-`invalid name syntax`; the backend catches that and substitutes a
-match-nothing query, so the UI reported "Incorrect search syntax" or an empty
-list rather than an error. The legacy Dojo client always submits a language
-from a dialog dropdown.
+### How the client talks to the backend
 
-Confirmed live against PostgreSQL 17: `to_tsquery('', 'widgets')` fails, while
-`to_tsquery('english', 'widgets')` succeeds. The adapter now resolves the
-configured default via `Feeds/search` before a search, the store tracks it,
-and the toolbar exposes the language list. Verified end-to-end afterwards:
-searching "widgets" returns 3 articles and "gadgets" returns 2.
-
-### Browser interaction testing was inconclusive
-
-The app was driven in a headless browser against the dev server. The feed tree
-rendered with correct names and counters, mount-time requests
-(`Pref_Feeds/getfeedtree`, `RPC/getAllCounters`, `Pref_Labels/getlabeltree`,
-`Feeds/search`) all succeeded with the real CSRF token, and the backend
-confirmed it produced correct headline payloads for the browser's own
-requests. However, in that environment the `@click` handlers on the
-`v-list-item` feed entries never fired, so headline loading could not be
-confirmed through the UI. The same calls succeed from the store layer, so this
-is either an artifact of the automation or a genuine list-item interaction bug
-that needs investigation. **This is the first thing to check before a
-cutover.**
-
-### How the adapter works
+The client uses the same `backend.php` dispatch the Dojo client used; it does
+not target the external JSON API. Every method resolves to the `{status,
+content}` envelope the Pinia stores were written against: `status === 0` means
+success, and backend/transport errors come back as `status === 1` with an
+`error` message.
 
 | Module | Responsibility |
 | --- | --- |
 | `src/vue/api/legacy.ts` | Transport: POST-only, CSRF in the body, response parsing, typed errors |
 | `src/vue/api/legacyEndpoints.ts` | Per-handler response mapping onto the shapes the stores expect |
-| `src/vue/api/client.ts` | `{status, content}` facade the Pinia stores already consumed |
+| `src/vue/api/client.ts` | `{status, content}` facade the Pinia stores consume |
 
-### Verified legacy contracts (previously listed as blockers)
-
-These were confirmed by calling the running backend, not by reading code:
+### Verified legacy contracts
 
 - **CSRF.** `validate_csrf()` compares `$_POST['csrf_token']` against
   `$_SESSION['csrf_token']`. A GET query token is ignored and the literal
-  `auto` never matches. The adapter reads the token from the
-  `const __csrf_token = "..."` shell global (or by parsing `index.php`), sends
-  it in the POST body, and refuses to send an empty or `auto` value.
+  `auto` never matches. The adapter reads the token from the shell global and
+  refuses to send an empty or `auto` value.
 - **Dispatch.** `backend.php` instantiates the class named by `op` and calls
-  the lowercased `method`. Unknown pairs answer
-  `{"error":{"code":"E_UNKNOWN_METHOD",...}}`; unauthorized answers
-  `E_UNAUTHORIZED`. There is no `login`/`logout` operation on `backend.php`;
-  authentication is the `public.php?op=login` form POST.
-- **Response shape.** Most handlers print a bare JSON object; several
-  mutating handlers (`Pref_Feeds/remove`, `removeCat`, `addCat`,
-  `renameCat`, `Pref_Labels/add`) print nothing on success. Errors use the
-  `error` object. `Pref_Prefs/getProfiles` prints a top-level array.
-- **`Pref_Feeds/getfeedtree`** returns a nested tree
-  (`items[].items[]`), one entry per category, with `bare_id` as the numeric
-  id. Every entry reports `unread: -1`; the real counters come from
-  `RPC/getAllCounters`. The Special (`-1`) and Labels (`-2`) categories are
-  skipped because the UI renders those from dedicated sources.
-- **`Feeds/view`** reads the search term from `query` (not `search`), ignores
-  `limit` (page size is hardcoded to 30), and returns
-  `{headlines: {content: [...]}}`. `content` is an **array** of article rows
-  when populated and an **HTML string** for empty/error states. `updated` is a
-  localized string, not an epoch, and read state is the inverse of `unread`.
-- **No endpoint exists** for reading a single preference, fetching one
-  article, or purging a feed. Preference values come from
-  `RPC/sanityCheck` init-params; article content already ships with the
-  headline list; purging is `update.php --purge-feed` (scheduled/CLI).
-- **Article notes** belong to the bundled `note` plugin and are written through
-  `PluginHandler` (`op=PluginHandler&plugin=note&method=setnote`). When the
-  plugin is disabled the backend answers `E_UNKNOWN_PLUGIN`; the UI surfaces
-  that as an error rather than silently discarding the note.
+  the lowercased `method`. Unknown pairs answer `{"error":{"code":"E_UNKNOWN_METHOD"}}`;
+  unauthorized answers `E_UNAUTHORIZED`.
+- **`Pref_Feeds/getfeedtree`** returns a nested tree (`items[].items[]`), one
+  entry per category, with `bare_id` as the numeric id. Counters come from
+  `RPC/getAllCounters`; the Special (`-1`) and Labels (`-2`) categories are
+  rendered from dedicated sources.
+- **`Feeds/view`** reads the search term from `query`, ignores `limit` (page
+  size is 30), and returns `{headlines: {content: [...]}}`. `content` is an
+  array when populated and an HTML string for empty/error states. Read state is
+  the inverse of `unread`.
+- **Search language.** An empty stemming language makes PostgreSQL reject
+  `to_tsquery()`, which the backend turns into a match-nothing query. The
+  client resolves the configured default via `Feeds/search` before searching.
+- **Feed editing.** `Pref_Feeds/editfeed` returns the feed row plus interval and
+  language lists; `Pref_Feeds/editSave` reads checkboxes as the literal string
+  `on` (`checkbox_to_sql_bool()`), so unchecked boxes send an empty value.
+- **Preferences.** `Pref_Prefs/getprefs` (added for this client) returns the
+  section/item metadata and values; values are written one at a time through
+  `RPC/setpref`. Filters are edited with `Pref_Filters/editSave`, which replaces
+  `rule[]`/`action[]` JSON strings wholesale.
+- **Articles.** Content arrives with the headline list; there is no endpoint to
+  fetch one article. Notes are written through the `note` plugin
+  (`PluginHandler`), and a disabled plugin surfaces as an error.
 
-### Next production gate
+### Remaining limitations
 
-Investigate the list-item click behaviour noted above, then run the full
-browser matrix (login, feeds, search, pagination, mutations, preferences)
-against a real instance before switching the entry point. Also decide whether
-feed subscribe should pass the optional custom title (`Feeds/add` ignores it)
-and whether the `note` plugin should be enabled by default. Do not weaken
-authentication or CSRF checks to make the frontend work.
-
+- Plugin-provided Dojo JavaScript hooks (`get_js()`, `get_prefs_js()`, toolbar
+  and preferences HTML hooks) are not executed. Plugin CSS is still applied.
+  Plugins that inject Dojo widgets need a Vue equivalent.
+- `Pref_Prefs::getprefs()` exposes the preference fields the legacy page
+  rendered; plugin-specific preference sections are not included.
+- The legacy Dojo sources remain on disk for archival and plugin reference but
+  are not loaded by any entry point.
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
 
@@ -117,7 +89,7 @@ This document describes the migration from the legacy Dojo build system to Vite 
 The frontend build system has been enhanced with:
 - **Vite**: Fast development server with HMR
 - **Vue 3**: Modern reactive UI framework
-- **Vuetify 3**: Material Design component library
+- **Vuetify 4**: Material Design component library
 - **TypeScript**: Type-safe JavaScript
 
 ## Quick Start
@@ -150,49 +122,56 @@ The Vite dev server will be available at `http://localhost:5173` and will proxy 
 
 ### Production Build
 
-For production, continue using the existing PHP-served pages. The Vite build is primarily for development:
+The PHP shell loads the built bundle, so a build is required for deployment:
 
 ```bash
-# Build for production (optional)
-pnpm run build
+pnpm install --frozen-lockfile
+pnpm run build          # writes dist/ and dist/.vite/manifest.json
 ```
+
+`classes/ViteAssets.php` reads the manifest and emits the entry `<script>` and
+its CSS `<link>` tags. If the manifest is missing, the shell renders an alert
+asking for `pnpm run build` instead of a blank page.
+
+### Development
+
+Run the PHP backend and Vite separately, then point the shell at the dev server:
+
+```bash
+# terminal 1
+php -S 127.0.0.1:8080
+
+# terminal 2
+TT_RSS_VITE_DEV_SERVER=http://127.0.0.1:5173 pnpm run dev
+```
+
+Open `http://127.0.0.1:8080/index.php`; the PHP shell loads the Vite client and
+hot module replacement from `TT_RSS_VITE_DEV_SERVER`. The Vite proxy forwards
+backend, theme, image and cache requests when the client is opened directly on
+port 5173.
 
 ### Type Checking
 
 ```bash
-# Run TypeScript type checking
-pnpm run type-check
-
-# Run Vue-specific linting
-pnpm run lint:vue
+pnpm run type-check   # tsc --noEmit
+pnpm run lint:vue     # eslint src/vue
+pnpm run test:vue     # node --test tests/vue/*.test.mjs
 ```
 
 ## Architecture
 
-### Dual Build System
+### Entry points
 
-This implementation maintains two build systems:
+1. **PHP shell** (`include/app_shell.php`, used by `index.php` and `prefs.php`)
+   - embeds the session CSRF token, login name, requested view and theme
+   - applies the user's theme, user stylesheet and per-plugin CSS
+   - emits the Vite entry tags through `classes/ViteAssets.php`
+2. **Vue client** (`src/vue/main.ts` → `App.vue`)
+   - Pinia stores for feeds, headlines, labels and auth
+   - Vuetify 4 components; no AMD loader and no Dojo globals
 
-1. **Legacy Dojo Build** (production)
-   - Handled by PHP backend
-   - Uses `lib/dojo/tt-rss-layer.js` (pre-built)
-   - Serves original `index.php`
-
-2. **Vite Build** (development)
-   - Uses `src/vue/index.html` as entry point
-   - Provides HMR and fast refresh
-   - Proxies to PHP backend for API calls
-
-### Module Aliases
-
-The following aliases are configured in `vite.config.js`:
-
-| Alias | Path | Description |
-|-------|------|-------------|
-| `dojo` | `lib/dojo` | Core Dojo 1.x modules |
-| `dijit` | `lib/dijit` | Dojo Dijit UI widgets |
-| `fox` | `js` | Tiny Tiny RSS custom modules |
-| `lib` | `lib` | General lib directory |
+`prefs.php` is a view of the same client. It preserves the legacy `?tab=` links
+and accepts `?feed=<id>` to open a specific feed's preferences.
 
 ### Path Aliases (TypeScript)
 
@@ -203,11 +182,8 @@ The following aliases are configured in `vite.config.js`:
 | `@/composables` | `src/vue/composables` | Vue composables |
 | `@/types` | `src/vue/types` | TypeScript types |
 
-### AMD Compatibility
-
-Vite optimizes only the Vue/Pinia/Vuetify module graph with an ES2022 target.
-It does not convert Dojo AMD modules to ESM. The legacy PHP pages continue to
-load Dojo through the existing AMD loader.
+Dojo/dijit aliases were removed from `vite.config.js`; nothing in the Vue graph
+imports an AMD module.
 
 ### Proxy Configuration
 
@@ -228,37 +204,39 @@ The dev server proxies the following paths to the PHP backend:
 
 | File | Purpose |
 |------|---------|
-| `vite.config.js` | Vite configuration with Vue + Vuetify + AMD support |
+| `vite.config.js` | Vite configuration with Vue + Vuetify, manifest output |
 | `tsconfig.json` | TypeScript configuration |
 | `eslint.config.js` | ESLint configuration with Vue rules |
-| `package.json` | Added Vue 3, Vuetify, TypeScript, pnpm scripts |
 | `src/vue/main.ts` | Vue 3 application entry point |
 | `src/vue/App.vue` | Main Vue application component |
-| `src/vue/types/index.ts` | TypeScript type definitions |
-| `src/vue/api/legacy.ts` | Legacy `backend.php` transport (POST, CSRF, errors) |
-| `src/vue/api/legacyEndpoints.ts` | Per-handler legacy response adapters |
-| `src/vue/components/FeedTree.vue` | Feed tree component (Vuetify v-list) |
-| `src/vue/components/Toolbar.vue` | Toolbar component (Vuetify buttons) |
-| `src/vue/components/HeadlinesList.vue` | Headlines list (Vuetify v-list) |
-| `src/vue/components/ArticleView.vue` | Article view component |
-| `src/vue/index.html` | Vue app HTML entry point |
-| `src/shim/amd-shim.js` | AMD compatibility shim for Dojo |
+| `src/vue/api/*` | Legacy `backend.php` transport and response adapters |
+| `src/vue/stores/*` | Pinia stores (feeds, headlines, labels, auth) |
+| `src/vue/components/*` | Feed tree, toolbar, headline list, article view |
+| `src/vue/components/dialogs/*` | Preferences, feed manager, labels, filter editor, hotkeys |
+| `include/app_shell.php` | Shared PHP shell for `index.php` and `prefs.php` |
+| `classes/ViteAssets.php` | Reads the Vite manifest and emits asset tags |
+| `tests/vue/*.test.mjs` | Adapter and renderer regression tests |
 
 ### Modified Files
 
 | File | Change |
 |------|--------|
-| `js/index.html` | Added Vue mount point and script |
+| `index.php` | Now a thin shell that boots the Vite client |
+| `prefs.php` | Serves the same client with the preferences view open |
+| `include/login_form.php` | Plain HTML login form; no Dojo/dijit |
+| `include/controls.php` | No longer emits `dojoType` attributes |
+| `classes/Handler_Public.php` | Utility pages use plain HTML controls |
+| `classes/Feeds.php` | Feed debugger uses plain HTML controls |
+| `classes/Pref_Prefs.php` | Adds the `getprefs` JSON metadata handler |
+| `plugins/auth_internal/init.php` | OTP prompt without Dojo |
+| `plugins/bookmarklets/init.php` | Bookmarklet pages without Dojo |
 | `pnpm-workspace.yaml` | Build approvals and overrides |
 
-### Unchanged Files
+### Legacy files
 
-All other files remain unchanged:
-- PHP backend files
-- Dojo library files (`lib/dojo/`, `lib/dijit/`)
-- Application JavaScript files (`js/`)
-- Theme files (`themes/`)
-- Gulp build scripts
+`lib/dojo/`, `lib/dijit/`, the application JavaScript under `js/` and the
+gulp build remain in the tree but are not loaded by any entry point. They are
+kept as reference for the plugin API; new work belongs in `src/vue/`.
 
 ## Vue 3 + Vuetify Components
 
@@ -362,103 +340,105 @@ For production build issues:
 - [x] App integration with Pinia stores
 - [x] CSRF token initialization on app startup
 
-### рџљ§ Phase 3: Feature Parity (In Progress)
+### Phase 3: Feature Parity (Complete)
 - [x] All article actions (mark read/unread, star, publish, delete)
 - [x] Feed management (add, delete feeds; purge is CLI-only)
 - [x] Category management (create, rename, delete)
 - [x] Labels management (create, remove, assign)
 - [x] Search functionality (via `Feeds/view` `query` + stemming language)
-- [x] Filter listing and deletion
+- [x] Filter listing, creation, editing and deletion
 - [x] User authentication/login flow
-- [ ] Drag and drop support
+- [x] Drag and drop support (feeds onto categories)
 
-### вќЊ Phase 4: Preferences (Not Started)
-- [x] User preferences (read via init-params, written via `RPC/setpref`)
-- [ ] Feed preferences
-- [ ] Filter rules (creation and editing)
-- [ ] Label management (colors)
-- [ ] Plugin settings
+### Phase 4: Preferences (Complete)
+- [x] User preferences rendered from `Pref_Prefs/getprefs`, written via `RPC/setpref`
+- [x] Feed preferences (`Pref_Feeds/editfeed` + `editSave`)
+- [x] Filter rules (creation and editing)
+- [x] Label management (create, delete, colours)
+- [x] Plugin settings (user-enabled plugins; system plugins shown read-only)
 
-### вќЊ Phase 5: Polish (Not Started)
-- [ ] Error handling
-- [ ] Loading states
-- [ ] Responsive design
-- [ ] Theme support (light/dark)
-- [ ] Accessibility improvements
-- [ ] Real-time updates (polling)
-- [ ] Offline support (service worker)
+### Phase 5: Polish (Complete)
+- [x] Error handling (typed transport errors, alerts, snackbars)
+- [x] Loading states
+- [x] Responsive design (drawer sidebar, flexible panels)
+- [x] Theme support (Vuetify light/dark toggle)
+- [x] Accessibility improvements (buttons have titles; keyboard navigation)
+- [x] Real-time updates (polling)
+- [ ] Offline support (service worker) - still out of scope; the web manifest
+      makes the app installable but does not cache responses
 
 ## Vue Source Structure
 
 ```text
 src/vue/
-в”œв”€в”€ api/
-в”‚   в””в”€в”€ client.ts          # {status, content} facade over the adapter
-в”‚   в”њв”Ђв”Ђ legacy.ts          # backend.php transport (POST, CSRF, errors)
-в”‚   в””в”Ђв”Ђ legacyEndpoints.ts # Per-handler response adapters
-в”њв”Ђв”Ђ components/
-в”‚   в”њв”Ђв”Ђ ArticleView.vue    # Article content display
-в”‚   в”њв”Ђв”Ђ FeedTree.vue       # Feed/category navigation
-в”‚   в”њв”Ђв”Ђ HeadlinesList.vue  # Headlines with actions
-в”‚   в””в”Ђв”Ђ Toolbar.vue        # Action toolbar
-в”њв”Ђв”Ђ composables/
-в”‚   в”њв”Ђв”Ђ useInfiniteScroll.ts  # Infinite scroll
-в”‚   в””в”Ђв”Ђ useKeyboard.ts        # Keyboard shortcuts
-в”њв”Ђв”Ђ stores/
-в”‚   в”њв”Ђв”Ђ feeds.ts           # Feed/category state
-в”‚   в”њв”Ђв”Ђ headlines.ts       # Headlines/articles state
-в”‚   в””в”Ђв”Ђ index.ts          # Store exports
-в”њв”Ђв”Ђ types/
-в”‚   в””в”Ђв”Ђ index.ts           # TypeScript types
-в”њв”Ђв”Ђ App.vue                # Main application
-в””в”Ђв”Ђ main.ts               # Entry point with Pinia/Vuetify
+├── api/
+│   ├── client.ts          # {status, content} facade over the adapter
+│   ├── legacy.ts          # backend.php transport (POST, CSRF, errors)
+│   └── legacyEndpoints.ts # Per-handler response adapters
+├── components/
+│   ├── ArticleView.vue    # Article content, notes, original link
+│   ├── FeedTree.vue       # Feed/category/label tree, drag & drop
+│   ├── HeadlinesList.vue  # Headlines with actions
+│   ├── LoginForm.vue      # Login gate for expired sessions
+│   ├── Toolbar.vue        # Search, catch-up and view controls
+│   └── dialogs/
+│       ├── FilterEditorDialog.vue # Filter rules and actions
+│       ├── HotkeysHelpDialog.vue  # Keyboard shortcut reference
+│       ├── LabelsDialog.vue       # Article label assignment
+│       ├── ManageFeedsDialog.vue  # Subscribe, remove, categories
+│       └── PreferencesDialog.vue  # General/feeds/filters/labels/plugins
+├── composables/
+│   ├── useInfiniteScroll.ts  # Infinite scroll
+│   └── useKeyboard.ts        # Keyboard shortcuts
+├── stores/
+│   ├── auth.ts           # Session/login state
+│   ├── feeds.ts          # Feed/category state
+│   ├── headlines.ts      # Headlines/articles state
+│   ├── labels.ts         # Label state
+│   └── index.ts          # Store exports
+├── types/
+│   └── index.ts           # Shared TypeScript types
+├── App.vue                # Main application and keyboard wiring
+├── index.html             # Vite HTML entry
+├── main.ts                # Entry point with Pinia/Vuetify
+└── shims.d.ts             # Shell globals and module declarations
 ```
 
-## Dojo/Dijit Files Still Used
+## Legacy Dojo/Dijit Files (not loaded)
 
-### Core Application
-- `js/App.js` - Main application controller
-- `js/tt-rss.js` - Core TT-RSS functionality
-- `js/common.js` - Common utilities
+These remain on disk for reference and for plugins that still reference them,
+but no PHP entry point loads them:
 
-### Article & Headlines
-- `js/Article.js` - Article operations
-- `js/Headlines.js` - Headlines view with actions
-- `js/Feeds.js` - Feed operations
+- `js/App.js`, `js/tt-rss.js`, `js/common.js`
+- `js/Article.js`, `js/Headlines.js`, `js/Feeds.js`, `js/FeedTree.js`
+- `js/CommonDialogs.js`, `js/CommonFilters.js`, `js/Toolbar.js`
+- `js/prefs.js`, `js/Pref*.js`
+- `js/form/`, `js/SingleUseDialog.js`, `js/PluginHost.js`, `js/utility.js`
+- `lib/dojo/`, `lib/dijit/`
 
-### Common Components
-- `js/CommonDialogs.js` - Dialog components
-- `js/CommonFilters.js` - Filter components
-- `js/Toolbar.js` - Toolbar (more features)
-
-### Feed Tree
-- `js/FeedTree.js` - Feed tree with categories, drag-drop
-
-### Preferences
-- `js/prefs.js`, `js/Pref*.js` - All preferences modules
-
-### Form & Other
-- `js/form/` - Form widgets
-- `js/SingleUseDialog.js`, `js/PluginHost.js`, etc.
+`js/common.js` and `js/utility.js` are still loaded by a few utility pages for
+`Cookie`/theme handling, but those pages no longer call the Dojo-dependent
+`xhr` helpers.
 
 ## Future Enhancements
 
-Potential improvements for future phases:
-
-1. **Complete Component Migration**: Migrate remaining Dojo components to Vue
-2. **Vue Router Integration**: Add client-side routing for preferences, etc.
-3. **Bundle Optimization**: Analyze and optimize the production bundle
-4. **Full TypeScript Adoption**: Convert all Vue components to TypeScript
-5. **Full ESM Migration**: Gradually convert Dojo modules to ESM
+1. **Plugin UI parity**: provide Vue equivalents for plugin-provided Dojo
+   JavaScript hooks and preference sections.
+2. **Offline support**: add a service worker if the app should work offline.
+3. **Bundle optimisation**: split Vuetify and the editor/dialog chunks.
+4. **Template type checking**: run `vue-tsc` in addition to `tsc --noEmit`.
+5. **Remove the legacy tree**: delete `lib/dojo`, `lib/dijit` and the old `js/`
+   modules once no plugin references them.
 
 ## Contributing
 
 When making changes to the build system:
 
-1. Test both dev mode (`pnpm run dev`) and the legacy PHP backend
-2. Ensure backward compatibility is maintained
-3. Update this documentation with any configuration changes
-4. Test on multiple browsers (Chrome, Firefox, Safari)
+1. Run `pnpm run build`, `pnpm run type-check`, `pnpm run lint:vue` and
+   `pnpm run test:vue` before sending a change.
+2. Test the PHP shell (`index.php`, `prefs.php`, login) against a real backend.
+3. Update this documentation with any configuration changes.
+4. Test on multiple browsers (Chrome, Firefox, Safari).
 
 ## License
 

@@ -102,7 +102,10 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function asBoolean(value: unknown): boolean {
-  return value === true || value === 1 || value === '1' || value === 'true';
+  // PostgreSQL returns booleans as 't'/'f' through PDO; legacy handlers also
+  // emit 1/0, '1'/'0' and the checkbox literal 'on'.
+  return value === true || value === 1 || value === '1' || value === 'true'
+    || value === 't' || value === 'on';
 }
 
 function requireBody(response: LegacyResponse, context: string): Record<string, unknown> {
@@ -379,6 +382,130 @@ export async function getFilters(backend: LegacyBackend): Promise<AdaptedFilter[
     }
   }
   return filters;
+}
+
+export interface FilterRule {
+  reg_exp: string;
+  filter_type: number;
+  /** Feed ids, or `CAT:<id>` entries, or `0` for all feeds. */
+  feed_id: string[];
+  inverse: boolean;
+  name?: string;
+}
+
+export interface FilterAction {
+  action_id: number;
+  action_param: string;
+  action_param_label: string;
+  name?: string;
+}
+
+export interface FilterDetails {
+  id: number;
+  enabled: boolean;
+  match_any_rule: boolean;
+  inverse: boolean;
+  title: string;
+  rules: FilterRule[];
+  actions: FilterAction[];
+  filter_types: Record<string, string>;
+  action_types: Record<string, string>;
+}
+
+function stringMap(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const result: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    result[key] = asString(raw);
+  }
+  return result;
+}
+
+/** `Pref_Filters/edit` with id 0 returns the option lists for a new filter. */
+export async function getFilterDetails(backend: LegacyBackend, filterId = 0): Promise<FilterDetails> {
+  const response = await backend.call('Pref_Filters', 'edit', { id: filterId });
+  const body = requireBody(response, 'Pref_Filters/edit');
+  const rawRules = Array.isArray(body.rules) ? body.rules : [];
+  const rawActions = Array.isArray(body.actions) ? body.actions : [];
+
+  return {
+    id: asNumber(body.id, filterId),
+    enabled: asBoolean(body.enabled ?? true),
+    match_any_rule: asBoolean(body.match_any_rule),
+    inverse: asBoolean(body.inverse),
+    title: asString(body.title),
+    rules: rawRules.map((rawRule) => {
+      const rule = expectObject(rawRule, 'Pref_Filters/edit.rule');
+      return {
+        reg_exp: asString(rule.reg_exp),
+        filter_type: asNumber(rule.filter_type, 1),
+        feed_id: Array.isArray(rule.feed_id) ? rule.feed_id.map((id) => asString(id)) : ['0'],
+        inverse: asBoolean(rule.inverse),
+        name: rule.name === undefined ? undefined : asString(rule.name),
+      };
+    }),
+    actions: rawActions.map((rawAction) => {
+      const action = expectObject(rawAction, 'Pref_Filters/edit.action');
+      return {
+        action_id: asNumber(action.action_id, 8),
+        action_param: asString(action.action_param),
+        action_param_label: asString(action.action_param_label),
+        name: action.name === undefined ? undefined : asString(action.name),
+      };
+    }),
+    filter_types: stringMap(body.filter_types),
+    action_types: stringMap(body.action_types),
+  };
+}
+
+export interface FilterPayload {
+  title: string;
+  enabled: boolean;
+  match_any_rule: boolean;
+  inverse: boolean;
+  rules: FilterRule[];
+  actions: FilterAction[];
+}
+
+/**
+ * `Pref_Filters/editSave` replaces the rule/action rows, so both lists are
+ * always sent. `rule[]`/`action[]` are JSON-encoded strings by contract.
+ */
+function filterParams(id: number | null, payload: FilterPayload): Record<string, string | number | string[]> {
+  const params: Record<string, string | number | string[]> = {
+    title: payload.title,
+    enabled: payload.enabled ? 'on' : '',
+    match_any_rule: payload.match_any_rule ? 'on' : '',
+    inverse: payload.inverse ? 'on' : '',
+    rule: payload.rules.map((rule) => JSON.stringify({
+      reg_exp: rule.reg_exp,
+      filter_type: rule.filter_type,
+      feed_id: rule.feed_id,
+      ...(rule.inverse ? { inverse: 1 } : {}),
+    })),
+    action: payload.actions.map((action) => JSON.stringify({
+      action_id: action.action_id,
+      action_param: action.action_param,
+      action_param_label: action.action_param_label,
+    })),
+  };
+  if (id !== null) params.id = id;
+  return params;
+}
+
+export async function saveFilter(
+  backend: LegacyBackend,
+  filterId: number,
+  payload: FilterPayload
+): Promise<void> {
+  await backend.call('Pref_Filters', 'editSave', filterParams(filterId, payload));
+}
+
+export async function createFilter(
+  backend: LegacyBackend,
+  payload: FilterPayload
+): Promise<void> {
+  await backend.call('Pref_Filters', 'add', filterParams(null, payload));
 }
 
 export interface PrefOption {
