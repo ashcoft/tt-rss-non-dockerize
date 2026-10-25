@@ -561,6 +561,37 @@ export async function setArticleNote(
   await backend.call('PluginHandler', 'setnote', { plugin: 'note', id: articleId, note });
 }
 
+/** Article tags are stored comma-separated; `tags_str` is what the handler reads. */
+export async function setArticleTags(
+  backend: LegacyBackend,
+  articleId: number,
+  tags: string[]
+): Promise<string[]> {
+  const response = await backend.call('Article', 'setArticleTags', {
+    id: articleId,
+    tags_str: tags.join(','),
+  });
+  const body = requireBody(response, 'Article/setArticleTags');
+  return Array.isArray(body.tags) ? body.tags.map((tag) => asString(tag)) : [];
+}
+
+/** Tag autocomplete; the handler expects `search` and returns a plain array. */
+export async function completeTags(backend: LegacyBackend, search: string): Promise<string[]> {
+  const response = await backend.call('Article', 'completeTags', { search });
+  const body = requireBody(response, 'Article/completeTags');
+  return Array.isArray(body.data) ? body.data.map((tag) => asString(tag)) : [];
+}
+
+/** Set an article's score; `ids` is a comma-delimited list. */
+export async function setArticleScore(
+  backend: LegacyBackend,
+  articleIds: number[],
+  score: number
+): Promise<void> {
+  if (articleIds.length === 0) return;
+  await backend.call('Article', 'setScore', { ids: articleIds.join(','), score });
+}
+
 /**
  * There is no legacy endpoint that returns a preference value; the Dojo client
  * receives the ones it needs through `RPC/sanityCheck` init-params.

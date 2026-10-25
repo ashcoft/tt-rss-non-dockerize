@@ -414,6 +414,41 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   /**
    * Assign or unassign a label to an article (Phase 3).
    */
+  /** Replace an article's tag list; the backend normalises and returns it. */
+  async function updateTags(articleId: number, tags: string[]): Promise<void> {
+    try {
+      const response = await api.setArticleTags(articleId, tags);
+      if (response.status !== 0) throw new Error(response.error ?? 'Failed to update tags');
+
+      const saved = response.content;
+      const headline = headlines.value.find(h => h.id === articleId);
+      if (headline) headline.tags = saved;
+      if (selectedArticle.value?.id === articleId) selectedArticle.value.tags = saved;
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+      throw err;
+    }
+  }
+
+  /** Tag autocomplete suggestions for the tag editor. */
+  async function suggestTags(search: string): Promise<string[]> {
+    const response = await api.completeTags(search);
+    return response.status === 0 ? response.content : [];
+  }
+
+  /** Set the score for an article. */
+  async function setScore(articleId: number, score: number): Promise<void> {
+    try {
+      await api.setArticleScore([articleId], score);
+      const headline = headlines.value.find(h => h.id === articleId);
+      if (headline) headline.score = score;
+      if (selectedArticle.value?.id === articleId) selectedArticle.value.score = score;
+    } catch (err) {
+      console.error('Failed to set score:', err);
+      throw err;
+    }
+  }
+
   async function assignLabel(labelId: number, articleId: number, assign: 0 | 1): Promise<void> {
     try {
       await api.setLabelForArticles(labelId, [articleId], assign);
@@ -465,6 +500,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     togglePublish,
     deleteArticle,
     updateNote,
+    updateTags,
+    suggestTags,
+    setScore,
     setViewMode,
     setOrderBy,
     setSearchQuery,

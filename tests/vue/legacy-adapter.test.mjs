@@ -353,6 +353,41 @@ test('getHeadlines forwards the view mode and sort order verbatim', async () => 
   assert.ok(calls[1].body.includes('order_by=date_reverse'));
 });
 
+test('setArticleTags sends a comma-separated tags_str and returns the saved list', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: JSON.stringify({ id: 7, tags: ['one', 'two'] }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const saved = await endpoints.setArticleTags(backend, 7, ['one', 'two']);
+
+  assert.ok(calls[0].body.includes('method=setArticleTags'));
+  assert.ok(calls[0].body.includes('tags_str=one%2Ctwo'));
+  assert.deepEqual(saved, ['one', 'two']);
+});
+
+test('completeTags unwraps the top-level array body', async () => {
+  installGlobals();
+  stubFetch([{ text: JSON.stringify(['alpha', 'alphabet']) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.deepEqual(await endpoints.completeTags(backend, 'al'), ['alpha', 'alphabet']);
+});
+
+test('setArticleScore sends a comma-delimited ids list and the score', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: JSON.stringify({ id: [1, 2], score: 300 }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.setArticleScore(backend, [1, 2], 300);
+
+  assert.ok(calls[0].body.includes('method=setScore'));
+  assert.ok(calls[0].body.includes('ids=1%2C2'));
+  assert.ok(calls[0].body.includes('score=300'));
+});
+
 test('getSearchOptions never returns an empty language', async () => {
   installGlobals();
   const backend = new LegacyBackend();

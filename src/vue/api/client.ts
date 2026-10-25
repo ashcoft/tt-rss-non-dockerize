@@ -227,6 +227,21 @@ class ApiClient {
     }, false);
   }
 
+  async setArticleTags(articleId: number, tags: string[]): Promise<ApiResponse<string[]>> {
+    return this.wrap(() => endpoints.setArticleTags(legacyBackend, articleId, tags), []);
+  }
+
+  async completeTags(search: string): Promise<ApiResponse<string[]>> {
+    return this.wrap(() => endpoints.completeTags(legacyBackend, search), []);
+  }
+
+  async setArticleScore(articleIds: number[], score: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.setArticleScore(legacyBackend, articleIds, score);
+      return true;
+    }, false);
+  }
+
   // ============================================
   // Labels
   // ============================================

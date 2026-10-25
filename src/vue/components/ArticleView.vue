@@ -14,10 +14,37 @@ const emit = defineEmits<{
 
 const headlinesStore = useHeadlinesStore();
 const noteDraft = ref(props.article.note ?? '');
+const tagDraft = ref<string[]>([...(props.article.tags ?? [])]);
+const tagSuggestions = ref<string[]>([]);
 const saving = ref(false);
 
 const closeArticle = () => {
   emit('close');
+};
+
+/** Persist the current tag list when the combobox changes. */
+const saveTags = async (value: unknown) => {
+  const tags = (Array.isArray(value) ? value : []).map((t) => String(t).trim()).filter(Boolean);
+  try {
+    await headlinesStore.updateTags(props.article.id, tags);
+  } catch {
+    // Keep the draft as typed; the store logs the failure.
+  }
+};
+
+/** Fetch autocomplete suggestions as the user types. */
+const onTagSearch = async (query: string) => {
+  const search = (query ?? '').trim();
+  if (search.length < 1) {
+    tagSuggestions.value = [];
+    return;
+  }
+  tagSuggestions.value = await headlinesStore.suggestTags(search);
+};
+
+const bumpScore = async (delta: number) => {
+  const next = delta === 0 ? 0 : (props.article.score ?? 0) + delta;
+  await headlinesStore.setScore(props.article.id, next);
 };
 
 const saveNote = async () => {
@@ -61,6 +88,30 @@ const sanitizedContent = computed(() => {
       <!-- Content is sanitized client-side using DOMPurify for XSS prevention -->
       <div class="article-body" v-html="sanitizedContent"></div>
       
+      <!-- Tags and score (parity with the Dojo article header) -->
+      <v-divider class="my-3" />
+      <div class="article-tags">
+        <v-combobox
+          v-model="tagDraft"
+          :items="tagSuggestions"
+          label="Tags"
+          chips
+          multiple
+          closable-chips
+          density="compact"
+          variant="outlined"
+          hide-details
+          @update:model-value="saveTags"
+          @update:search="onTagSearch"
+        />
+        <div class="score-row">
+          <span class="score-label">Score: {{ article.score ?? 0 }}</span>
+          <v-btn size="x-small" variant="text" @click="bumpScore(-100)">-100</v-btn>
+          <v-btn size="x-small" variant="text" @click="bumpScore(0)">0</v-btn>
+          <v-btn size="x-small" variant="text" @click="bumpScore(100)">+100</v-btn>
+        </div>
+      </div>
+
       <!-- Note editor (Phase 3) -->
       <v-divider class="my-3" />
       <v-textarea
@@ -121,6 +172,23 @@ const sanitizedContent = computed(() => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.article-tags {
+  padding: 0 1rem;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: #666;
+}
+
+.score-label {
+  margin-right: 0.5rem;
 }
 
 .article-footer {
