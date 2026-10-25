@@ -37,13 +37,13 @@ class VueAssets {
         private static function load_manifest(): array {
                 $path = dirname(__DIR__) . '/' . self::MANIFEST;
 
-                if (!is_file($path)) {
+                if (is_file($path) === false) {
                         return [];
                 }
 
                 $decoded = json_decode((string)file_get_contents($path), true);
 
-                return is_array($decoded) ? $decoded : [];
+                return is_array($decoded) === true ? $decoded : [];
         }
 
         /** Whether a production build is present and usable. */
@@ -101,12 +101,12 @@ class VueAssets {
                 $out = '';
 
                 foreach ((array)($entry['css'] ?? []) as $css) {
-                        if (is_file(self::asset_path((string)$css))) {
+                        if (is_file(self::asset_path((string)$css)) === true) {
                                 $out .= stylesheet_tag(self::BUILD_DIR . '/' . $css);
                         }
                 }
 
-                if (isset($entry['file'])) {
+                if (isset($entry['file']) === true) {
                         $out .= '<script type="module" src="'
                                 . htmlspecialchars(self::BUILD_DIR . '/' . $entry['file'], ENT_QUOTES, 'UTF-8')
                                 . '"></script>';

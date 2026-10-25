@@ -30,7 +30,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const categories = ref<Category[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const currentFeedId = ref<number | string>(0);
+  /** null means nothing is selected; 0 is the valid Archived feed. */
+  const currentFeedId = ref<number | string | null>(null);
   const currentIsCat = ref(false);
 
   // Getters
@@ -125,7 +126,7 @@ export const useFeedsStore = defineStore('feeds', () => {
   function reset() {
     feeds.value = [];
     categories.value = [];
-    currentFeedId.value = 0;
+    currentFeedId.value = null;
     currentIsCat.value = false;
     error.value = null;
   }
@@ -156,7 +157,7 @@ export const useFeedsStore = defineStore('feeds', () => {
       if (response.status === 0) {
         feeds.value = feeds.value.filter(f => f.id !== feedId);
         if (currentFeedId.value === feedId && !currentIsCat.value) {
-          currentFeedId.value = 0;
+          currentFeedId.value = null;
         }
         return true;
       }
@@ -230,7 +231,7 @@ export const useFeedsStore = defineStore('feeds', () => {
       if (response.status === 0) {
         categories.value = categories.value.filter(c => c.id !== categoryId);
         if (currentFeedId.value === categoryId && currentIsCat.value) {
-          currentFeedId.value = 0;
+          currentFeedId.value = null;
           currentIsCat.value = false;
         }
         return true;

@@ -154,12 +154,20 @@ const toggleTheme = () => {
 };
 
 // Polling (Phase 5: real-time updates)
+/** Reload the current feed and its counters. */
+const refreshCurrentFeed = async () => {
+  if (feedsStore.currentFeedId === null) return;
+
+  await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
+  await feedsStore.loadFeeds();
+};
+
 const startPolling = () => {
   stopPolling();
-  pollTimer = setInterval(async () => {
-    if (!feedsStore.currentFeedId) return;
-    await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
-    await feedsStore.loadFeeds();
+  pollTimer = setInterval(() => {
+    // currentFeedId is null when nothing is selected; 0 is the Archived feed.
+    if (feedsStore.currentFeedId === null) return;
+    void refreshCurrentFeed();
   }, POLL_INTERVAL_MS);
 };
 
@@ -387,13 +395,13 @@ useKeyboard({
   onSelect: () => void openCursorHeadline(),
   onOpenArticle: () => void openCursorHeadline(),
   onToggleRead: () => void toggleCursorRead(),
-  onToggleStar: async () => {
+  onToggleStar: () => {
     const headline = headlinesStore.cursorHeadline;
-    if (headline) await headlinesStore.toggleStar(headline.id);
+    if (headline) void headlinesStore.toggleStar(headline.id);
   },
-  onTogglePublish: async () => {
+  onTogglePublish: () => {
     const headline = headlinesStore.cursorHeadline;
-    if (headline) await headlinesStore.togglePublish(headline.id);
+    if (headline) void headlinesStore.togglePublish(headline.id);
   },
   onRefresh: () => void handleToolbarAction('refresh'),
   onCatchup: () => void handleToolbarAction('catchup'),

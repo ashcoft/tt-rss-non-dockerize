@@ -40,11 +40,13 @@ if ($authenticated === true) {
 	<meta name="viewport" content="initial-scale=1,width=device-width" />
 
 	<?php
-	if ($authenticated === true && empty($_SESSION["safe_mode"])) {
-		$theme = Prefs::get(Prefs::USER_CSS_THEME, $_SESSION['uid'], $_SESSION['profile'] ?? null);
+	if ($authenticated === true) {
+		if (empty($_SESSION["safe_mode"])) {
+			$theme = Prefs::get(Prefs::USER_CSS_THEME, $_SESSION['uid'], $_SESSION['profile'] ?? null);
 
-		if ($theme && theme_exists("$theme")) {
-			echo stylesheet_tag(get_theme_path($theme), ['id' => 'theme_css']);
+			if ($theme && theme_exists("$theme")) {
+				echo stylesheet_tag(get_theme_path($theme), ['id' => 'theme_css']);
+			}
 		}
 	}
 	?>
