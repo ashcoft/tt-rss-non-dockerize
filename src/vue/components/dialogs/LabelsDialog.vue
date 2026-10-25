@@ -108,11 +108,13 @@ const assignedLabelIds = computed(() => new Set(props.assignedLabels ?? []));
 
 watch(
   () => props.modelValue,
-  async (open) => {
-    if (open) {
-      message.value = '';
-      await loadLabels();
-    }
+  (open) => {
+    if (!open) return;
+
+    message.value = '';
+    // loadLabels() reports its own failures through `message`; the explicit
+    // void makes that clear and keeps the watcher callback synchronous.
+    void loadLabels();
   }
 );
 

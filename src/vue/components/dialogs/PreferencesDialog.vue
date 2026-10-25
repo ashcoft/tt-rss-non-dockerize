@@ -121,12 +121,14 @@ const filters = ref<Array<Record<string, unknown>>>([]);
 
 watch(
   () => props.modelValue,
-  async (open) => {
-    if (open) {
-      message.value = '';
-      tab.value = 'general';
-      await Promise.all([loadPrefs(), loadFilters()]);
-    }
+  (open) => {
+    if (!open) return;
+
+    message.value = '';
+    tab.value = 'general';
+    // Both loaders report failures through `message`; the explicit void keeps
+    // the watcher callback synchronous.
+    void Promise.all([loadPrefs(), loadFilters()]);
   }
 );
 

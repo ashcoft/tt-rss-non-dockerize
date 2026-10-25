@@ -88,8 +88,8 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
     );
   }
 
-  const html = await response.text();
-  const token = extractCsrfToken(html);
+  const shell = await response.text();
+  const token = readTokenDeclaration(shell);
 
   if (token === '' || token === CSRF_PLACEHOLDER) {
     throw new LegacyProtocolError(
@@ -101,29 +101,31 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
 }
 
 /**
- * Pull the token out of the shell's `const __csrf_token = "..."` declaration.
+ * Read the value from the shell's `const __csrf_token = "..."` declaration.
  *
- * Parsed by scanning rather than with a regex: the input is a whole HTML
- * document, and a pattern over it both invites backtracking concerns and
- * obscures that only one exact declaration is being read.
+ * Scanned rather than matched with a regex: the input is a whole document, and
+ * a pattern over it both invites backtracking concerns and obscures that only
+ * one exact declaration is being read. Returns '' when it is absent.
  */
-function extractCsrfToken(html: string): string {
-  const marker = '__csrf_token';
-  const at = html.indexOf(marker);
+function readTokenDeclaration(shell: string): string {
+  const at = shell.indexOf(CSRF_MARKER);
 
   if (at === -1) {
     return '';
   }
 
-  const quote = html.indexOf('"', at);
-  const end = quote === -1 ? -1 : html.indexOf('"', quote + 1);
+  const open = shell.indexOf('"', at);
+  const close = open === -1 ? -1 : shell.indexOf('"', open + 1);
 
-  if (quote === -1 || end === -1) {
+  if (open === -1 || close === -1) {
     return '';
   }
 
-  return html.slice(quote + 1, end);
+  return shell.slice(open + 1, close);
 }
+
+/** The declaration the PHP shell embeds the session token in. */
+const CSRF_MARKER = '__csrf_token';
 
 /** Methods the backend accepts without a valid CSRF token. */
 const CSRF_IGNORED = new Set([
