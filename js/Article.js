@@ -264,7 +264,7 @@ const Article = {
 
 		const container = row.querySelector(".content-inner");
 
-		container.innerHTML = Article.getPackedContent(row);
+		container.innerHTML = (hl.content || "").trim() + Article.renderEnclosures(hl.enclosures).trim();
 
 		dojo.parser.parse(container);
 
@@ -276,23 +276,11 @@ const Article = {
 
 		PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
 	},
-	/**
-	 * Return the cached content and enclosures HTML for a packed row.
-	 */
-	getPackedContent(row) {
-		const packedContent = (typeof row._packedContentHtml === "string" ? row._packedContentHtml : "");
-		const packedEnclosures = (typeof row._packedEnclosuresHtml === "string" ? row._packedEnclosuresHtml : "");
-
-		return packedContent + packedEnclosures;
-	},
 	pack: function(row) {
 		if (row.getAttribute("data-is-packed") !== "1") {
 			row.setAttribute("data-is-packed", "1");
 
 			const content_inner = row.querySelector(".content-inner");
-
-			row._packedContentHtml = row.getAttribute("data-content") || "";
-			row._packedEnclosuresHtml = row.getAttribute("data-rendered-enclosures") || "";
 
 			// missing in unexpanded mode
 			if (content_inner)
