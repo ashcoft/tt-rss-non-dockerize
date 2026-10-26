@@ -832,12 +832,12 @@ const App = {
                }
             }
          } else {
-            let tab = localStorage.getItem("ttrss:prefs-tab");
+            const saved_tab_id = localStorage.getItem("ttrss:prefs-tab");
 
-            if (tab) {
-               tab = dijit.byId(tab);
-               if (tab) {
-                  dijit.byId("pref-tabs").selectChild(tab);
+            if (saved_tab_id) {
+               const saved_tab = dijit.byId(saved_tab_id);
+               if (saved_tab) {
+                  dijit.byId("pref-tabs").selectChild(saved_tab);
                }
             }
          }
