@@ -449,16 +449,19 @@ class API extends Handler {
 	/**
 	 * Trigger an immediate refresh of a feed.
 	 *
-	 * Skipped when open_basedir is set, since the fetch would be restricted.
+	 * Only feeds owned by the session user are refreshed; an unknown or
+	 * unowned feed id is reported as a failure rather than silently ignored.
 	 */
 	public function updateFeed(): bool {
-		$feed_id = (int) clean($_REQUEST["feed_id"]);
+		$feed_id = (int) clean($_REQUEST['feed_id']);
+		$user_owned_feed = (bool) ORM::for_table('ttrss_feeds')
+			->where(['id' => $feed_id, 'owner_uid' => $_SESSION['uid']])
+			->count();
 
-		if (!ini_get("open_basedir")) {
-			RSSUtils::update_rss_feed($feed_id);
-		}
+		if ($user_owned_feed === true && RSSUtils::update_rss_feed($feed_id) === true)
+			return $this->_wrap(self::STATUS_OK, ['status' => 'OK']);
 
-		return $this->_wrap(self::STATUS_OK, ["status" => "OK"]);
+		return $this->_wrap(self::STATUS_ERR, ['error' => self::E_OPERATION_FAILED]);
 	}
 
 	/**
@@ -730,7 +733,8 @@ class API extends Handler {
 				$feed = ORM::for_table('ttrss_feeds')
 					->select_many('id', 'cache_images')
 					->select_expr('SUBSTRING_FOR_DATE(last_updated,1,19)', 'last_updated')
-					->find_one($feed_id);
+					->where(['id' => $feed_id, 'owner_uid' => $_SESSION['uid']])
+					->find_one();
 
 				if ($feed) {
 					$last_updated = strtotime($feed->last_updated ?? '');
