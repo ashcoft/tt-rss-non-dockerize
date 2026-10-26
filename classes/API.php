@@ -449,7 +449,8 @@ class API extends Handler {
 	/**
 	 * Trigger an immediate refresh of a feed.
 	 *
-	 * Skipped when open_basedir is set, since the fetch would be restricted.
+	 * Only feeds owned by the session user are refreshed; an unknown or
+	 * unowned feed id is reported as a failure rather than silently ignored.
 	 */
 	public function updateFeed(): bool {
 		$feed_id = (int) clean($_REQUEST['feed_id']);
@@ -457,7 +458,7 @@ class API extends Handler {
 			->where(['id' => $feed_id, 'owner_uid' => $_SESSION['uid']])
 			->count();
 
-		if ($user_owned_feed && RSSUtils::update_rss_feed($feed_id))
+		if ($user_owned_feed === true && RSSUtils::update_rss_feed($feed_id))
 			return $this->_wrap(self::STATUS_OK, ['status' => 'OK']);
 
 		return $this->_wrap(self::STATUS_ERR, ['error' => self::E_OPERATION_FAILED]);
