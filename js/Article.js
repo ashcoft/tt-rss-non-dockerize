@@ -250,31 +250,30 @@ const Article = {
 
 		return comments;
 	},
-	unpack(row) {
-		if (row.getAttribute("data-is-packed") !== "1")
-			return;
+	unpack: function(row) {
+		if (row.getAttribute("data-is-packed") === "1") {
+			// article content lives in the Headlines cache (a row attribute copy
+			// would retain a second, escaped copy of every loaded article)
+			const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
 
-		// article content lives in the Headlines cache (a row attribute copy
-		// would retain a second, escaped copy of every loaded article)
-		const hl = Headlines.objectById(parseInt(row.getAttribute("data-article-id")));
+			// the row outlived the headlines cache (feed transition)
+			if (!hl)
+				return;
 
-		// the row outlived the headlines cache (feed transition)
-		if (!hl)
-			return;
+			const container = row.querySelector(".content-inner");
 
-		const container = row.querySelector(".content-inner");
+			container.innerHTML = (hl.content || "").trim() + Article.renderEnclosures(hl.enclosures).trim();
 
-		container.innerHTML = (hl.content || "").trim() + Article.renderEnclosures(hl.enclosures).trim();
+			dojo.parser.parse(container);
 
-		dojo.parser.parse(container);
+			// blank content element might screw up onclick selection and keyboard moving
+			if (container.textContent.length === 0)
+				container.innerHTML += "&nbsp;";
 
-		// blank content element might screw up onclick selection and keyboard moving
-		if (container.textContent.length === 0)
-			container.innerHTML += "&nbsp;";
+			row.setAttribute("data-is-packed", "0");
 
-		row.setAttribute("data-is-packed", "0");
-
-		PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
+			PluginHost.run(PluginHost.HOOK_ARTICLE_RENDERED_CDM, row);
+		}
 	},
 	pack: function(row) {
 		if (row.getAttribute("data-is-packed") !== "1") {

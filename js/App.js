@@ -794,6 +794,10 @@ const App = {
    updateRuntimeInfo: function() {
       xhr.json("backend.php", {op: "RPC", method: "getruntimeinfo"}, () => {
          // handled by xhr.json()
+      }).catch((e) => {
+         // a periodic background poll: a timeout or transient failure here is
+         // reported by the net-alert indicator, not as an uncaught rejection
+         console.warn("updateRuntimeInfo:", e);
       });
    },
    initSecondStage: function() {
@@ -828,12 +832,12 @@ const App = {
                }
             }
          } else {
-            let tab = localStorage.getItem("ttrss:prefs-tab");
+            const saved_tab_id = localStorage.getItem("ttrss:prefs-tab");
 
-            if (tab) {
-               tab = dijit.byId(tab);
-               if (tab) {
-                  dijit.byId("pref-tabs").selectChild(tab);
+            if (saved_tab_id) {
+               const saved_tab = dijit.byId(saved_tab_id);
+               if (saved_tab) {
+                  dijit.byId("pref-tabs").selectChild(saved_tab);
                }
             }
          }
@@ -1056,6 +1060,11 @@ const App = {
 					plugin_icon_a.show()
 				else
 					plugin_icon_a.hide();
+			})
+			.catch((e) => {
+				// hourly background poll: the same transient failure that trips the
+				// net-alert indicator must not surface as an uncaught rejection
+				console.warn("checkForUpdates:", e);
 			});
 	},
    updateTitle: function() {
