@@ -458,7 +458,7 @@ class API extends Handler {
 			->where(['id' => $feed_id, 'owner_uid' => $_SESSION['uid']])
 			->count();
 
-		if ($user_owned_feed === true && RSSUtils::update_rss_feed($feed_id))
+		if ($user_owned_feed === true && RSSUtils::update_rss_feed($feed_id) === true)
 			return $this->_wrap(self::STATUS_OK, ['status' => 'OK']);
 
 		return $this->_wrap(self::STATUS_ERR, ['error' => self::E_OPERATION_FAILED]);
