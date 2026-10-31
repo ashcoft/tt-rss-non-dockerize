@@ -1775,6 +1775,7 @@ body.ttrss_utility hr {
 }
 .cdm.expandable:not(.active) {
   cursor: pointer;
+  display: flow-root;
 }
 .cdm.expandable:not(.active) .content,
 .cdm.expandable:not(.active) .collapse {

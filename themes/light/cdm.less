@@ -345,6 +345,11 @@
 		&:not(.active) {
 			cursor : pointer;
 
+			// the thumbnail preview is floated, and a collapsed row hides its
+			// .content, so without a new block formatting context the float
+			// escapes the row and overlaps the next article
+			display : flow-root;
+
 			.content, .collapse {
 				display : none;
 			}
