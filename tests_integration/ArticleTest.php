@@ -367,4 +367,43 @@ final class ArticleTest extends DbTestCase {
         $this->assertArrayHasKey('entries', $result);
         $this->assertArrayHasKey('formatted', $result);
     }
+
+    /**
+     * seed.sql gives article 1 a video enclosure plus an image enclosure, which
+     * mirrors a YouTube entry (media:content + media:thumbnail). Once a plugin
+     * renders the video as an inline player, the thumbnail must not also be
+     * inlined as a second image: it is that player's poster.
+     */
+    public function test_format_enclosures_drops_thumbnail_beside_inline_player(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'https://www.youtube.com/v/dQw4w9WgXcQ?version=3',
+                        content_type = 'application/x-shockwave-flash'
+                    WHERE post_id = 1 AND content_type = 'video/mp4'");
+
+        PluginHost::getInstance()->load("af_youtube_embed", PluginHost::KIND_ALL);
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertStringContainsString('<iframe', $result['formatted'],
+            'the video enclosure should render as an inline player');
+        $this->assertSame([], $result['entries'],
+            'the thumbnail next to the player should not be inlined as a second image');
+    }
+
+    /**
+     * Without an inline player the image enclosure is a normal attachment and
+     * must still be inlined.
+     */
+    public function test_format_enclosures_keeps_image_without_inline_player(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("DELETE FROM ttrss_enclosures WHERE post_id = 1 AND content_type = 'video/mp4'");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertStringNotContainsString('<iframe', $result['formatted']);
+        $images = array_filter($result['entries'],
+            fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/'));
+        $this->assertCount(1, $images, 'the image enclosure should still be inlined');
+    }
 }
