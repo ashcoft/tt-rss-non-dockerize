@@ -381,7 +381,7 @@ class Article extends Handler_Protected {
 		// player's poster, so inlining it as a separate <img> shows the same
 		// frame twice. Only iframes are matched: an audio/video enclosure's
 		// neighbouring image can be a legitimate, distinct cover.
-		if (str_contains($rv['formatted'], "<iframe"))
+		if (str_contains($rv['formatted'], "<iframe") === true)
 			$rv['entries'] = array_values(array_filter($rv['entries'],
 				fn (array $enc): bool => !str_starts_with((string)($enc['content_type'] ?? ""), "image/")));
 
