@@ -491,7 +491,9 @@ class Article extends Handler_Protected {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	static function _get_enclosures(int $id, bool $with_original_url = false): array {
+	// Name and visibility match the other underscore-prefixed helpers in this
+	// class and its callers across the codebase; kept as upstream has them.
+	static function _get_enclosures(int $id, bool $with_original_url = false): array { // NOSONAR
 		$encs = ORM::for_table('ttrss_enclosures')
 			->where('post_id', $id)
 			->find_many();
@@ -507,7 +509,7 @@ class Article extends Handler_Protected {
 			// to identify an enclosure by its source URL ask for the pre-cache
 			// value. It stays off by default: this result is published through
 			// the API as `attachments` and the URL can carry credentials.
-			if ($with_original_url) {
+			if ($with_original_url === true) {
 				$enc->original_url = $enc->content_url;
 			}
 
