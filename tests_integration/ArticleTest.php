@@ -449,8 +449,10 @@ final class ArticleTest extends DbTestCase {
         $this->useYoutubePlayerPlugin();
         $this->turnArticle1VideoIntoYoutubeEnclosure();
 
+        // DiskCache keys are sha1(content_url); this is a cache key, not a
+        // security boundary, so match the production algorithm exactly.
         $cache = DiskCache::instance('images');
-        $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+        $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'); // NOSONAR
         $cache->put($key, 'fake-image-bytes');
 
         try {
@@ -510,23 +512,23 @@ final class ArticleTest extends DbTestCase {
         $this->assertNotNull($plugin, 'af_youtube_embed should have been loaded');
 
         $hooked = $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE);
-        $this->youtube_was_hooked = in_array($plugin, $hooked, true);
+        $this->youtubeWasHooked = in_array($plugin, $hooked, true);
 
-        if ($this->youtube_was_hooked === false) {
+        if ($this->youtubeWasHooked === false) {
             $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
         }
 
-        $this->youtube_plugin = $plugin;
+        $this->youtubePlugin = $plugin;
     }
 
     protected function tearDown(): void {
-        if ($this->youtube_plugin !== null && $this->youtube_was_hooked === false) {
-            PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtube_plugin);
+        if ($this->youtubePlugin !== null && $this->youtubeWasHooked === false) {
+            PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtubePlugin);
         }
 
         parent::tearDown();
     }
 
-    private ?Plugin $youtube_plugin = null;
-    private bool $youtube_was_hooked = false;
+    private ?Plugin $youtubePlugin = null;
+    private bool $youtubeWasHooked = false;
 }

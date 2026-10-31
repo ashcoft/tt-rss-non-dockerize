@@ -376,33 +376,47 @@ class Article extends Handler_Protected {
 			}
 		}
 
-		// A video's media:thumbnail is its player's poster. When af_youtube_embed
-		// inlines the video as an iframe, that thumbnail would be inlined too and
-		// show the same frame twice. Drop exactly the enclosures whose URL carries
-		// one of the players' video ids, so a separate photo stays. Match against
-		// original_url: DiskCache rewrites content_url to a redirect that no longer
-		// contains the id. preview_entries keeps the unfiltered list, since the
-		// poster is still the image the headline preview wants.
+		// A video's media:thumbnail is its player's poster; once af_youtube_embed
+		// inlines the video as an iframe the thumbnail would show the same frame
+		// twice. preview_entries keeps the unfiltered list, since the poster is
+		// still the image the headline preview wants.
 		$rv['preview_entries'] = $rv['entries'];
+		$rv['entries'] = self::_drop_player_posters($rv['entries'], $rv['formatted']);
 
-		if (preg_match_all('/<iframe[^>]+src=["\']([^"\']+)/i', $rv['formatted'], $matches) > 0) {
-			$video_ids = [];
+		return $rv;
+	}
 
-			foreach ($matches[1] as $src) {
-				$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($src));
+	/**
+	 * Remove the poster enclosure of every video that was inlined as a player.
+	 *
+	 * The thumbnail is matched on `original_url`, because DiskCache rewrites
+	 * `content_url` to a redirect that no longer contains the video id.
+	 *
+	 * @param array<int, array<string, mixed>> $entries
+	 * @return array<int, array<string, mixed>>
+	 */
+	static function _drop_player_posters(array $entries, string $formatted): array {
+		if (preg_match_all('/<iframe[^>]+src=["\']([^"\']+)/i', $formatted, $matches) === 0) {
+			return $entries;
+		}
 
-				if ($video_id !== false) {
-					$video_ids[] = $video_id;
-				}
-			}
+		$video_ids = [];
 
-			if ($video_ids !== []) {
-				$rv['entries'] = array_values(array_filter($rv['entries'],
-					fn (array $enc): bool => !array_filter($video_ids,
-						fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id))));
+		foreach ($matches[1] as $src) {
+			$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($src));
+
+			if ($video_id !== false) {
+				$video_ids[] = $video_id;
 			}
 		}
-		return $rv;
+
+		if ($video_ids === []) {
+			return $entries;
+		}
+
+		return array_values(array_filter($entries,
+			fn (array $enc): bool => !array_filter($video_ids,
+				fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id))));
 	}
 
 	/**
