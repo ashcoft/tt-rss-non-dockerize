@@ -303,7 +303,7 @@ class Article extends Handler_Protected {
 
 	/**
 	 * @param int $id article id
-	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>}
+	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>, 'preview_entries': array<int, array<string, mixed>>}
 	 */
 	static function _format_enclosures(int $id, bool $always_display_enclosures, string $article_content, bool $hide_images = false): array {
 		$enclosures = self::_get_enclosures($id);
@@ -334,7 +334,8 @@ class Article extends Handler_Protected {
 		if (!empty($enclosures_formatted)) {
 			return [
 					'formatted' => $enclosures_formatted,
-					'entries' => []
+					'entries' => [],
+					'preview_entries' => []
 			];
 		}
 
@@ -375,15 +376,22 @@ class Article extends Handler_Protected {
 			}
 		}
 
-		// A media:thumbnail sits next to the media:content it belongs to. When
-		// that content renders as an embedded player (af_youtube_embed turns a
-		// YouTube video enclosure into an iframe), the thumbnail is that
-		// player's poster, so inlining it as a separate <img> shows the same
-		// frame twice. Only iframes are matched: an audio/video enclosure's
-		// neighbouring image can be a legitimate, distinct cover.
-		if (str_contains($rv['formatted'], "<iframe") === true)
-			$rv['entries'] = array_values(array_filter($rv['entries'],
-				fn (array $enc): bool => !str_starts_with((string)($enc['content_type'] ?? ""), "image/")));
+		// A video's media:thumbnail is its player's poster. When af_youtube_embed
+		// inlines the video as an iframe, that thumbnail would be inlined too and
+		// show the same frame twice. Drop exactly the enclosure whose URL carries
+		// the player's video id, so a separate photo in the same article stays.
+		// preview_entries keeps the unfiltered list, since the poster is still
+		// the image the headline preview wants.
+		$rv['preview_entries'] = $rv['entries'];
+
+		if (preg_match('/<iframe[^>]+src=["\']([^"\']+)/i', $rv['formatted'], $matches) === 1) {
+			$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($matches[1]));
+
+			if ($video_id !== false) {
+				$rv['entries'] = array_values(array_filter($rv['entries'],
+					fn (array $enc): bool => !str_contains((string)($enc['content_url'] ?? ''), $video_id)));
+			}
+		}
 
 		return $rv;
 	}

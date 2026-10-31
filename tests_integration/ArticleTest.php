@@ -375,13 +375,8 @@ final class ArticleTest extends DbTestCase {
      * inlined as a second image: it is that player's poster.
      */
     public function test_format_enclosures_drops_thumbnail_beside_inline_player(): void {
-        $pdo = Db::pdo();
-        $pdo->exec("UPDATE ttrss_enclosures
-                    SET content_url = 'https://www.youtube.com/v/dQw4w9WgXcQ?version=3',
-                        content_type = 'application/x-shockwave-flash'
-                    WHERE post_id = 1 AND content_type = 'video/mp4'");
-
-        PluginHost::getInstance()->load("af_youtube_embed", PluginHost::KIND_ALL);
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
 
         $result = Article::_format_enclosures(1, true, '<p>Content</p>');
 
@@ -389,6 +384,45 @@ final class ArticleTest extends DbTestCase {
             'the video enclosure should render as an inline player');
         $this->assertSame([], $result['entries'],
             'the thumbnail next to the player should not be inlined as a second image');
+    }
+
+    /**
+     * The dropped thumbnail is the article's only image, so it must still be
+     * available for the headline image preview.
+     */
+    public function test_format_enclosures_keeps_thumbnail_for_preview(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame([], $result['entries'], 'inline output drops the poster');
+        $this->assertCount(1, $result['preview_entries'],
+            'preview_entries keeps the thumbnail the inline output drops');
+        [$image] = Article::_get_image($result['preview_entries'], '<p>Content</p>', 'https://youtube.com', []);
+        $this->assertNotEmpty($image, 'the headline image preview should still resolve');
+    }
+
+    /**
+     * Only the media:thumbnail (typed image/generic) is the player's poster. A
+     * separate photo in the same article must keep being inlined.
+     */
+    public function test_format_enclosures_keeps_separate_photo_beside_player(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/photo.jpg', 'image/jpeg', '', '0', 800, 600, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $images = array_values(array_filter($result['entries'],
+            fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/')));
+        $this->assertCount(1, $images, 'a distinct photo should still be inlined');
+        $this->assertSame('https://example.com/photo.jpg', $images[0]['content_url'],
+            'only the poster is dropped, not the unrelated photo');
     }
 
     /**
@@ -406,4 +440,42 @@ final class ArticleTest extends DbTestCase {
             fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/'));
         $this->assertCount(1, $images, 'the image enclosure should still be inlined');
     }
+
+    private function turnArticle1VideoIntoYoutubeEnclosure(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'https://www.youtube.com/v/dQw4w9WgXcQ?version=3',
+                        content_type = 'application/x-shockwave-flash'
+                    WHERE post_id = 1 AND content_type = 'video/mp4'");
+    }
+
+    /**
+     * PluginHost is a process-wide singleton and load() registers a plugin only
+     * once, so a plugin left hooked here would leak into later tests, and a
+     * plugin left registered but unhooked would silently stop working in them.
+     * Hook it explicitly for this test and unhook it in tearDown.
+     */
+    private function useYoutubePlayerPlugin(): void {
+        $host = PluginHost::getInstance();
+        $host->load('af_youtube_embed', PluginHost::KIND_ALL);
+
+        $plugin = $host->get_plugin('af_youtube_embed');
+        $this->assertNotNull($plugin, 'af_youtube_embed should have been loaded');
+
+        if (!in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true)) {
+            $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+        }
+
+        $this->youtube_plugin = $plugin;
+    }
+
+    protected function tearDown(): void {
+        if ($this->youtube_plugin !== null) {
+            PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtube_plugin);
+        }
+
+        parent::tearDown();
+    }
+
+    private ?Plugin $youtube_plugin = null;
 }

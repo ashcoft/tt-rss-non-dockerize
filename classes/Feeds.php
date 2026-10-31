@@ -325,9 +325,11 @@ class Feeds extends Handler_Protected {
 					$line["enclosures"] = [ 'formatted' => '', 'entries' => [] ];
 				}
 
-				// Extract article image for preview
+				// Extract article image for preview. Use the unfiltered list:
+				// 'entries' drops the media:thumbnail when a player is inlined,
+				// but that thumbnail is exactly the image this preview wants.
 				[$article_image] = Article::_get_image(
-					$line["enclosures"]['entries'],
+					$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
 					$line["content"],
 					$line["site_url"] ?? '',
 					$line
