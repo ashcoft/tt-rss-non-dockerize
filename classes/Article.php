@@ -375,6 +375,16 @@ class Article extends Handler_Protected {
 			}
 		}
 
+		// A media:thumbnail sits next to the media:content it belongs to. When
+		// that content renders as an embedded player (af_youtube_embed turns a
+		// YouTube video enclosure into an iframe), the thumbnail is that
+		// player's poster, so inlining it as a separate <img> shows the same
+		// frame twice. Only iframes are matched: an audio/video enclosure's
+		// neighbouring image can be a legitimate, distinct cover.
+		if (str_contains($rv['formatted'], "<iframe"))
+			$rv['entries'] = array_values(array_filter($rv['entries'],
+				fn (array $enc): bool => !str_starts_with((string)($enc['content_type'] ?? ""), "image/")));
+
 		return $rv;
 	}
 
