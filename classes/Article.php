@@ -378,21 +378,30 @@ class Article extends Handler_Protected {
 
 		// A video's media:thumbnail is its player's poster. When af_youtube_embed
 		// inlines the video as an iframe, that thumbnail would be inlined too and
-		// show the same frame twice. Drop exactly the enclosure whose URL carries
-		// the player's video id, so a separate photo in the same article stays.
-		// preview_entries keeps the unfiltered list, since the poster is still
-		// the image the headline preview wants.
+		// show the same frame twice. Drop exactly the enclosures whose URL carries
+		// one of the players' video ids, so a separate photo stays. Match against
+		// original_url: DiskCache rewrites content_url to a redirect that no longer
+		// contains the id. preview_entries keeps the unfiltered list, since the
+		// poster is still the image the headline preview wants.
 		$rv['preview_entries'] = $rv['entries'];
 
-		if (preg_match('/<iframe[^>]+src=["\']([^"\']+)/i', $rv['formatted'], $matches) === 1) {
-			$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($matches[1]));
+		if (preg_match_all('/<iframe[^>]+src=["\']([^"\']+)/i', $rv['formatted'], $matches) > 0) {
+			$video_ids = [];
 
-			if ($video_id !== false) {
+			foreach ($matches[1] as $src) {
+				$video_id = UrlHelper::url_to_youtube_vid(html_entity_decode($src));
+
+				if ($video_id !== false) {
+					$video_ids[] = $video_id;
+				}
+			}
+
+			if ($video_ids !== []) {
 				$rv['entries'] = array_values(array_filter($rv['entries'],
-					fn (array $enc): bool => !str_contains((string)($enc['content_url'] ?? ''), $video_id)));
+					fn (array $enc): bool => !array_filter($video_ids,
+						fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id))));
 			}
 		}
-
 		return $rv;
 	}
 
@@ -476,10 +485,15 @@ class Article extends Handler_Protected {
 
 		foreach ($encs as $enc) {
 			$cache_key = sha1($enc->content_url);
+			$original_url = $enc->content_url;
 
 			if ($cache->exists($cache_key)) {
 				$enc->content_url = $cache->get_url($cache_key);
 			}
+
+			// keep the pre-cache URL: callers still need the source URL to
+			// identify an enclosure after content_url became a redirect
+			$enc->original_url = $original_url;
 
 			$rv[] = $enc->as_array();
 		}

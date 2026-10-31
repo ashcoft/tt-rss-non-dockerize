@@ -441,6 +441,53 @@ final class ArticleTest extends DbTestCase {
         $this->assertCount(1, $images, 'the image enclosure should still be inlined');
     }
 
+    /**
+     * DiskCache rewrites content_url to a redirect that no longer contains the
+     * video id, so the poster must be matched on the pre-cache URL.
+     */
+    public function test_format_enclosures_drops_cached_thumbnail_beside_player(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $cache = DiskCache::instance('images');
+        $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+        $cache->put($key, 'fake-image-bytes');
+
+        try {
+            $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+        } finally {
+            $cache->remove($key);
+        }
+
+        $this->assertSame([], $result['entries'],
+            'a cached poster should still be recognised and dropped');
+    }
+
+    /**
+     * An article can inline more than one video; every player's poster has to
+     * be dropped, not just the first.
+     */
+    public function test_format_enclosures_drops_posters_for_multiple_players(): void {
+        $this->useYoutubePlayerPlugin();
+
+        $pdo = Db::pdo();
+        $pdo->exec("DELETE FROM ttrss_enclosures WHERE post_id = 1");
+        $sth = $pdo->prepare("INSERT INTO ttrss_enclosures
+            (content_url, content_type, title, duration, width, height, post_id)
+            VALUES (?,?,?,0,?,?,1)");
+        foreach (['aaaaaaaaaaa', 'bbbbbbbbbbb'] as $video_id) {
+            $sth->execute(["https://www.youtube.com/v/$video_id?version=3", 'application/x-shockwave-flash', '', 640, 390]);
+            $sth->execute(["https://i.ytimg.com/vi/$video_id/hqdefault.jpg", 'image/generic', '', 480, 360]);
+        }
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame(2, substr_count($result['formatted'], '<iframe'),
+            'both videos should be inlined');
+        $this->assertSame([], $result['entries'],
+            'both posters should be dropped, not just the first');
+    }
+
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures
@@ -450,10 +497,10 @@ final class ArticleTest extends DbTestCase {
     }
 
     /**
-     * PluginHost is a process-wide singleton and load() registers a plugin only
-     * once, so a plugin left hooked here would leak into later tests, and a
-     * plugin left registered but unhooked would silently stop working in them.
-     * Hook it explicitly for this test and unhook it in tearDown.
+     * PluginHost is a process-wide singleton, so state changed here leaks into
+     * later tests. Record whether the plugin was already hooked, hook it for
+     * this test, and restore that exact state in tearDown: removing a hook that
+     * was already there would silently disable YouTube rendering later.
      */
     private function useYoutubePlayerPlugin(): void {
         $host = PluginHost::getInstance();
@@ -462,7 +509,10 @@ final class ArticleTest extends DbTestCase {
         $plugin = $host->get_plugin('af_youtube_embed');
         $this->assertNotNull($plugin, 'af_youtube_embed should have been loaded');
 
-        if (in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true) === false) {
+        $hooked = $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE);
+        $this->youtube_was_hooked = in_array($plugin, $hooked, true);
+
+        if ($this->youtube_was_hooked === false) {
             $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
         }
 
@@ -470,7 +520,7 @@ final class ArticleTest extends DbTestCase {
     }
 
     protected function tearDown(): void {
-        if ($this->youtube_plugin !== null) {
+        if ($this->youtube_plugin !== null && $this->youtube_was_hooked === false) {
             PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtube_plugin);
         }
 
@@ -478,4 +528,5 @@ final class ArticleTest extends DbTestCase {
     }
 
     private ?Plugin $youtube_plugin = null;
+    private bool $youtube_was_hooked = false;
 }
