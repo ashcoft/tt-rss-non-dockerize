@@ -306,7 +306,7 @@ class Article extends Handler_Protected {
 	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>, 'preview_entries': array<int, array<string, mixed>>}
 	 */
 	static function _format_enclosures(int $id, bool $always_display_enclosures, string $article_content, bool $hide_images = false): array {
-		$enclosures = self::enclosuresWithOriginalUrl($id);
+		$enclosures = self::_get_enclosures($id, with_original_url: true);
 		$enclosures_formatted = "";
 
 		/*foreach ($enclosures as &$enc) {
@@ -491,26 +491,7 @@ class Article extends Handler_Protected {
 	/**
 	 * @return array<int, array<string, mixed>>
 	 */
-	static function _get_enclosures(int $id): array {
-		// Drop the internal field: this result is exposed through the API as
-		// `attachments`, and the source URL can carry credentials.
-		return array_map(function (array $enc): array {
-			unset($enc["original_url"]);
-
-			return $enc;
-		}, self::enclosuresWithOriginalUrl($id));
-	}
-
-	/**
-	 * Enclosures with the pre-cache URL kept in `original_url`.
-	 *
-	 * DiskCache rewrites `content_url` to a redirect, so a caller that has to
-	 * identify an enclosure by its source URL needs the value it had before
-	 * the rewrite. Internal: `_get_enclosures()` strips the field.
-	 *
-	 * @return array<int, array<string, mixed>>
-	 */
-	private static function enclosuresWithOriginalUrl(int $id): array {
+	static function _get_enclosures(int $id, bool $with_original_url = false): array {
 		$encs = ORM::for_table('ttrss_enclosures')
 			->where('post_id', $id)
 			->find_many();
@@ -521,7 +502,14 @@ class Article extends Handler_Protected {
 
 		foreach ($encs as $enc) {
 			$cache_key = sha1($enc->content_url);
-			$enc->original_url = $enc->content_url;
+
+			// DiskCache rewrites content_url to a redirect, so callers that have
+			// to identify an enclosure by its source URL ask for the pre-cache
+			// value. It stays off by default: this result is published through
+			// the API as `attachments` and the URL can carry credentials.
+			if ($with_original_url) {
+				$enc->original_url = $enc->content_url;
+			}
 
 			if ($cache->exists($cache_key)) {
 				$enc->content_url = $cache->get_url($cache_key);
