@@ -462,7 +462,7 @@ final class ArticleTest extends DbTestCase {
         $plugin = $host->get_plugin('af_youtube_embed');
         $this->assertNotNull($plugin, 'af_youtube_embed should have been loaded');
 
-        if (!in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true)) {
+        if (in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true) === false) {
             $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
         }
 
