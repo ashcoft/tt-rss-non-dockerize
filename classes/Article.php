@@ -381,7 +381,7 @@ class Article extends Handler_Protected {
 		// twice. preview_entries keeps the unfiltered list, since the poster is
 		// still the image the headline preview wants.
 		$rv['preview_entries'] = $rv['entries'];
-		$rv['entries'] = self::_drop_player_posters($rv['entries'], $rv['formatted']);
+		$rv['entries'] = self::dropPlayerPosters($rv['entries'], $rv['formatted']);
 
 		return $rv;
 	}
@@ -395,7 +395,7 @@ class Article extends Handler_Protected {
 	 * @param array<int, array<string, mixed>> $entries
 	 * @return array<int, array<string, mixed>>
 	 */
-	static function _drop_player_posters(array $entries, string $formatted): array {
+	private static function dropPlayerPosters(array $entries, string $formatted): array {
 		if (preg_match_all('/<iframe[^>]+src=["\']([^"\']+)/i', $formatted, $matches) === 0) {
 			return $entries;
 		}
