@@ -417,7 +417,7 @@ class Article extends Handler_Protected {
 		// Only an image can be the player's poster: a PDF or audio file that
 		// happens to carry the id in its URL is a real attachment.
 		return array_values(array_filter($entries,
-			fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/') === false
+			fn (array $enc): bool => str_starts_with(mb_strtolower((string)($enc['content_type'] ?? '')), 'image/') === false
 				|| array_filter($video_ids,
 					fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id)) === []));
 	}

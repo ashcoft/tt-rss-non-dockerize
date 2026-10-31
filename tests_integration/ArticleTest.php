@@ -519,6 +519,24 @@ final class ArticleTest extends DbTestCase {
         }
     }
 
+    /**
+     * A feed may declare the MIME type in any case, so the image check has to
+     * fold case or an uppercase poster stays beside the player.
+     */
+    public function test_format_enclosures_drops_uppercase_mime_poster(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures SET content_type = 'IMAGE/JPEG'
+                    WHERE post_id = 1 AND content_type = 'image/jpeg'");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame([], $result['entries'],
+            'an uppercase image/* poster should still be dropped');
+    }
+
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures
