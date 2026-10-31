@@ -490,6 +490,35 @@ final class ArticleTest extends DbTestCase {
             'both posters should be dropped, not just the first');
     }
 
+    /**
+     * Only an image can be a player's poster. A non-image enclosure that happens
+     * to carry the video id in its URL is a real attachment and must survive.
+     */
+    public function test_format_enclosures_keeps_non_image_sharing_video_id(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/dQw4w9WgXcQ-transcript.pdf', 'application/pdf', '', '0', 0, 0, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertCount(1, $result['entries'], 'the pdf should survive');
+        $this->assertSame('application/pdf', $result['entries'][0]['content_type']);
+    }
+
+    /**
+     * original_url is internal: the API exposes _get_enclosures() as
+     * `attachments`, and a source URL can carry credentials.
+     */
+    public function test_get_enclosures_does_not_expose_original_url(): void {
+        foreach (Article::_get_enclosures(1) as $enc) {
+            $this->assertArrayNotHasKey('original_url', $enc);
+        }
+    }
+
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures

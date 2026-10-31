@@ -306,7 +306,7 @@ class Article extends Handler_Protected {
 	 * @return array{'formatted': string, 'entries': array<int, array<string, mixed>>, 'preview_entries': array<int, array<string, mixed>>}
 	 */
 	static function _format_enclosures(int $id, bool $always_display_enclosures, string $article_content, bool $hide_images = false): array {
-		$enclosures = self::_get_enclosures($id);
+		$enclosures = self::enclosuresWithOriginalUrl($id);
 		$enclosures_formatted = "";
 
 		/*foreach ($enclosures as &$enc) {
@@ -414,9 +414,12 @@ class Article extends Handler_Protected {
 			return $entries;
 		}
 
+		// Only an image can be the player's poster: a PDF or audio file that
+		// happens to carry the id in its URL is a real attachment.
 		return array_values(array_filter($entries,
-			fn (array $enc): bool => !array_filter($video_ids,
-				fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id))));
+			fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/') === false
+				|| array_filter($video_ids,
+					fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id)) === []));
 	}
 
 	/**
@@ -489,6 +492,25 @@ class Article extends Handler_Protected {
 	 * @return array<int, array<string, mixed>>
 	 */
 	static function _get_enclosures(int $id): array {
+		// Drop the internal field: this result is exposed through the API as
+		// `attachments`, and the source URL can carry credentials.
+		return array_map(function (array $enc): array {
+			unset($enc["original_url"]);
+
+			return $enc;
+		}, self::enclosuresWithOriginalUrl($id));
+	}
+
+	/**
+	 * Enclosures with the pre-cache URL kept in `original_url`.
+	 *
+	 * DiskCache rewrites `content_url` to a redirect, so a caller that has to
+	 * identify an enclosure by its source URL needs the value it had before
+	 * the rewrite. Internal: `_get_enclosures()` strips the field.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function enclosuresWithOriginalUrl(int $id): array {
 		$encs = ORM::for_table('ttrss_enclosures')
 			->where('post_id', $id)
 			->find_many();
@@ -499,21 +521,16 @@ class Article extends Handler_Protected {
 
 		foreach ($encs as $enc) {
 			$cache_key = sha1($enc->content_url);
-			$original_url = $enc->content_url;
+			$enc->original_url = $enc->content_url;
 
 			if ($cache->exists($cache_key)) {
 				$enc->content_url = $cache->get_url($cache_key);
 			}
 
-			// keep the pre-cache URL: callers still need the source URL to
-			// identify an enclosure after content_url became a redirect
-			$enc->original_url = $original_url;
-
 			$rv[] = $enc->as_array();
 		}
 
 		return $rv;
-
 	}
 
 	static function _purge_orphans(): void {
