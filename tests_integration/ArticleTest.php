@@ -537,6 +537,10 @@ final class ArticleTest extends DbTestCase {
             'an uppercase image/* poster should still be dropped');
     }
 
+    /**
+     * seed.sql stores article 1's video enclosure as video/mp4; turn it into
+     * the YouTube URL that af_youtube_embed recognises.
+     */
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures
@@ -568,6 +572,9 @@ final class ArticleTest extends DbTestCase {
         $this->youtubePlugin = $plugin;
     }
 
+    /**
+     * Undo the singleton state useYoutubePlayerPlugin() may have changed.
+     */
     protected function tearDown(): void {
         if ($this->youtubePlugin !== null && $this->youtubeWasHooked === false) {
             PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtubePlugin);

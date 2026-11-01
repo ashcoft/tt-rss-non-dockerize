@@ -488,11 +488,13 @@ class Article extends Handler_Protected {
 		}
 	}
 
-	/**
-	 * @return array<int, array<string, mixed>>
-	 */
 	// Name and visibility match the other underscore-prefixed helpers in this
 	// class and its callers across the codebase; kept as upstream has them.
+	/**
+	 * @param bool $with_original_url also return each enclosure's pre-cache URL
+	 *     as `original_url`; for internal callers only
+	 * @return array<int, array<string, mixed>>
+	 */
 	static function _get_enclosures(int $id, bool $with_original_url = false): array { // NOSONAR
 		$encs = ORM::for_table('ttrss_enclosures')
 			->where('post_id', $id)
