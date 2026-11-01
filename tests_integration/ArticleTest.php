@@ -453,12 +453,21 @@ final class ArticleTest extends DbTestCase {
         // security boundary, so match the production algorithm exactly.
         $cache = DiskCache::instance('images');
         $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'); // NOSONAR
+
+        // Preserve whatever was cached: this is a real, shared cache directory.
+        $had_entry = $cache->exists($key);
+        $previous = $had_entry ? $cache->get($key) : null;
+
         $cache->put($key, 'fake-image-bytes');
 
         try {
             $result = Article::_format_enclosures(1, true, '<p>Content</p>');
         } finally {
-            $cache->remove($key);
+            if ($had_entry === true) {
+                $cache->put($key, $previous);
+            } else {
+                $cache->remove($key);
+            }
         }
 
         $this->assertSame([], $result['entries'],
@@ -541,6 +550,44 @@ final class ArticleTest extends DbTestCase {
      * seed.sql stores article 1's video enclosure as video/mp4; turn it into
      * the YouTube URL that af_youtube_embed recognises.
      */
+    /**
+     * The internal matching key must not reach the client: Feeds hands
+     * `entries` and `preview_entries` to the browser as `hl.enclosures`, and a
+     * source URL can carry a token.
+     */
+    public function test_format_enclosures_does_not_expose_original_url(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        foreach (['entries', 'preview_entries'] as $key) {
+            foreach ($result[$key] as $enc) {
+                $this->assertArrayNotHasKey('original_url', $enc, "$key must not expose original_url");
+            }
+        }
+    }
+
+    /**
+     * An unrelated image that merely carries the video id in its query string
+     * is not the player's poster, so it must stay.
+     */
+    public function test_format_enclosures_keeps_image_with_id_in_query_string(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/photo.jpg?ref=dQw4w9WgXcQ', 'image/jpeg', '', '0', 800, 600, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $urls = array_column($result['entries'], 'content_url');
+        $this->assertContains('https://example.com/photo.jpg?ref=dQw4w9WgXcQ', $urls,
+            'only the poster is dropped, not an image sharing the id in its query string');
+    }
+
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures

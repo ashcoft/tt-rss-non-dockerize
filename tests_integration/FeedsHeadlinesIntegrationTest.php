@@ -427,7 +427,11 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
         $host->load('af_youtube_embed', PluginHost::KIND_ALL);
         $plugin = $host->get_plugin('af_youtube_embed');
 
-        if (in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true) === false) {
+        // Only undo what this test changed: removing a hook that was already
+        // registered would disable YouTube rendering for later tests.
+        $was_hooked = in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true);
+
+        if ($was_hooked === false) {
             $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
         }
 
@@ -450,7 +454,9 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
             $this->assertNotEmpty($by_id[1]['image_preview'] ?? '',
                 'a YouTube item keeps its poster as the headline image preview');
         } finally {
-            $host->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+            if ($was_hooked === false) {
+                $host->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+            }
         }
     }
 

@@ -383,6 +383,16 @@ class Article extends Handler_Protected {
 		$rv['preview_entries'] = $rv['entries'];
 		$rv['entries'] = self::dropPlayerPosters($rv['entries'], $rv['formatted']);
 
+		// original_url is an internal matching aid only. Both lists are handed to
+		// the client as `hl.enclosures`, and a source URL can carry tokens.
+		foreach (['entries', 'preview_entries'] as $key) {
+			$rv[$key] = array_map(function (array $enc): array {
+				unset($enc['original_url']);
+
+				return $enc;
+			}, $rv[$key]);
+		}
+
 		return $rv;
 	}
 
@@ -415,11 +425,14 @@ class Article extends Handler_Protected {
 		}
 
 		// Only an image can be the player's poster: a PDF or audio file that
-		// happens to carry the id in its URL is a real attachment.
+		// happens to carry the id in its URL is a real attachment. Match the URL
+		// path only, so an unrelated image carrying the id in a query string or
+		// host is left alone.
 		return array_values(array_filter($entries,
 			fn (array $enc): bool => str_starts_with(mb_strtolower((string)($enc['content_type'] ?? '')), 'image/') === false
 				|| array_filter($video_ids,
-					fn (string $video_id): bool => str_contains((string)($enc['original_url'] ?? ''), $video_id)) === []));
+					fn (string $video_id): bool => str_contains(
+						(string)parse_url((string)($enc['original_url'] ?? ''), PHP_URL_PATH), $video_id)) === []));
 	}
 
 	/**
