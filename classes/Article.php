@@ -366,11 +366,16 @@ class Article extends Handler_Protected {
 			if ($rendered_enc) {
 				$rv['formatted'] .= $rendered_enc;
 			} else {
+				// A hook may return a rebuilt entry without the internal key; keep the
+				// pre-hook source URL so the poster filter can still identify it.
+				$source_url = $enc['original_url'] ?? $enc['content_url'];
 				PluginHost::getInstance()->chain_hooks_callback(PluginHost::HOOK_ENCLOSURE_ENTRY,
 					function ($result) use (&$enc) {
 						$enc = $result;
 					},
 					$enc, $id, $rv);
+
+				$enc['original_url'] = $source_url;
 
 				$rv['entries'][] = $enc;
 			}

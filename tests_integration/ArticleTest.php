@@ -588,6 +588,48 @@ final class ArticleTest extends DbTestCase {
             'only the poster is dropped, not an image sharing the id in its query string');
     }
 
+    /**
+     * An enclosure-entry hook may return a rebuilt entry without the internal
+     * matching key. The poster filter has to keep working in that case.
+     */
+    public function test_format_enclosures_drops_poster_when_entry_hook_rebuilds(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $host = PluginHost::getInstance();
+        $rebuilder = new class ($host) extends Plugin {
+            public function about() {
+                return [null, 'rebuilds enclosures', 'test', false];
+            }
+
+            public function init($host) {
+                $host->add_hook($host::HOOK_ENCLOSURE_ENTRY, $this);
+            }
+
+            public function hook_enclosure_entry($enc, $id, $rv) {
+                // documented keys only, as a third-party plugin might return
+                return [
+                    'content_url' => $enc['content_url'],
+                    'content_type' => $enc['content_type'],
+                    'title' => $enc['title'] ?? '',
+                    'filename' => $enc['filename'] ?? '',
+                    'width' => $enc['width'] ?? '',
+                    'height' => $enc['height'] ?? '',
+                ];
+            }
+        };
+        $rebuilder->init($host);
+
+        try {
+            $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+        } finally {
+            $host->del_hook(PluginHost::HOOK_ENCLOSURE_ENTRY, $rebuilder);
+        }
+
+        $this->assertSame([], $result['entries'],
+            'the poster should still be dropped when a hook rebuilds the entry');
+    }
+
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures
