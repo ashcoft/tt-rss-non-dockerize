@@ -406,6 +406,53 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
         }
     }
 
+    // ── Headline image preview ──
+
+    /**
+     * End-to-end guard for the preview source: the preview must come from the
+     * unfiltered enclosure list, not from the inline `entries`, where the
+     * player's poster has been removed.
+     *
+     * Article 1 carries a video enclosure plus its media:thumbnail, which is
+     * the article's only image.
+     */
+    public function test_headlines_image_preview_uses_unfiltered_enclosures(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'https://www.youtube.com/v/dQw4w9WgXcQ?version=3',
+                        content_type = 'application/x-shockwave-flash'
+                    WHERE post_id = 1 AND content_type = 'video/mp4'");
+
+        $host = PluginHost::getInstance();
+        $host->load('af_youtube_embed', PluginHost::KIND_ALL);
+        $plugin = $host->get_plugin('af_youtube_embed');
+
+        if (in_array($plugin, $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE), true) === false) {
+            $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+        }
+
+        try {
+            [$override_order, $skip_first_id_check] = Feeds::_order_to_override_query('date_reverse');
+
+            $method = new ReflectionMethod('Feeds', '_format_headlines_list');
+            $method->setAccessible(true);
+
+            $ret = $method->invoke(new Feeds(['feed' => 1]), 1, '', 'all_articles', 30, false,
+                0, $override_order, true, null, $skip_first_id_check, 'date_reverse');
+
+            $by_id = [];
+            foreach ($ret[4]['content'] as $row) {
+                if (is_array($row))
+                    $by_id[$row['id'] ?? 0] = $row;
+            }
+
+            $this->assertNotEmpty($by_id[1]['image_preview'] ?? '',
+                'a YouTube item keeps its poster as the headline image preview');
+        } finally {
+            $host->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+        }
+    }
+
     // ── Feed with no articles for owner ──
 
     public function test_get_headlines_feed_not_subscribed(): void {
