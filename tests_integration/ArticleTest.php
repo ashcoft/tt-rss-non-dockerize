@@ -367,4 +367,326 @@ final class ArticleTest extends DbTestCase {
         $this->assertArrayHasKey('entries', $result);
         $this->assertArrayHasKey('formatted', $result);
     }
+
+    /**
+     * seed.sql gives article 1 a video enclosure plus an image enclosure, which
+     * mirrors a YouTube entry (media:content + media:thumbnail). Once a plugin
+     * renders the video as an inline player, the thumbnail must not also be
+     * inlined as a second image: it is that player's poster.
+     */
+    public function test_format_enclosures_drops_thumbnail_beside_inline_player(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertStringContainsString('<iframe', $result['formatted'],
+            'the video enclosure should render as an inline player');
+        $this->assertSame([], $result['entries'],
+            'the thumbnail next to the player should not be inlined as a second image');
+    }
+
+    /**
+     * The dropped thumbnail is the article's only image, so it must still be
+     * available for the headline image preview.
+     */
+    public function test_format_enclosures_keeps_thumbnail_for_preview(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame([], $result['entries'], 'inline output drops the poster');
+        $this->assertCount(1, $result['preview_entries'],
+            'preview_entries keeps the thumbnail the inline output drops');
+        [$image] = Article::_get_image($result['preview_entries'], '<p>Content</p>', 'https://youtube.com', []);
+        $this->assertNotEmpty($image, 'the headline image preview should still resolve');
+    }
+
+    /**
+     * Only the media:thumbnail (typed image/generic) is the player's poster. A
+     * separate photo in the same article must keep being inlined.
+     */
+    public function test_format_enclosures_keeps_separate_photo_beside_player(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/photo.jpg', 'image/jpeg', '', '0', 800, 600, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $images = array_values(array_filter($result['entries'],
+            fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/')));
+        $this->assertCount(1, $images, 'a distinct photo should still be inlined');
+        $this->assertSame('https://example.com/photo.jpg', $images[0]['content_url'],
+            'only the poster is dropped, not the unrelated photo');
+    }
+
+    /**
+     * Without an inline player the image enclosure is a normal attachment and
+     * must still be inlined.
+     */
+    public function test_format_enclosures_keeps_image_without_inline_player(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("DELETE FROM ttrss_enclosures WHERE post_id = 1 AND content_type = 'video/mp4'");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertStringNotContainsString('<iframe', $result['formatted']);
+        $images = array_filter($result['entries'],
+            fn (array $enc): bool => str_starts_with((string)($enc['content_type'] ?? ''), 'image/'));
+        $this->assertCount(1, $images, 'the image enclosure should still be inlined');
+    }
+
+    /**
+     * DiskCache rewrites content_url to a redirect that no longer contains the
+     * video id, so the poster must be matched on the pre-cache URL.
+     */
+    public function test_format_enclosures_drops_cached_thumbnail_beside_player(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        // DiskCache keys are sha1(content_url); this is a cache key, not a
+        // security boundary, so match the production algorithm exactly.
+        $cache = DiskCache::instance('images');
+        $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'); // NOSONAR
+
+        // Preserve whatever was cached: this is a real, shared cache directory.
+        $had_entry = $cache->exists($key) === true;
+        $previous = $had_entry === true ? $cache->get($key) : null;
+
+        $cache->put($key, 'fake-image-bytes');
+
+        try {
+            $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+        } finally {
+            if ($had_entry === true) {
+                $cache->put($key, $previous);
+            } else {
+                $cache->remove($key);
+            }
+        }
+
+        $this->assertSame([], $result['entries'],
+            'a cached poster should still be recognised and dropped');
+    }
+
+    /**
+     * An article can inline more than one video; every player's poster has to
+     * be dropped, not just the first.
+     */
+    public function test_format_enclosures_drops_posters_for_multiple_players(): void {
+        $this->useYoutubePlayerPlugin();
+
+        $pdo = Db::pdo();
+        $pdo->exec("DELETE FROM ttrss_enclosures WHERE post_id = 1");
+        $sth = $pdo->prepare("INSERT INTO ttrss_enclosures
+            (content_url, content_type, title, duration, width, height, post_id)
+            VALUES (?,?,?,0,?,?,1)");
+        foreach (['aaaaaaaaaaa', 'bbbbbbbbbbb'] as $video_id) {
+            $sth->execute(["https://www.youtube.com/v/$video_id?version=3", 'application/x-shockwave-flash', '', 640, 390]);
+            $sth->execute(["https://i.ytimg.com/vi/$video_id/hqdefault.jpg", 'image/generic', '', 480, 360]);
+        }
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame(2, substr_count($result['formatted'], '<iframe'),
+            'both videos should be inlined');
+        $this->assertSame([], $result['entries'],
+            'both posters should be dropped, not just the first');
+    }
+
+    /**
+     * Only an image can be a player's poster. A non-image enclosure that happens
+     * to carry the video id in its URL is a real attachment and must survive.
+     */
+    public function test_format_enclosures_keeps_non_image_sharing_video_id(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/dQw4w9WgXcQ-transcript.pdf', 'application/pdf', '', '0', 0, 0, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertCount(1, $result['entries'], 'the pdf should survive');
+        $this->assertSame('application/pdf', $result['entries'][0]['content_type']);
+    }
+
+    /**
+     * original_url is internal: the API exposes _get_enclosures() as
+     * `attachments`, and a source URL can carry credentials.
+     */
+    public function test_get_enclosures_does_not_expose_original_url(): void {
+        foreach (Article::_get_enclosures(1) as $enc) {
+            $this->assertArrayNotHasKey('original_url', $enc);
+        }
+    }
+
+    /**
+     * A feed may declare the MIME type in any case, so the image check has to
+     * fold case or an uppercase poster stays beside the player.
+     */
+    public function test_format_enclosures_drops_uppercase_mime_poster(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures SET content_type = 'IMAGE/JPEG'
+                    WHERE post_id = 1 AND content_type = 'image/jpeg'");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $this->assertSame([], $result['entries'],
+            'an uppercase image/* poster should still be dropped');
+    }
+
+    /**
+     * seed.sql stores article 1's video enclosure as video/mp4; turn it into
+     * the YouTube URL that af_youtube_embed recognises.
+     */
+    /**
+     * The internal matching key must not reach the client: Feeds hands
+     * `entries` and `preview_entries` to the browser as `hl.enclosures`, and a
+     * source URL can carry a token.
+     */
+    public function test_format_enclosures_does_not_expose_original_url(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        foreach (['entries', 'preview_entries'] as $key) {
+            foreach ($result[$key] as $enc) {
+                $this->assertArrayNotHasKey('original_url', $enc, "$key must not expose original_url");
+            }
+        }
+    }
+
+    /**
+     * An unrelated image that merely carries the video id in its query string
+     * is not the player's poster, so it must stay.
+     */
+    public function test_format_enclosures_keeps_image_with_id_in_query_string(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $pdo = Db::pdo();
+        $pdo->exec("INSERT INTO ttrss_enclosures
+                    (content_url, content_type, title, duration, width, height, post_id)
+                    VALUES ('https://example.com/photo.jpg?ref=dQw4w9WgXcQ', 'image/jpeg', '', '0', 800, 600, 1)");
+
+        $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+
+        $urls = array_column($result['entries'], 'content_url');
+        $this->assertContains('https://example.com/photo.jpg?ref=dQw4w9WgXcQ', $urls,
+            'only the poster is dropped, not an image sharing the id in its query string');
+    }
+
+    /**
+     * An enclosure-entry hook may return a rebuilt entry without the internal
+     * matching key. The poster filter has to keep working in that case.
+     */
+    public function test_format_enclosures_drops_poster_when_entry_hook_rebuilds(): void {
+        $this->useYoutubePlayerPlugin();
+        $this->turnArticle1VideoIntoYoutubeEnclosure();
+
+        $host = PluginHost::getInstance();
+        $rebuilder = new class ($host) extends Plugin {
+            /** @return array<int, mixed> */
+            public function about() {
+                return [null, 'rebuilds enclosures', 'test', false];
+            }
+
+            /** @param PluginHost $host registers the enclosure-entry hook */
+            public function init($host) {
+                $host->add_hook($host::HOOK_ENCLOSURE_ENTRY, $this);
+            }
+
+            /**
+             * Rebuild the entry from the documented keys only, as a third-party
+             * plugin might, dropping the internal matching key.
+             *
+             * @param array<string, mixed> $enc
+             * @param int $id
+             * @param array<string, mixed> $rv
+             * @return array<string, mixed>
+             */
+            public function hook_enclosure_entry($enc, $id, $rv) {
+                // documented keys only, as a third-party plugin might return
+                return [
+                    'content_url' => $enc['content_url'],
+                    'content_type' => $enc['content_type'],
+                    'title' => $enc['title'] ?? '',
+                    'filename' => $enc['filename'] ?? '',
+                    'width' => $enc['width'] ?? '',
+                    'height' => $enc['height'] ?? '',
+                ];
+            }
+        };
+        $rebuilder->init($host);
+
+        try {
+            $result = Article::_format_enclosures(1, true, '<p>Content</p>');
+        } finally {
+            $host->del_hook(PluginHost::HOOK_ENCLOSURE_ENTRY, $rebuilder);
+        }
+
+        $this->assertSame([], $result['entries'],
+            'the poster should still be dropped when a hook rebuilds the entry');
+    }
+
+    /**
+     * seed.sql stores article 1's video enclosure as video/mp4; turn it into
+     * the YouTube URL that af_youtube_embed recognises.
+     */
+    private function turnArticle1VideoIntoYoutubeEnclosure(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'https://www.youtube.com/v/dQw4w9WgXcQ?version=3',
+                        content_type = 'application/x-shockwave-flash'
+                    WHERE post_id = 1 AND content_type = 'video/mp4'");
+    }
+
+    /**
+     * PluginHost is a process-wide singleton, so state changed here leaks into
+     * later tests. Record whether the plugin was already hooked, hook it for
+     * this test, and restore that exact state in tearDown: removing a hook that
+     * was already there would silently disable YouTube rendering later.
+     */
+    private function useYoutubePlayerPlugin(): void {
+        $host = PluginHost::getInstance();
+        $host->load('af_youtube_embed', PluginHost::KIND_ALL);
+
+        $plugin = $host->get_plugin('af_youtube_embed');
+        $this->assertNotNull($plugin, 'af_youtube_embed should have been loaded');
+
+        $hooked = $host->get_hooks(PluginHost::HOOK_RENDER_ENCLOSURE);
+        $this->youtubeWasHooked = in_array($plugin, $hooked, true);
+
+        if ($this->youtubeWasHooked === false) {
+            $host->add_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $plugin);
+        }
+
+        $this->youtubePlugin = $plugin;
+    }
+
+    /**
+     * Undo the singleton state useYoutubePlayerPlugin() may have changed.
+     */
+    protected function tearDown(): void {
+        if ($this->youtubePlugin !== null && $this->youtubeWasHooked === false) {
+            PluginHost::getInstance()->del_hook(PluginHost::HOOK_RENDER_ENCLOSURE, $this->youtubePlugin);
+        }
+
+        parent::tearDown();
+    }
+
+    private ?Plugin $youtubePlugin = null;
+    private bool $youtubeWasHooked = false;
 }
