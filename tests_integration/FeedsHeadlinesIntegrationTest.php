@@ -442,8 +442,9 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
 
             $by_id = [];
             foreach ($ret[4]['content'] as $row) {
-                if (is_array($row))
+                if (is_array($row) === true) {
                     $by_id[$row['id'] ?? 0] = $row;
+                }
             }
 
             $this->assertNotEmpty($by_id[1]['image_preview'] ?? '',
