@@ -455,7 +455,7 @@ final class ArticleTest extends DbTestCase {
         $key = sha1('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'); // NOSONAR
 
         // Preserve whatever was cached: this is a real, shared cache directory.
-        $had_entry = $cache->exists($key);
+        $had_entry = $cache->exists($key) === true;
         $previous = $had_entry ? $cache->get($key) : null;
 
         $cache->put($key, 'fake-image-bytes');
