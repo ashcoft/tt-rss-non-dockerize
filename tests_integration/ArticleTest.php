@@ -456,7 +456,7 @@ final class ArticleTest extends DbTestCase {
 
         // Preserve whatever was cached: this is a real, shared cache directory.
         $had_entry = $cache->exists($key) === true;
-        $previous = $had_entry ? $cache->get($key) : null;
+        $previous = $had_entry === true ? $cache->get($key) : null;
 
         $cache->put($key, 'fake-image-bytes');
 
@@ -598,14 +598,25 @@ final class ArticleTest extends DbTestCase {
 
         $host = PluginHost::getInstance();
         $rebuilder = new class ($host) extends Plugin {
+            /** @return array<int, mixed> */
             public function about() {
                 return [null, 'rebuilds enclosures', 'test', false];
             }
 
+            /** @param PluginHost $host registers the enclosure-entry hook */
             public function init($host) {
                 $host->add_hook($host::HOOK_ENCLOSURE_ENTRY, $this);
             }
 
+            /**
+             * Rebuild the entry from the documented keys only, as a third-party
+             * plugin might, dropping the internal matching key.
+             *
+             * @param array<string, mixed> $enc
+             * @param int $id
+             * @param array<string, mixed> $rv
+             * @return array<string, mixed>
+             */
             public function hook_enclosure_entry($enc, $id, $rv) {
                 // documented keys only, as a third-party plugin might return
                 return [
@@ -630,6 +641,10 @@ final class ArticleTest extends DbTestCase {
             'the poster should still be dropped when a hook rebuilds the entry');
     }
 
+    /**
+     * seed.sql stores article 1's video enclosure as video/mp4; turn it into
+     * the YouTube URL that af_youtube_embed recognises.
+     */
     private function turnArticle1VideoIntoYoutubeEnclosure(): void {
         $pdo = Db::pdo();
         $pdo->exec("UPDATE ttrss_enclosures
