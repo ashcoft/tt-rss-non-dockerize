@@ -8,8 +8,6 @@
  * build on a patched minimatch without the incompatible transitive path.
  */
 (() => {
-  'use strict';
-
   const { execSync } = require('node:child_process');
   const path = require('node:path');
   const { globSync } = require('glob');
