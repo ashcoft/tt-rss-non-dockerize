@@ -20,3 +20,5 @@ Thumbs.db
 /.phpstan-tmp
 /.rector-tmp
 /.tools/
+.agent/dist/
+.agent/node_modules/
