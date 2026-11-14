@@ -3,6 +3,7 @@ packages:
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true
+  nx: true
 overrides:
   esbuild@>=0 <0.28.1: '0.28.1'
   # GHSA-g3hv-75wg-m249: globparts amplification in firstPhasePreProcess().
