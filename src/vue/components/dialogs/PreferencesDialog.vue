@@ -11,6 +11,7 @@
           <v-tab value="general">General</v-tab>
           <v-tab value="filters">Filters</v-tab>
           <v-tab value="password">Password</v-tab>
+          <v-tab value="plugins">Plugins</v-tab>
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
@@ -120,6 +121,10 @@
               authentication module.
             </p>
           </v-window-item>
+
+          <v-window-item value="plugins">
+            <PluginManagerPanel v-if="tab === 'plugins'" />
+          </v-window-item>
         </v-window>
 
         <v-alert v-if="message" :type="messageType" variant="tonal" density="compact" class="mt-4">
@@ -145,6 +150,7 @@ import { computed, ref, watch } from 'vue';
 import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 import FilterEditorDialog from './FilterEditorDialog.vue';
+import PluginManagerPanel from './PluginManagerDialog.vue';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();

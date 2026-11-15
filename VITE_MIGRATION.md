@@ -116,6 +116,10 @@ rather than the clickable item. There is no known blocker here.
   article at a time. Added per-article selection checkboxes, a select-all
   control and a bar to mark the selection read or delete it, backed by a new
   `deleteArticles` store action (single `RPC/delete` for the whole selection).
+- **Plugin management was missing.** Added `Pref_Prefs/getPluginsList` and
+  `setplugins` behind a Plugins tab in `PreferencesDialog`: list, search and
+  enable/disable the per-user plugins. System plugins are shown disabled
+  because they are managed by global configuration.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -123,8 +127,8 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers the common user preferences (and password changes) but not feed
-  preferences or plugin settings.
+  covers the common user preferences, password changes and plugin management,
+  but not feed preferences or the full filter-rule editor.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).

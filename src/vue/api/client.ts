@@ -35,6 +35,8 @@ export type {
   FilterDetails,
   FilterRule,
   FilterAction,
+  PluginInfo,
+  PluginsList,
 } from './legacyEndpoints';
 
 class ApiClient {
@@ -409,6 +411,24 @@ class ApiClient {
   /** Keyboard-shortcuts help as an HTML fragment (sanitize before display). */
   async getHotkeyHelp(): Promise<ApiResponse<string>> {
     return this.wrap(() => endpoints.getHotkeyHelp(legacyBackend), '');
+  }
+
+  // ============================================
+  // Plugins
+  // ============================================
+
+  async getPluginsList(): Promise<ApiResponse<endpoints.PluginsList>> {
+    return this.wrap(() => endpoints.getPluginsList(legacyBackend), {
+      plugins: [],
+      isAdmin: false,
+    });
+  }
+
+  async setEnabledPlugins(names: string[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.setEnabledPlugins(legacyBackend, names);
+      return true;
+    }, false);
   }
 
   // ============================================
