@@ -22,3 +22,7 @@ Thumbs.db
 /.phpstan-tmp
 /.rector-tmp
 /.tools/
+# Playwright artifacts
+/test-results
+/playwright-report
+/.playwright
