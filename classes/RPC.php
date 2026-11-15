@@ -108,7 +108,7 @@ class RPC extends Handler_Protected {
 			'runtime-info' => static::_make_runtime_info()
 		];
 
-		print json_encode($reply);
+		print json_encode($reply, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 	}
 
 	function getAllCounters(): void {
@@ -138,7 +138,7 @@ class RPC extends Handler_Protected {
 		if ($feed_ids === null)
 			$reply['runtime-info'] = static::_make_runtime_info();
 
-		print json_encode($reply);
+		print json_encode($reply, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 	}
 
 	/* GET["cmode"] = 0 - mark as read, 1 - as unread, 2 - toggle */
