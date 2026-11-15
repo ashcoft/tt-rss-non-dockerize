@@ -107,4 +107,59 @@ test.describe('Vue front-end', () => {
     const icons = page.locator('.feed-icon');
     expect(await icons.count()).toBeGreaterThan(0);
   });
+
+  test('opens an article in the reading pane', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Technology');
+    await page.getByText('Hacker News', { exact: true }).click();
+
+    const headline = page.getByText('Show HN: I built a distributed task queue in Rust');
+    await expect(headline).toBeVisible({ timeout: 15000 });
+    await headline.click();
+
+    // The reading pane (ArticleView) shows the article body and its actions.
+    await expect(page.getByText('View Original')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: 'Mark above as read' })).toBeVisible();
+  });
+
+  test('bulk-selects headlines and marks them read', async ({ page }) => {
+    await login(page);
+    // Use Ars Technica: no other test reads its articles, and marking read
+    // removes them from the default (unread) view.
+    await expandCategory(page, 'Technology');
+    await page.getByText('Ars Technica', { exact: true }).click();
+    await expect(
+      page.getByText('Apple announces new M5 chip with 40% faster neural engine')
+    ).toBeVisible({ timeout: 15000 });
+
+    // The Select menu offers All/Unread/Invert/None; pick "All".
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('listitem').filter({ hasText: 'All' }).first().click();
+
+    await expect(page.getByText(/selected/)).toBeVisible();
+    await page.getByRole('button', { name: 'Mark read' }).click();
+    // The action reports success through the app snackbar.
+    await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
+  });
+
+  test('toggles a boolean preference and persists it', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // The first preference is "Combined mode"; toggling it saves immediately and
+    // the dialog reports the result in its own alert (not the app snackbar).
+    const checkbox = page.getByLabel(/Combined mode/).first();
+    const before = await checkbox.isChecked();
+    await checkbox.click();
+    await expect(page.getByRole('dialog').locator('.v-alert')).toContainText(/saved/i, {
+      timeout: 10000,
+    });
+
+    // Reloading keeps the new value (it round-tripped through the backend).
+    await page.reload();
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    const after = page.getByLabel(/Combined mode/).first();
+    await expect(after).toBeChecked({ checked: !before });
+  });
 });
