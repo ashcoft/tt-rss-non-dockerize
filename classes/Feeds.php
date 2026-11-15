@@ -328,12 +328,37 @@ class Feeds extends Handler_Protected {
 				// Extract article image for preview. Use the unfiltered list:
 				// 'entries' drops the media:thumbnail when a player is inlined,
 				// but that thumbnail is exactly the image this preview wants.
-				[$article_image] = Article::_get_image(
-					$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
-					$line["content"],
-					$line["site_url"] ?? '',
-					$line
-				);
+				//
+				// The client renders this as a plain <img>, so it has to honor the same
+				// restrictions as the article body: "Do not embed media" (global and per
+				// feed) and bandwidth saving mode. Otherwise a reader who disabled media
+				$image_preview_allowed = empty($_SESSION["bw_limit"]) &&
+					!Prefs::get(Prefs::STRIP_IMAGES, $_SESSION['uid'], $profile) &&
+					!sql_bool_to_bool($line["hide_images"]);
+
+				if ($image_preview_allowed) {
+					[$article_image] = Article::_get_image(
+						$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
+						$line["content"],
+						$line["site_url"] ?? '',
+						$line
+					);
+
+					// A private target is refused on every port, so a hostile feed cannot
+					// use the preview to probe the reader's local network. _get_image() may
+					// already have replaced a remote image with one of our own cache URLs,
+					// and those legitimately carry the installation's own address; the
+					// browser is already talking to that host, so same-installation URLs
+					// are trusted.
+					if ($article_image &&
+							!str_starts_with($article_image, Config::get_self_url() . '/') &&
+					 		UrlHelper::has_disallowed_ip($article_image, false, false)) {
+						$article_image = '';
+					}
+				} else {
+					$article_image = '';
+				}
+
 				$line["image_preview"] = $article_image ?: '';
 
 				$line["updated_long"] = TimeHelper::make_local_datetime($line["updated"]);
