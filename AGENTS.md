@@ -43,6 +43,16 @@ E2E_BASE_URL=http://127.0.0.1:8080 corepack pnpm run test:e2e
 Note: `TTRSS_SINGLE_USER_MODE=1` serves the app to an already-authenticated
 session, so the login form is bypassed; the spec handles both cases.
 
+### Bun (optional)
+
+The scripts also run under [Bun](https://bun.sh) for faster local iteration
+(`bun run build`, `bun run test:vue`, `bun run test:e2e`; `bun test tests/vue`
+runs the same `node:test` files). **pnpm stays canonical**: CI, Dependabot and
+the release workflows all use pnpm, and `pnpm install` enforces a supply-chain
+policy the lockfile depends on. `bun install` is not a drop-in here — it warns
+about the `"@semantic-release/npm>npm": "-"` override and blocks a postinstall
+— so use `pnpm install` and, if you prefer Bun, only as the script runner.
+
 ## Frontend architecture
 
 - `src/vue/` is the Vue app. `index.php` serves it via `include/vue_shell.php`
