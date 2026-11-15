@@ -18,6 +18,7 @@ import {
   LegacyProtocolError,
   LegacyUnsupportedOperation,
   type LegacyBackend,
+  type LegacyParams,
   type LegacyResponse,
 } from './legacy';
 
@@ -561,6 +562,141 @@ export async function setArticleLabel(
 
 export async function removeFilter(backend: LegacyBackend, filterId: number): Promise<void> {
   await backend.call('Pref_Filters', 'remove', { ids: filterId });
+}
+
+/** One match rule. `feed_id` holds feed ids, `CAT:<id>` category ids or `0`. */
+export interface FilterRule {
+  reg_exp: string;
+  filter_type: number;
+  feed_id: string[];
+  inverse: boolean;
+}
+
+/**
+ * One action. `action_param_label` is what the label action (7) stores, and
+ * `action_param` is what every other parameterised action stores.
+ */
+export interface FilterAction {
+  action_id: number;
+  action_param: string;
+  action_param_label: string;
+}
+
+export interface FilterDetails {
+  id: number;
+  enabled: boolean;
+  match_any_rule: boolean;
+  inverse: boolean;
+  title: string;
+  rules: FilterRule[];
+  actions: FilterAction[];
+  /** Filter type id -> localized description (Title, Content, ...). */
+  filterTypes: Record<string, string>;
+  /** Action id -> localized description (Delete article, ...). */
+  actionTypes: Record<string, string>;
+  /** Plugin action key ("Class:action") -> description. */
+  pluginActions: Record<string, string>;
+  labels: Array<{ id: number; caption: string }>;
+}
+
+/**
+ * `Pref_Filters/edit` returns the filter's editable record. With `id: 0` it
+ * returns an empty template (rule/action vocabularies and labels) used to
+ * create a new filter.
+ */
+export async function getFilterDetails(
+  backend: LegacyBackend,
+  filterId: number
+): Promise<FilterDetails> {
+  const response = await backend.call('Pref_Filters', 'edit', { id: filterId });
+  const body = requireBody(response, 'Pref_Filters/edit');
+
+  const stringMap = (value: unknown): Record<string, string> => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+    const result: Record<string, string> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = asString(entry);
+    }
+    return result;
+  };
+
+  const rules = (Array.isArray(body.rules) ? body.rules : []).map((raw) => {
+    const rule = expectObject(raw, 'Pref_Filters/edit.rule');
+    const feedIds = Array.isArray(rule.feed_id) ? rule.feed_id : [rule.feed_id];
+    return {
+      reg_exp: asString(rule.reg_exp),
+      filter_type: asNumber(rule.filter_type, 1),
+      feed_id: feedIds.map((id) => asString(id)),
+      inverse: rule.inverse === true || rule.inverse === 1 || rule.inverse === '1',
+    } satisfies FilterRule;
+  });
+
+  const actions = (Array.isArray(body.actions) ? body.actions : []).map((raw) => {
+    const action = expectObject(raw, 'Pref_Filters/edit.action');
+    return {
+      action_id: asNumber(action.action_id),
+      action_param: asString(action.action_param),
+      action_param_label: asString(action.action_param_label, asString(action.action_param)),
+    } satisfies FilterAction;
+  });
+
+  const labels = (Array.isArray(body.labels) ? body.labels : []).map((raw) => {
+    const label = expectObject(raw, 'Pref_Filters/edit.label');
+    return { id: asNumber(label.id), caption: asString(label.caption) };
+  });
+
+  return {
+    id: asNumber(body.id),
+    enabled: body.enabled !== false,
+    match_any_rule: body.match_any_rule === true,
+    inverse: body.inverse === true,
+    title: asString(body.title),
+    rules,
+    actions,
+    filterTypes: stringMap(body.filter_types),
+    actionTypes: stringMap(body.action_types),
+    pluginActions: stringMap(body.plugin_actions),
+    labels,
+  };
+}
+
+/**
+ * Create (`id: 0`) or update a filter. Rules and actions are sent as repeated
+ * `rule[]`/`action[]` JSON strings, which is what `_save_rules_and_actions()`
+ * parses. Checkboxes go through `checkbox_to_sql_bool()`, so the checked value
+ * is the literal string "on".
+ */
+export async function saveFilter(
+  backend: LegacyBackend,
+  details: FilterDetails
+): Promise<void> {
+  const params: LegacyParams = {
+    enabled: checkboxValue(details.enabled),
+    match_any_rule: checkboxValue(details.match_any_rule),
+    inverse: checkboxValue(details.inverse),
+    title: details.title,
+    rule: details.rules.map((rule) =>
+      JSON.stringify({
+        reg_exp: rule.reg_exp,
+        filter_type: rule.filter_type,
+        feed_id: rule.feed_id,
+        inverse: rule.inverse,
+      })
+    ),
+    action: details.actions.map((action) =>
+      JSON.stringify({
+        action_id: action.action_id,
+        action_param: action.action_param,
+        action_param_label: action.action_param_label,
+      })
+    ),
+  };
+
+  if (details.id > 0) {
+    await backend.call('Pref_Filters', 'editSave', { ...params, id: details.id });
+  } else {
+    await backend.call('Pref_Filters', 'add', params);
+  }
 }
 
 /** RPC article mutations share the `{ids, cmode}` contract. */

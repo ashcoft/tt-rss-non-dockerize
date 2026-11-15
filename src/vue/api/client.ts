@@ -32,6 +32,9 @@ export type {
   AdaptedLabel as Label,
   AdaptedHeadline as Headline,
   HeadlinesPage,
+  FilterDetails,
+  FilterRule,
+  FilterAction,
 } from './legacyEndpoints';
 
 class ApiClient {
@@ -293,6 +296,17 @@ class ApiClient {
 
   async getFilters(): Promise<ApiResponse<Array<Record<string, unknown>>>> {
     return this.wrap(() => endpoints.getFilters(legacyBackend), []);
+  }
+
+  async getFilterDetails(filterId: number): Promise<ApiResponse<endpoints.FilterDetails | null>> {
+    return this.wrap(() => endpoints.getFilterDetails(legacyBackend, filterId), null);
+  }
+
+  async saveFilter(details: endpoints.FilterDetails): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFilter(legacyBackend, details);
+      return true;
+    }, false);
   }
 
   async deleteFilter(filterId: number): Promise<ApiResponse<boolean>> {

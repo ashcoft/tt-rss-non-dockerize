@@ -43,6 +43,16 @@ function compileComponent(relativePath) {
   const module = { exports: {} };
   const localRequire = (id) => {
     if (id.includes('api/client')) return { default: {} };
+    // The Pinia stores pull in a large dependency graph that this renderer
+    // does not need; a minimal stub is enough for the dialog under test.
+    if (id === '../../stores' || id === '../stores') {
+      return { useFeedsStore: () => ({ feeds: [], categories: [] }) };
+    }
+    // Sibling dialogs import each other; compile them on demand.
+    if (id.endsWith('.vue')) {
+      const name = id.replace(/^\.\//, '');
+      return { default: compileComponent(`../../src/vue/components/dialogs/${name}`) };
+    }
     // Local .ts sources the components import are compiled on demand; the
     // allowlist in requireModule only covers third-party packages.
     const local = LOCAL_SOURCES[id];
@@ -107,8 +117,8 @@ function mount(Component, extraProps = {}) {
   }));
   for (const name of ['VCard', 'VCardTitle', 'VCardText', 'VCardActions', 'VTabs', 'VTab',
     'VWindow', 'VWindowItem', 'VList', 'VListItem', 'VListItemTitle', 'VListItemSubtitle',
-    'VCheckbox', 'VTextField', 'VBtn', 'VSpacer', 'VDivider', 'VIcon', 'VChip', 'VAlert',
-    'VProgressCircular']) app.component(name, passthrough);
+    'VCheckbox', 'VTextField', 'VTextarea', 'VSelect', 'VBtn', 'VSpacer', 'VDivider', 'VIcon',
+    'VChip', 'VAlert', 'VProgressCircular']) app.component(name, passthrough);
   const root = { children: [] };
   app.mount(root);
   return { app, root, updates, dialog: () => dialogProps };
