@@ -220,6 +220,25 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['The rise of WebAssembly in server-side applications']);
   });
 
+  test('the label feed lists the labelled articles', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Labels');
+    await page.getByText('test-label-1', { exact: true }).click();
+
+    // Selecting the label must request the synthetic label feed id
+    // (LABEL_BASE_INDEX - 1 - labelId), not the raw id (which the backend would
+    // treat as a regular feed). Switch to "All Articles" so the assertion does
+    // not depend on which labelled articles earlier tests happened to read.
+    const show = page.getByRole('combobox', { name: 'Show' });
+    await show.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.getByRole('option', { name: 'All Articles' }).click();
+
+    const titles = page.locator('.headlines-list-content .v-list-item-title');
+    await expect(titles).toHaveCount(2, { timeout: 15000 });
+    await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();
