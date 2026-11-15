@@ -120,6 +120,9 @@ rather than the clickable item. There is no known blocker here.
   `setplugins` behind a Plugins tab in `PreferencesDialog`: list, search and
   enable/disable the per-user plugins. System plugins are shown disabled
   because they are managed by global configuration.
+- **Advanced per-feed options were missing.** The Edit Feed tab now exposes the
+  HTTP auth, private, image-caching, mark-unread-on-update, digest and
+  enclosure flags the feed record already carries.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -127,8 +130,8 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers the common user preferences, password changes and plugin management,
-  but not feed preferences or the full filter-rule editor.
+  covers the common user preferences, password changes, plugin management and
+  per-feed options, but not the full filter-rule editor or digest settings.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).
