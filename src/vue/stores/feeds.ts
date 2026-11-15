@@ -283,6 +283,64 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
+  /**
+   * Persist the current feed/category order and category membership.
+   *
+   * The tree is sent to `Pref_Feeds/savefeedorder`; on success the server order
+   * is authoritative, so the feed list is reloaded.
+   */
+  async function saveOrder(): Promise<boolean> {
+    try {
+      const response = await api.saveFeedOrder(categories.value, feeds.value);
+      if (response.status === 0) {
+        await loadFeeds();
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save feed order';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save feed order';
+      return false;
+    }
+  }
+
+  /**
+   * Move a feed one position up/down within its category group, then persist.
+   *
+   * `delta` is -1 or 1. The move is bounded to the feed's own category so it
+   * cannot be dragged across categories by accident.
+   */
+  async function moveFeed(feedId: number, delta: -1 | 1): Promise<boolean> {
+    const feed = feeds.value.find(f => f.id === feedId);
+    if (!feed) return false;
+
+    const group = feeds.value.filter(f => (f.cat_id ?? null) === (feed.cat_id ?? null));
+    const groupIndex = group.findIndex(f => f.id === feedId);
+    const target = groupIndex + delta;
+    if (target < 0 || target >= group.length) return false;
+
+    // Indices into the full feeds array, so the swap works in place.
+    const from = feeds.value.indexOf(feed);
+    const to = feeds.value.indexOf(group[target]);
+    const [moved] = feeds.value.splice(from, 1);
+    feeds.value.splice(to, 0, moved);
+
+    return saveOrder();
+  }
+
+  /** Move a category one position up/down, then persist. */
+  async function moveCategory(categoryId: number, delta: -1 | 1): Promise<boolean> {
+    const index = categories.value.findIndex(c => c.id === categoryId);
+    if (index === -1) return false;
+    const target = index + delta;
+    if (target < 0 || target >= categories.value.length) return false;
+
+    const [moved] = categories.value.splice(index, 1);
+    categories.value.splice(target, 0, moved);
+
+    return saveOrder();
+  }
+
   return {
     // State
     feeds,
@@ -311,6 +369,9 @@ export const useFeedsStore = defineStore('feeds', () => {
     deleteCategory,
     renameCategory,
     catchupFeed,
+    saveOrder,
+    moveFeed,
+    moveCategory,
     reset,
   };
 });

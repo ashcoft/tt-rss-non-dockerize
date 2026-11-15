@@ -106,6 +106,20 @@
               >
                 {{ category.unread }}
               </v-chip>
+              <v-btn
+                icon="mdi-chevron-up"
+                size="x-small"
+                variant="text"
+                title="Move category up"
+                @click.stop="emit('reorder', 'category', category.id, -1)"
+              />
+              <v-btn
+                icon="mdi-chevron-down"
+                size="x-small"
+                variant="text"
+                title="Move category down"
+                @click.stop="emit('reorder', 'category', category.id, 1)"
+              />
             </template>
           </v-list-item>
         </template>
@@ -126,6 +140,20 @@
             >
               {{ feed.unread }}
             </v-chip>
+            <v-btn
+              icon="mdi-chevron-up"
+              size="x-small"
+              variant="text"
+              title="Move feed up"
+              @click.stop="emit('reorder', 'feed', feed.id, -1)"
+            />
+            <v-btn
+              icon="mdi-chevron-down"
+              size="x-small"
+              variant="text"
+              title="Move feed down"
+              @click.stop="emit('reorder', 'feed', feed.id, 1)"
+            />
           </template>
         </v-list-item>
       </v-list-group>
@@ -156,6 +184,20 @@
             >
               {{ feed.unread }}
             </v-chip>
+            <v-btn
+              icon="mdi-chevron-up"
+              size="x-small"
+              variant="text"
+              title="Move feed up"
+              @click.stop="emit('reorder', 'feed', feed.id, -1)"
+            />
+            <v-btn
+              icon="mdi-chevron-down"
+              size="x-small"
+              variant="text"
+              title="Move feed down"
+              @click.stop="emit('reorder', 'feed', feed.id, 1)"
+            />
           </template>
         </v-list-item>
       </v-list-group>
@@ -180,6 +222,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'select', feedId: number | string, isCat: boolean): void;
   (e: 'feed-action', action: string, feedId: number): void;
+  (e: 'reorder', kind: 'feed' | 'category', id: number, delta: -1 | 1): void;
 }>();
 
 // State

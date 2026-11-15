@@ -23,6 +23,7 @@
             :labels="labelsStore.labels"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
+            @reorder="handleFeedReorder"
           />
         </aside>
 
@@ -230,6 +231,17 @@ const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
   feedsStore.selectFeed(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
+};
+
+/** Move a feed or category one position and persist the new order. */
+const handleFeedReorder = async (kind: 'feed' | 'category', id: number, delta: -1 | 1) => {
+  const ok =
+    kind === 'category'
+      ? await feedsStore.moveCategory(id, delta)
+      : await feedsStore.moveFeed(id, delta);
+  if (!ok && feedsStore.error) {
+    showMessage(feedsStore.error, 'error');
+  }
 };
 
 /** The toolbar's search payload, when the action carries one. */

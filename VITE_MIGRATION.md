@@ -5,9 +5,9 @@
 **`index.php` now serves the Vue app; the Dojo client is no longer the main
 entry point.** The reading flow (login, feed tree, headlines, search, view
 modes, sorting, article actions, tags, scoring, feed editing, feed-icon upload,
-labels and label colours), content-filter management (list, create, edit,
-delete) and OPML import/export run entirely on Vue 3 + Vuetify + Pinia, talking
-to `backend.php` through the legacy adapter.
+feed/category reordering, labels and label colours), content-filter management
+(list, create, edit, delete) and OPML import/export run entirely on Vue 3 +
+Vuetify + Pinia, talking to `backend.php` through the legacy adapter.
 
 The Dojo stack is **not yet deleted**. What remains:
 
@@ -78,6 +78,10 @@ rather than the clickable item. There is no known blocker here.
 - **Feed-icon upload was missing.** Added `Pref_Feeds/uploadIcon` (multipart,
   returns `{rc, icon_url}`) and `removeIcon`, wired into the Edit Feed tab with
   a live preview from `public.php?op=feed_icon`.
+- **Feed/category reordering was missing.** Added `Pref_Feeds/savefeedorder`
+  (the Dojo tree payload, built by `buildFeedOrderPayload`) and up/down move
+  controls on every feed and category in `FeedTree`. Moving a feed is bounded
+  to its own category so a move cannot change membership by accident.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -87,7 +91,6 @@ modes and all four sort orders return correctly ordered results.
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
   covers only a handful of user preferences, not feed preferences or plugin
   settings.
-- **Drag and drop** reordering of feeds and categories.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).
@@ -155,8 +158,8 @@ shell. Two details are easy to get wrong:
 ### Next production gate
 
 Removing the Dojo libraries requires the items under "Still on Dojo", in this
-order: the preference screens, then drag-and-drop and the plugin UI surfaces.
-Do not weaken authentication or CSRF checks to make the frontend work.
+order: the preference screens, then the plugin UI surfaces. Do not weaken
+authentication or CSRF checks to make the frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
