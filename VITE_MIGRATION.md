@@ -142,6 +142,12 @@ rather than the clickable item. There is no known blocker here.
   positive label id, which `Feeds/view` treats as a regular feed. It now uses
   the synthetic id `LABEL_BASE_INDEX - 1 - labelId`, matching
   `Labels::label_to_feed_id()`. Found with the E2E suite.
+- **Search with nothing selected returned nothing.** The toolbar search sent
+  `feed=null`; it now defaults to the All Articles feed, matching the legacy
+  client. Found with the E2E suite.
+- **The article comments link was missing.** The adapter mapped the comment
+  count and URL but nothing rendered them; the article header now shows the
+  comments link.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
