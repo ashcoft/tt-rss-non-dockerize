@@ -35,6 +35,9 @@
         </span>
         <v-spacer />
         <template v-if="selectedIds.size > 0">
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'open_original', [...selectedIds])">
+            Open original
+          </v-btn>
           <v-btn size="small" variant="text" @click="emit('bulk-action', 'mark_read', [...selectedIds])">
             Mark read
           </v-btn>
@@ -46,6 +49,9 @@
           </v-btn>
           <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_published', [...selectedIds])">
             Toggle published
+          </v-btn>
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'set_score', [...selectedIds])">
+            Set score
           </v-btn>
           <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
             Delete

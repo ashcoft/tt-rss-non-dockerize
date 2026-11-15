@@ -396,6 +396,25 @@ const handleBulkAction = async (action: string, ids: number[]) => {
       await headlinesStore.togglePublished(ids);
       showMessage(`${ids.length} article(s) toggled published`, 'success');
       break;
+    case 'open_original':
+      // Open each selected article's link in a new tab (the legacy behaviour).
+      for (const id of ids) {
+        const headline = headlinesStore.headlines.find(h => h.id === id);
+        if (headline?.link) window.open(headline.link, '_blank', 'noopener,noreferrer');
+      }
+      break;
+    case 'set_score': {
+      const input = window.prompt('New score for the selected articles:', '0');
+      if (input === null) break;
+      const score = Number.parseInt(input, 10);
+      if (Number.isNaN(score)) {
+        showMessage('Score must be a number', 'warning');
+        break;
+      }
+      await headlinesStore.setScoreFor(ids, score);
+      showMessage(`Score set on ${ids.length} article(s)`, 'success');
+      break;
+    }
     case 'delete':
       await headlinesStore.deleteArticles(ids);
       showMessage(`${ids.length} article(s) deleted`, 'success');

@@ -166,6 +166,25 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
   });
 
+  test('bulk-sets a score on the selected headlines', async ({ page }) => {
+    await login(page);
+    // Ars Technica's articles are not read by other tests.
+    await expandCategory(page, 'Technology');
+    await page.getByText('Ars Technica', { exact: true }).click();
+    await expect(
+      page.getByText('Apple announces new M5 chip with 40% faster neural engine')
+    ).toBeVisible({ timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('listitem').filter({ hasText: 'All' }).first().click();
+    await expect(page.getByText(/selected/)).toBeVisible();
+
+    // The score prompt is a native dialog; answer it, then expect success.
+    page.once('dialog', (dialog) => dialog.accept('5'));
+    await page.getByRole('button', { name: 'Set score' }).click();
+    await expect(page.locator('.v-snackbar')).toContainText(/score set/i, { timeout: 10000 });
+  });
+
   test('toggles a boolean preference and persists it', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();
