@@ -10,25 +10,60 @@
       <p>No headlines to display</p>
     </div>
 
-    <v-list v-else class="headlines-list-content" lines="three">
-      <v-list-item
-        v-for="headline in headlines"
-        :key="headline.id"
-        :class="{
-          'headline-read': headline.is_read,
-          'headline-active': headline.id === activeId,
-        }"
-        @click="emit('select', headline)"
-      >
-        <template #prepend>
-          <v-checkbox
-            :model-value="headline.is_read"
-            hide-details
-            density="compact"
-            @click.stop
-            @update:model-value="toggleRead(headline)"
-          />
+    <div v-else>
+      <!-- Bulk selection bar: shown when at least one article is checked. -->
+      <div class="bulk-bar">
+        <v-checkbox
+          :model-value="allSelected"
+          :indeterminate="someSelected && !allSelected"
+          hide-details
+          density="compact"
+          class="bulk-select-all"
+          title="Select all"
+          @update:model-value="toggleAll"
+        />
+        <span v-if="selectedIds.size > 0" class="bulk-count">
+          {{ selectedIds.size }} selected
+        </span>
+        <v-spacer />
+        <template v-if="selectedIds.size > 0">
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'mark_read', [...selectedIds])">
+            Mark read
+          </v-btn>
+          <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
+            Delete
+          </v-btn>
         </template>
+      </div>
+
+      <v-list class="headlines-list-content" lines="three">
+        <v-list-item
+          v-for="headline in headlines"
+          :key="headline.id"
+          :class="{
+            'headline-read': headline.is_read,
+            'headline-active': headline.id === activeId,
+          }"
+          @click="emit('select', headline)"
+        >
+          <template #prepend>
+            <v-checkbox
+              :model-value="selectedIds.has(headline.id)"
+              hide-details
+              density="compact"
+              title="Select article"
+              @click.stop
+              @update:model-value="(checked: boolean) => toggleSelected(headline.id, checked)"
+            />
+            <v-checkbox
+              :model-value="headline.is_read"
+              hide-details
+              density="compact"
+              title="Mark as read"
+              @click.stop
+              @update:model-value="toggleRead(headline)"
+            />
+          </template>
 
         <v-list-item-title class="headline-title">
           {{ headline.title }}
@@ -79,6 +114,7 @@
         </template>
       </v-list-item>
         </v-list>
+      </div>
 
     <div v-if="hasMore && !loading" class="load-more">
       <v-btn
@@ -111,7 +147,31 @@ const emit = defineEmits<{
   select: [headline: Headline];
   action: [headline: Headline, action: string];
   'load-more': [];
+  'bulk-action': [action: string, ids: number[]];
 }>();
+
+// Bulk selection: a set of headline ids checked via the selection checkbox.
+const selectedIds = ref(new Set<number>());
+
+const allSelected = computed(
+  () => props.headlines.length > 0 && props.headlines.every(h => selectedIds.value.has(h.id))
+);
+const someSelected = computed(() => selectedIds.value.size > 0);
+
+// Reassign so the ref triggers reactivity when the set mutates.
+const toggleSelected = (id: number, checked: boolean) => {
+  const next = new Set(selectedIds.value);
+  if (checked) {
+    next.add(id);
+  } else {
+    next.delete(id);
+  }
+  selectedIds.value = next;
+};
+
+const toggleAll = (checked: boolean) => {
+  selectedIds.value = checked ? new Set(props.headlines.map(h => h.id)) : new Set();
+};
 
 // Infinite scroll wiring (Phase 5)
 const listRef = ref<HTMLElement | null>(null);
@@ -182,5 +242,22 @@ const formatDate = (updated: string): string => updated;
 .headline-actions {
   display: flex;
   gap: 0.25rem;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.bulk-select-all {
+  flex: 0 0 auto;
+}
+
+.bulk-count {
+  font-size: 0.8125rem;
+  color: #666;
 }
 </style>

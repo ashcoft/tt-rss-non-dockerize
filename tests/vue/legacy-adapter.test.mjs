@@ -1180,3 +1180,19 @@ test('getHotkeyHelp returns the raw HTML fragment', async () => {
   assert.ok(calls[0].body.includes('method=hotkeyHelp'));
   assert.equal(help, html);
 });
+
+test('deleteArticles sends a comma-delimited ids list and skips empty input', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.deleteArticles(backend, [1, 2, 3]);
+  await endpoints.deleteArticles(backend, []);
+
+  // An empty list must not issue a request (it would delete nothing, but the
+  // backend treats a missing `ids` as an error in some handlers).
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].body.includes('method=delete'));
+  assert.ok(calls[0].body.includes('ids=1%2C2%2C3'));
+});
