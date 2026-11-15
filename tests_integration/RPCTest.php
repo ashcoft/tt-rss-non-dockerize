@@ -354,7 +354,9 @@ final class RPCTest extends DbTestCase {
         $params = $ref->invoke($rpc);
 
         foreach (['purge_old_days', 'purge_unread_articles',
-                  'show_content_preview', 'vfeed_group_by_feed'] as $key) {
+                  'show_content_preview', 'vfeed_group_by_feed',
+                  'digest_enable', 'digest_catchup',
+                  'digest_preferred_time', 'digest_min_score'] as $key) {
             $this->assertArrayHasKey($key, $params, "init-params must expose $key");
         }
     }

@@ -125,6 +125,9 @@ rather than the clickable item. There is no known blocker here.
 - **Advanced per-feed options were missing.** The Edit Feed tab now exposes the
   HTTP auth, private, image-caching, mark-unread-on-update, digest and
   enclosure flags the feed record already carries.
+- **Digest settings were missing.** `RPC/sanityCheck` init-params now returns
+  the four digest preferences (read with their real types, since the send time
+  is a string), and the dialog lists them.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -132,8 +135,8 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers the common user preferences, password changes, plugin management and
-  per-feed options, but not the full filter-rule editor or digest settings.
+  covers the common user preferences, digest, password, plugin management and
+  per-feed options, but not the full filter-rule editor.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).

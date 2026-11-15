@@ -363,6 +363,16 @@ class RPC extends Handler_Protected {
 			$params[strtolower($param)] = (int) Prefs::get($param, $_SESSION['uid'], $profile);
 		}
 
+		// Digest settings are not all integers (the send time is a
+		// string), so they are read with their real types rather than
+		// through the int-casting loop above.
+		foreach ([Prefs::DIGEST_ENABLE, Prefs::DIGEST_CATCHUP] as $param) {
+			$params[strtolower($param)] = (int) Prefs::get($param, $_SESSION['uid'], $profile);
+		}
+
+		$params["digest_preferred_time"] = (string) Prefs::get(Prefs::DIGEST_PREFERRED_TIME, $_SESSION['uid'], $profile);
+		$params["digest_min_score"] = (int) Prefs::get(Prefs::DIGEST_MIN_SCORE, $_SESSION['uid'], $profile);
+
 		$params["safe_mode"] = !empty($_SESSION["safe_mode"]);
 		$params["check_for_updates"] = Config::get(Config::CHECK_FOR_UPDATES);
 		$params["icons_url"] = Config::get_self_url() . '/public.php';
