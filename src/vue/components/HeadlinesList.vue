@@ -13,15 +13,23 @@
     <div v-else>
       <!-- Bulk selection bar: shown when at least one article is checked. -->
       <div class="bulk-bar">
-        <v-checkbox
-          :model-value="allSelected"
-          :indeterminate="someSelected && !allSelected"
-          hide-details
-          density="compact"
-          class="bulk-select-all"
-          title="Select all"
-          @update:model-value="toggleAll"
-        />
+        <v-menu>
+          <template #activator="{ props }">
+            <v-btn v-bind="props" size="small" variant="text" prepend-icon="mdi-checkbox-multiple-outline">
+              Select
+              <v-icon end>mdi-chevron-down</v-icon>
+            </v-btn>
+          </template>
+          <v-list>
+            <v-list-item
+              v-for="item in selectOptions"
+              :key="item.value"
+              @click="selectBy(item.value)"
+            >
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
         <span v-if="selectedIds.size > 0" class="bulk-count">
           {{ selectedIds.size }} selected
         </span>
@@ -29,6 +37,15 @@
         <template v-if="selectedIds.size > 0">
           <v-btn size="small" variant="text" @click="emit('bulk-action', 'mark_read', [...selectedIds])">
             Mark read
+          </v-btn>
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_unread', [...selectedIds])">
+            Toggle unread
+          </v-btn>
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_starred', [...selectedIds])">
+            Toggle starred
+          </v-btn>
+          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_published', [...selectedIds])">
+            Toggle published
           </v-btn>
           <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
             Delete
@@ -153,10 +170,13 @@ const emit = defineEmits<{
 // Bulk selection: a set of headline ids checked via the selection checkbox.
 const selectedIds = ref(new Set<number>());
 
-const allSelected = computed(
-  () => props.headlines.length > 0 && props.headlines.every(h => selectedIds.value.has(h.id))
-);
-const someSelected = computed(() => selectedIds.value.size > 0);
+// Mirrors the legacy headline toolbar's Select menu.
+const selectOptions = [
+  { title: 'All', value: 'all' },
+  { title: 'Unread', value: 'unread' },
+  { title: 'Invert', value: 'invert' },
+  { title: 'None', value: 'none' },
+];
 
 // Reassign so the ref triggers reactivity when the set mutates.
 const toggleSelected = (id: number, checked: boolean) => {
@@ -169,8 +189,21 @@ const toggleSelected = (id: number, checked: boolean) => {
   selectedIds.value = next;
 };
 
-const toggleAll = (checked: boolean) => {
-  selectedIds.value = checked ? new Set(props.headlines.map(h => h.id)) : new Set();
+/** Apply one of the Select-menu operations to the current list. */
+const selectBy = (mode: string) => {
+  if (mode === 'all') {
+    selectedIds.value = new Set(props.headlines.map(h => h.id));
+  } else if (mode === 'none') {
+    selectedIds.value = new Set();
+  } else if (mode === 'unread') {
+    selectedIds.value = new Set(props.headlines.filter(h => !h.is_read).map(h => h.id));
+  } else if (mode === 'invert') {
+    const next = new Set<number>();
+    for (const h of props.headlines) {
+      if (!selectedIds.value.has(h.id)) next.add(h.id);
+    }
+    selectedIds.value = next;
+  }
 };
 
 // Infinite scroll wiring (Phase 5)

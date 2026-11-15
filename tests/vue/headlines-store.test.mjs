@@ -134,6 +134,33 @@ test('moving the cursor in an empty list is a no-op', () => {
   assert.equal(store.cursorId.value, null);
 });
 
+test('toggleStarred splits a mixed selection into star and unstar calls', async () => {
+  // The store issues one RPC/markSelected per mode, so a mixed selection must
+  // become two requests (mode 2 for the unstarred ids, mode 0 for the starred).
+  const calls = [];
+  globalThis.window = { __csrf_token: 't', location: { href: 'http://localhost/index.php' } };
+  globalThis.document = { createElement: () => ({ sandbox: true }) };
+  globalThis.fetch = async (_url, options = {}) => {
+    calls.push(options.body ?? '');
+    return { ok: true, status: 200, text: async () => '' };
+  };
+
+  const store = storeWith([10, 20, 30]);
+  store.headlines.value[0].is_marked = false;
+  store.headlines.value[1].is_marked = true; // 20 already starred
+  store.headlines.value[2].is_marked = false;
+
+  await store.toggleStarred([10, 20]);
+
+  const modes = calls.map((body) => /cmode=(\d+)/.exec(body)?.[1]);
+  assert.equal(calls.length, 2, `expected two markSelected calls, got ${calls.length}`);
+  assert.deepEqual(modes.sort(), ['0', '2']);
+  assert.equal(store.headlines.value[0].is_marked, true);
+  assert.equal(store.headlines.value[1].is_marked, false);
+  // 30 is outside the selection, so it must be untouched.
+  assert.equal(store.headlines.value[2].is_marked, false);
+});
+
 test('reset clears the cursor', () => {
   const store = storeWith([10, 20]);
   store.setCursor(20);

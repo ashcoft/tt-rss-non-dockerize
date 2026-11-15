@@ -372,6 +372,63 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     }
   }
 
+  /**
+   * Toggle the starred flag on each given article, based on its current state.
+   *
+   * `RPC/markSelected` applies one mode to the whole id list, so a mixed
+   * selection is split into the ids to star and the ids to unstar.
+   */
+  async function toggleStarred(articleIds: number[]): Promise<void> {
+    const ids = new Set(articleIds);
+    const toStar = headlines.value.filter(h => ids.has(h.id) && !h.is_marked).map(h => h.id);
+    const toUnstar = headlines.value.filter(h => ids.has(h.id) && h.is_marked).map(h => h.id);
+    try {
+      if (toStar.length > 0) await api.markArticles(toStar, 2);
+      if (toUnstar.length > 0) await api.markArticles(toUnstar, 0);
+      for (const headline of headlines.value) {
+        if (ids.has(headline.id)) headline.is_marked = !headline.is_marked;
+      }
+      if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
+        selectedArticle.value.is_marked = !selectedArticle.value.is_marked;
+      }
+    } catch (err) {
+      console.error('Failed to toggle starred:', err);
+      throw err;
+    }
+  }
+
+  /** Toggle the published flag on each given article, based on its state. */
+  async function togglePublished(articleIds: number[]): Promise<void> {
+    const ids = new Set(articleIds);
+    const toPublish = headlines.value.filter(h => ids.has(h.id) && !h.is_published).map(h => h.id);
+    const toUnpublish = headlines.value.filter(h => ids.has(h.id) && h.is_published).map(h => h.id);
+    try {
+      if (toPublish.length > 0) await api.publishArticles(toPublish, 2);
+      if (toUnpublish.length > 0) await api.publishArticles(toUnpublish, 0);
+      for (const headline of headlines.value) {
+        if (ids.has(headline.id)) headline.is_published = !headline.is_published;
+      }
+      if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
+        selectedArticle.value.is_published = !selectedArticle.value.is_published;
+      }
+    } catch (err) {
+      console.error('Failed to toggle published:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Toggle the unread flag on each given article, based on its current state.
+   * A mixed selection is split so each article flips individually.
+   */
+  async function toggleUnread(articleIds: number[]): Promise<void> {
+    const ids = new Set(articleIds);
+    const toRead = headlines.value.filter(h => ids.has(h.id) && !h.is_read).map(h => h.id);
+    const toUnread = headlines.value.filter(h => ids.has(h.id) && h.is_read).map(h => h.id);
+    if (toRead.length > 0) await markAsRead(toRead);
+    if (toUnread.length > 0) await markAsUnread(toUnread);
+  }
+
   /** Permanently delete several articles in one request. */
   async function deleteArticles(articleIds: number[]): Promise<void> {
     if (articleIds.length === 0) return;
@@ -552,6 +609,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     togglePublish,
     deleteArticle,
     deleteArticles,
+    toggleStarred,
+    togglePublished,
+    toggleUnread,
     updateNote,
     updateTags,
     suggestTags,

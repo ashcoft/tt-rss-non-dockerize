@@ -113,9 +113,11 @@ rather than the clickable item. There is no known blocker here.
   feed. It now renders each feed's icon from `public.php?op=feed_icon` (base
   URL from `icons_url` in init-params), falling back to the glyph on error.
 - **Bulk article selection was missing.** The headline list only acted on one
-  article at a time. Added per-article selection checkboxes, a select-all
-  control and a bar to mark the selection read or delete it, backed by a new
-  `deleteArticles` store action (single `RPC/delete` for the whole selection).
+  article at a time. Added a Select menu (all/unread/invert/none), per-article
+  checkboxes and a bar to mark read, toggle unread/starred/published or delete
+  the selection, backed by `deleteArticles`, `toggleStarred`, `togglePublished`
+  and `toggleUnread` store actions. A mixed selection is split so each article
+  flips individually (one `RPC/markSelected` per mode).
 - **Plugin management was missing.** Added `Pref_Prefs/getPluginsList` and
   `setplugins` behind a Plugins tab in `PreferencesDialog`: list, search and
   enable/disable the per-user plugins. System plugins are shown disabled
