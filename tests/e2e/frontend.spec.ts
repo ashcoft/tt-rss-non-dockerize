@@ -267,6 +267,26 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('adds a tag to an article', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    await page.locator('.headlines-list-content .v-list-item-title').first().click();
+
+    // Type a tag into the combobox and commit it with Enter; the store saves
+    // the whole tag list via Article/setArticleTags. Vuetify renders a hidden
+    // input before the real one, so target the last.
+    const input = page.locator('.article-view .v-combobox input').last();
+    await input.fill('e2etag');
+    await input.press('Enter');
+
+    // The chip is rendered once the list round-trips.
+    await expect(page.locator('.article-view .v-chip').filter({ hasText: 'e2etag' })).toBeVisible({
+      timeout: 15000,
+    });
+  });
+
   test('searches articles by term', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');
