@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 /**
  * Playwright global setup: re-seed the tt-rss database so the E2E run starts
@@ -8,13 +8,15 @@ import { fileURLToPath } from 'node:url';
  *
  * The tests mutate real state (marking articles read removes them from the
  * default view), so a repeatable run needs fresh data. Seeding is best-effort:
- * if psql or the seed file is unavailable, the run proceeds against whatever
- * state the instance has (tests that depend on unread articles may then be
- * skipped or fail, which is preferable to a hard error).
+ * if psql or the seed file is unavailable the run proceeds against whatever
+ * state the instance has, rather than failing the whole suite.
  */
 export default function globalSetup(): void {
-  const seed = fileURLToPath(new URL('../tests_integration/seed.sql', import.meta.url));
-  if (!existsSync(seed)) return;
+  const seed = resolve(process.cwd(), 'tests_integration/seed.sql');
+  if (!existsSync(seed)) {
+    console.warn(`[e2e] seed file not found at ${seed}; skipping re-seed`);
+    return;
+  }
 
   const host = process.env.TTRSS_DB_HOST;
   const port = process.env.TTRSS_DB_PORT;
@@ -28,12 +30,13 @@ export default function globalSetup(): void {
   }
 
   try {
-    execFileSync('psql', ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-f', seed], {
-      env: { ...process.env, PGPASSWORD: pass ?? '' },
-      stdio: 'ignore',
-    });
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-v', 'ON_ERROR_STOP=1', '-f', seed],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
     console.log('[e2e] re-seeded the test database');
   } catch (err) {
-    console.warn('[e2e] could not re-seed the database; continuing with current state', err);
+    console.warn('[e2e] could not re-seed the database; continuing with current state:', (err as Error).message);
   }
 }

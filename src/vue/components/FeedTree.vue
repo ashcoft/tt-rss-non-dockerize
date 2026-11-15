@@ -153,6 +153,20 @@
               {{ feed.unread }}
             </v-chip>
             <v-btn
+              icon="mdi-check"
+              size="x-small"
+              variant="text"
+              title="Mark feed as read"
+              @click.stop="emit('feed-action', 'mark_read', feed.id)"
+            />
+            <v-btn
+              icon="mdi-pencil"
+              size="x-small"
+              variant="text"
+              title="Edit feed"
+              @click.stop="emit('feed-action', 'edit', feed.id)"
+            />
+            <v-btn
               icon="mdi-chevron-up"
               size="x-small"
               variant="text"
