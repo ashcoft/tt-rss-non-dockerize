@@ -168,3 +168,8 @@ INSERT INTO ttrss_enclosures (content_url, content_type, title, duration, width,
 ('https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'image/jpeg', 'Thumbnail', 0, 480, 360, 1);
 
 SELECT setval(pg_get_serial_sequence('ttrss_enclosures', 'id'), (SELECT MAX(id) FROM ttrss_enclosures));
+
+-- 5c. Label assignments: test-label-1 on articles 1 and 9.
+INSERT INTO ttrss_user_labels2 (label_id, article_id) VALUES
+(1, 1),
+(1, 9);

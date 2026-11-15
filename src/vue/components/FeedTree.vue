@@ -272,6 +272,10 @@ const emit = defineEmits<{
   (e: 'reorder', kind: 'feed' | 'category', id: number, delta: -1 | 1): void;
 }>();
 
+// Matches LABEL_BASE_INDEX in include/functions.php. Feed ids below it are
+// labels; a label's feed id is LABEL_BASE_INDEX - 1 - labelId.
+const LABEL_BASE_INDEX = -1024;
+
 // State
 const searchQuery = ref('');
 // Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
@@ -349,8 +353,12 @@ const handleSelect = (index: string) => {
   const isCategory = index.startsWith('cat-');
 
   if (isLabel) {
+    // Labels are selected through a synthetic negative feed id: the backend
+    // (Feeds::view) treats feed ids below LABEL_BASE_INDEX (-1024) as labels.
+    // The label tree reports the raw positive id, so derive the feed id the
+    // same way Labels::label_to_feed_id() does: LABEL_BASE_INDEX - 1 - id.
     const labelId = Number.parseInt(index.replace('label-', ''));
-    emit('select', labelId, false);
+    emit('select', LABEL_BASE_INDEX - 1 - Math.abs(labelId), false);
   } else if (isCategory) {
     const catId = Number.parseInt(index.replace('cat-', ''));
     emit('select', catId, true);

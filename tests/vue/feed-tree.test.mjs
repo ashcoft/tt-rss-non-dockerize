@@ -248,3 +248,23 @@ test('FeedTree renders each feed icon from the public.php endpoint', async () =>
   assert.ok(icon, `expected a feed icon img, saw: ${JSON.stringify(elements.map((e) => [e.tag, e.props.src]))}`);
   assert.equal(icon.props.src, '/public.php?op=feed_icon&id=7');
 });
+
+test('FeedTree selects a label through its synthetic negative feed id', async () => {
+  const selected = [];
+  const { items } = mountFeedTree({
+    feeds: [],
+    categories: [],
+    labels: [{ id: 2, caption: 'Work' }],
+    onSelect: (id, isCat) => { selected.push([id, isCat]); },
+  });
+
+  await nextTick();
+
+  const labelItem = items.find((i) => i.title === 'Work');
+  assert.ok(labelItem, `expected a label item, saw: ${JSON.stringify(items.map(i => i.title))}`);
+  labelItem.onClick();
+
+  // Feeds::view treats ids below LABEL_BASE_INDEX (-1024) as labels, and
+  // Labels::label_to_feed_id() is LABEL_BASE_INDEX - 1 - labelId.
+  assert.deepEqual(selected, [[-1024 - 1 - 2, false]]);
+});
