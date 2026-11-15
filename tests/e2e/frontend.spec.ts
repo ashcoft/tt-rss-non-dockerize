@@ -208,6 +208,34 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.v-snackbar')).toContainText(/score set/i, { timeout: 10000 });
   });
 
+  test('stars a headline and it appears in the Starred feed', async ({ page }) => {
+    await login(page);
+    // Use "All Articles" so the row is present regardless of read state.
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    const row = page.locator('.headlines-list-content .v-list-item').first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    const title = (await row.locator('.headline-title').innerText()).trim();
+
+    // Star it, then confirm the Starred feed now contains it.
+    await row.getByRole('button', { name: 'Star' }).click();
+    await page.getByText('Starred', { exact: true }).click();
+    const starred = page.locator('.headlines-list-content .v-list-item').filter({ hasText: title });
+    await expect(starred).toHaveCount(1, { timeout: 15000 });
+
+    // Unstar it again; the button flips back and the article leaves the feed on
+    // the next load (the list is not re-fetched in place).
+    await starred.first().getByRole('button', { name: 'Unstar' }).click();
+    await page.reload();
+    await page.getByRole('button', { name: 'Preferences' }).waitFor({ timeout: 15000 });
+    await expandCategory(page, 'Special');
+    await page.getByText('Starred', { exact: true }).click();
+    await expect(
+      page.locator('.headlines-list-content .v-list-item').filter({ hasText: title })
+    ).toHaveCount(0, { timeout: 15000 });
+  });
+
   test('the Starred feed lists exactly the starred articles', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');

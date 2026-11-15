@@ -108,6 +108,7 @@
               variant="text"
               size="small"
               :color="headline.is_marked ? 'amber' : 'grey'"
+              :title="headline.is_marked ? 'Unstar' : 'Star'"
               @click.stop="emit('action', headline, 'toggle_star')"
             >
               <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
@@ -118,6 +119,7 @@
               variant="text"
               size="small"
               :color="headline.is_published ? 'blue' : 'grey'"
+              :title="headline.is_published ? 'Unpublish' : 'Publish'"
               @click.stop="emit('action', headline, 'toggle_publish')"
             >
               <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
