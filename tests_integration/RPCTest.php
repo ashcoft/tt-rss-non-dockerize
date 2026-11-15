@@ -338,4 +338,24 @@ final class RPCTest extends DbTestCase {
         $updated = $stmt->fetch();
         $this->assertFalse($updated['published']);
     }
+
+    /**
+     * Verify that sanityCheck's init-params expose the preferences the Vue
+     * preferences dialog reads. These four have no other read endpoint, so a
+     * missing entry leaves the dialog showing blank values for settings the
+     * user cannot otherwise see.
+     */
+    public function test_init_params_expose_dialog_preferences(): void {
+        $_SESSION['auth_module'] = 'auth_internal';
+
+        $rpc = new RPC([]);
+        $ref = new ReflectionMethod('RPC', '_make_init_params');
+        $ref->setAccessible(true);
+        $params = $ref->invoke($rpc);
+
+        foreach (['purge_old_days', 'purge_unread_articles',
+                  'show_content_preview', 'vfeed_group_by_feed'] as $key) {
+            $this->assertArrayHasKey($key, $params, "init-params must expose $key");
+        }
+    }
 }
