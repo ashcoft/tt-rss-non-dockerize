@@ -1,4 +1,4 @@
-/* global Plugins, __, require, PluginHost, App */
+/* global Plugins, __, PluginHost, App */
 
 Plugins.Shorten_Expanded = {
 	threshold: 1.5, // of window height
@@ -30,15 +30,13 @@ Plugins.Shorten_Expanded = {
 					${content_inner.innerHTML}
 					${attachments ? attachments.innerHTML : ''}
 				</div>
-				<button dojoType="dijit.form.Button" class="alt-info expand-prompt" onclick="return Plugins.Shorten_Expanded.expand('${row.id}')" href="#">
+				<button class="alt-info expand-prompt" onclick="return Plugins.Shorten_Expanded.expand('${row.id}')" href="#">
 					${App.FormFields.icon('add')}
 					${__("Expand article")}
 				</button>`;
 
 			if (attachments)
 				attachments.innerHTML = "";
-
-			dojo.parser.parse(content_inner);
 
 			return true;
 		}
@@ -65,8 +63,7 @@ Plugins.Shorten_Expanded = {
 	}
 }
 
-require(['dojo/_base/kernel', 'dojo/ready'], (dojo, ready) => {
-	ready(() => {
+;(() => {
 		const self = Plugins.Shorten_Expanded;
 
 		self.observer = new ResizeObserver(self.debounce((entries) => {
@@ -81,5 +78,4 @@ require(['dojo/_base/kernel', 'dojo/ready'], (dojo, ready) => {
 			self.process_row(row);
 			return true;
 		});
-	});
-});
+})();

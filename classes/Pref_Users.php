@@ -163,116 +163,65 @@ class Pref_Users extends Handler_Administrative {
 			UserHelper::reset_password(clean($_REQUEST["id"]));
 		}
 
-		function index(): void {
+	/**
+ * JSON user list for the Vue administration tab.
+ *
+ * Mirrors the table built by index(): same search and sort parameters, same
+ * columns. The access-level names are included so the client can render them
+ * without duplicating UserHelper constants.
+ */
+function getusersjson(): void {
+	global $access_level_names;
 
-			global $access_level_names;
+	$user_search = clean($_REQUEST["search"] ?? "");
 
-			$user_search = clean($_REQUEST["search"] ?? "");
-
-			if (array_key_exists("search", $_REQUEST)) {
-				$_SESSION["prefs_user_search"] = $user_search;
-			} else {
-				$user_search = ($_SESSION["prefs_user_search"] ?? "");
-			}
-
-			$sort = clean($_REQUEST["sort"] ?? "");
-
-			if (!$sort || $sort == "undefined") {
-				$sort = "login";
-			}
-
-			if (!in_array($sort, ["login", "access_level", "created", "num_feeds", "created", "last_login"]))
-				$sort = "login";
-
-			if ($sort != "login") $sort = "$sort DESC";
-			?>
-
-			<div dojoType='dijit.layout.BorderContainer' gutters='false'>
-				<div style='padding : 0px' dojoType='dijit.layout.ContentPane' region='top'>
-					<div dojoType='fox.Toolbar'>
-
-						<div style='float : right'>
-							<form dojoType="dijit.form.Form" onsubmit="Users.reload(); return false;">
-								<input dojoType='dijit.form.TextBox' id='user_search' size='20' type='search'
-									value="<?= htmlspecialchars($user_search) ?>">
-								<button dojoType='dijit.form.Button' type='submit'>
-									<?= __('Search') ?>
-								</button>
-							</form>
-						</div>
-
-						<div dojoType='fox.form.DropDownButton'>
-							<span><?= __('Select') ?></span>
-							<div dojoType='dijit.Menu' style='display: none'>
-								<div onclick="Tables.select('users-list', true)"
-									dojoType='dijit.MenuItem'><?= __('All') ?></div>
-								<div onclick="Tables.select('users-list', false)"
-									dojoType='dijit.MenuItem'><?= __('None') ?></div>
-								</div>
-							</div>
-
-						<button dojoType='dijit.form.Button' onclick='Users.add()'>
-							<?= __('Create user') ?>
-						</button>
-
-						<button dojoType='dijit.form.Button' onclick='Users.removeSelected()'>
-							<?= __('Remove') ?>
-						</button>
-
-						<button dojoType='dijit.form.Button' onclick='Users.resetSelected()'>
-							<?= __('Reset password') ?>
-						</button>
-
-						<?php PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION, "prefUsersToolbar") ?>
-
-					</div>
-				</div>
-				<div style='padding : 0px' dojoType='dijit.layout.ContentPane' region='center'>
-
-					<table width='100%' class='users-list' id='users-list'>
-
-						<tr>
-							<th></th>
-							<th><a href='#' onclick="Users.reload('login')"><?= __('Login') ?></a></th>
-							<th><a href='#' onclick="Users.reload('access_level')"><?= __('Access level') ?></a></th>
-							<th><a href='#' onclick="Users.reload('num_feeds')"><?= __('Subscribed feeds') ?></a></th>
-							<th><a href='#' onclick="Users.reload('created')"><?= __('Registered') ?></a></th>
-							<th><a href='#' onclick="Users.reload('last_login')"><?= __('Last login') ?></a></th>
-						</tr>
-
-						<?php
-							$users = ORM::for_table('ttrss_users')
-								->table_alias('u')
-								->left_outer_join("ttrss_feeds", ["owner_uid", "=", "u.id"], 'f')
-									->select_expr('u.*,COUNT(f.id) AS num_feeds')
-									->where_like("login", $user_search ? "%$user_search%" : "%")
-									->order_by_expr($sort)
-									->group_by_expr('u.id')
-									->find_many();
-
-							foreach ($users as $user) { ?>
-
-								<tr data-row-id='<?= $user["id"] ?>' onclick='Users.edit(<?= $user["id"] ?>)' title="<?= __('Click to edit') ?>">
-									<td class='checkbox'>
-										<input onclick='Tables.onRowChecked(this); event.stopPropagation();'
-										dojoType='dijit.form.CheckBox' type='checkbox'>
-									</td>
-
-									<td width='30%'>
-										<i class='material-icons'>person</i>
-										<strong><?= htmlspecialchars($user["login"]) ?></strong>
-									</td>
-									<td><?= $access_level_names[$user["access_level"]] ?></td>
-									<td><?= $user["num_feeds"] ?></td>
-									<td class='text-muted'><?= TimeHelper::make_local_datetime($user['created']) ?></td>
-									<td class='text-muted'><?= TimeHelper::make_local_datetime($user['last_login']) ?></td>
-								</tr>
-						<?php } ?>
-					</table>
-				</div>
-				<?php PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB, "prefUsers") ?>
-			</div>
-		<?php
+	if (array_key_exists("search", $_REQUEST)) {
+		$_SESSION["prefs_user_search"] = $user_search;
+	} else {
+		$user_search = ($_SESSION["prefs_user_search"] ?? "");
 	}
+
+	$sort = clean($_REQUEST["sort"] ?? "");
+
+	if (!$sort || $sort == "undefined") {
+		$sort = "login";
+	}
+
+	if (!in_array($sort, ["login", "access_level", "created", "num_feeds", "last_login"])) {
+		$sort = "login";
+	}
+
+	if ($sort != "login") {
+		$sort = "$sort DESC";
+	}
+
+	$users = ORM::for_table('ttrss_users')
+		->table_alias('u')
+		->left_outer_join("ttrss_feeds", ["owner_uid", "=", "u.id"], 'f')
+		->select_expr('u.*,COUNT(f.id) AS num_feeds')
+		->where_like("login", $user_search ? "%$user_search%" : "%")
+		->order_by_expr($sort)
+		->group_by_expr('u.id')
+		->find_many();
+
+	$rv = [];
+
+	foreach ($users as $user) {
+		$rv[] = [
+			"id" => (int)$user["id"],
+			"login" => $user["login"],
+			"access_level" => (int)$user["access_level"],
+			"access_level_name" => $access_level_names[$user["access_level"]] ?? "",
+			"num_feeds" => (int)$user["num_feeds"],
+			"created" => TimeHelper::make_local_datetime($user["created"]),
+			"last_login" => TimeHelper::make_local_datetime($user["last_login"]),
+		];
+	}
+
+	print json_encode([
+		"users" => $rv,
+		"access_level_names" => $access_level_names,
+	]);
+}
 
 }

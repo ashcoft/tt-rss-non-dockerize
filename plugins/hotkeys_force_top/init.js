@@ -1,8 +1,8 @@
-/* global Headlines, require */
+/* global Headlines */
 
-require(['dojo/_base/kernel', 'dojo/ready'], function (dojo, ready) {
-        ready(function () {
-          Headlines.default_force_to_top = true;
-        });
-});
-
+// The legacy client read this flag when sorting the headlines list; the Vue
+// store reads it too (see headlines.ts), so a plugin can still force the
+// default sort order to put newer articles on top.
+if (typeof Headlines !== "undefined") {
+	Headlines.default_force_to_top = true;
+}

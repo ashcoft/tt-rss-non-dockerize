@@ -113,7 +113,7 @@ class Af_Psql_Trgm extends Plugin {
 		}
 
 		print "<footer class='text-center'>
-			<button dojoType='dijit.form.Button' type='submit' class='alt-primary'>".__('Close this window')."</button>
+			<button type='submit' class='alt-primary'>".__('Close this window')."</button>
 		</footer>";
 
 
@@ -134,8 +134,8 @@ class Af_Psql_Trgm extends Plugin {
 
 		?>
 
-		<div dojoType="dijit.layout.AccordionPane"
-			title="<i class='material-icons'>extension</i> <?= __('Mark similar articles as read (af_psql_trgm)') ?>">
+		<div class="prefs-plugin-pane"
+			data-title="<i class='material-icons'>extension</i> <?= __('Mark similar articles as read (af_psql_trgm)') ?>">
 
 			<?php
 			$res = $this->pdo->query("select 'similarity'::regproc");
@@ -144,38 +144,29 @@ class Af_Psql_Trgm extends Plugin {
 				print_error("pg_trgm extension not found.");
 			} ?>
 
-			<form dojoType="dijit.form.Form">
+			<form class="plugin-prefs-form" method="post" action="backend.php">
 
 				<?= \Controls\pluginhandler_tags($this, "save") ?>
 
-				<script type="dojo/method" event="onSubmit" args="evt">
-					evt.preventDefault();
-					if (this.validate()) {
-						Notify.progress('Saving data...', true);
-						xhr.post("backend.php", this.getValues(), (reply) => {
-							Notify.info(reply);
-						})
-					}
-				</script>
 
 				<?= format_notice("Enable for specific feeds in the feed editor.") ?>
 
 				<fieldset>
 					<label><?= __("Minimum similarity:") ?></label>
-					<input dojoType="dijit.form.NumberSpinner"
+					<input type="number"
 						placeholder="<?= $this->default_similarity ?>"
 						id='psql_trgm_similarity'
 						required="1"
 						name="similarity" value="<?= htmlspecialchars($similarity) ?>">
 
-					<div dojoType='dijit.Tooltip' connectId='psql_trgm_similarity' position='below'>
+					<div class='plugin-tooltip'>
 						<?= __("PostgreSQL trigram extension returns string similarity as a floating point number (0-1). Setting it too low might produce false positives, zero disables checking.") ?>
 					</div>
 				</fieldset>
 
 				<fieldset>
 					<label><?= __("Minimum title length:") ?></label>
-					<input dojoType="dijit.form.NumberSpinner"
+					<input type="number"
 						placeholder="<?= $this->default_min_length ?>"
 						required="1"
 						name="min_title_length" value="<?= htmlspecialchars($min_title_length) ?>">

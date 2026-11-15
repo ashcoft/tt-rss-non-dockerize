@@ -7,9 +7,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<meta name="viewport" content="initial-scale=1,width=device-width" />
 	<?php
-	foreach (["lib/dojo/dojo.js",
-				"lib/dojo/tt-rss-layer.js",
-			 	"js/common.js",
+	foreach (["js/common.js",
 				"js/utility.js"] as $jsfile) {
 
 		echo javascript_tag($jsfile);
@@ -29,10 +27,6 @@
 			display : none;
 		}
 	</style>
-
-	<script type="text/javascript">
-		require({cache:{}});
-	</script>
 
 	<script type="text/javascript">
 		const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
@@ -63,48 +57,44 @@
 
 <script type="text/javascript">
 	const UtilityApp = {
-        previousLogin: "",
+	previousLogin: "",
 	    init: function() { /* invoked by UtilityJS */
-            require(['dojo/parser', "dojo/ready", 'dijit/form/Button','dijit/form/CheckBox', 'dijit/form/Form',
-                'dijit/form/Select','dijit/form/TextBox','dijit/form/ValidationTextBox'],function(parser, ready){
-                ready(function() {
-					parser.parse();
+		const bw_limit = document.getElementById("bw_limit");
+		if (bw_limit) bw_limit.checked = Cookie.get("ttrss_bwlimit") == 'true';
 
-					dijit.byId("bw_limit").attr("checked", Cookie.get("ttrss_bwlimit") == 'true');
-					dijit.byId("login").focus();
-                });
-            });
-		},
-        fetchProfiles: function() {
-	        const login = dijit.byId("login").attr('value');
-
-	        if (login && login != this.previousLogin) {
-                this.previousLogin = login;
-
-                xhr.json("public.php", {op: "getprofiles", login: login},
-                    (reply) => {
-                        const profile = dijit.byId('profile');
-
-                        profile.removeOption(profile.getOptions());
-
-                        reply.forEach((p) => {
-                            profile
-                                .attr("disabled", false)
-                                .addOption(p);
-                        });
-                    });
-            }
+		const login = document.getElementById("login");
+		if (login) login.focus();
 	    },
-        gotoRegForm: function() {
-        	window.location.href = "register.php";
-        	return false;
-    	},
-        bwLimitChange: function(elem) {
-        	Cookie.set("ttrss_bwlimit", elem.checked,
+	fetchProfiles: function() {
+		const login = document.getElementById("login").value;
+
+		if (login && login != this.previousLogin) {
+		this.previousLogin = login;
+
+		xhr.json("public.php", {op: "getprofiles", login: login},
+		    (reply) => {
+			const profile = document.getElementById('profile');
+
+			while (profile.options.length > 0) profile.remove(0);
+
+			reply.forEach((p) => {
+			    profile.disabled = false;
+			    const option = document.createElement("option");
+			    option.textContent = p;
+			    profile.appendChild(option);
+			});
+		    });
+	    }
+	    },
+	gotoRegForm: function() {
+		window.location.href = "register.php";
+		return false;
+	},
+	bwLimitChange: function(elem) {
+		Cookie.set("ttrss_bwlimit", elem.checked,
 				<?php print Config::get(Config::SESSION_COOKIE_LIFETIME) ?>);
 	    }
     };
-
 
 </script>
 
@@ -114,8 +104,7 @@
 
 	<h1><?= "Authentication" ?></h1>
 	<div class="content">
-		<form action="public.php?return=<?= $return ?>"
-			  dojoType="dijit.form.Form" method="POST">
+		<form action="public.php?return=<?= $return ?>" method="POST">
 
 			<?= \Controls\hidden_tag("op", "login"); ?>
 
@@ -126,7 +115,7 @@
 
 			<fieldset>
 				<label><?= __("Login:") ?></label>
-				<input name="login" id="login" dojoType="dijit.form.TextBox" type="text"
+				<input name="login" id="login" type="text"
 					autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
 					onchange="UtilityApp.fetchProfiles()"
 					onfocus="UtilityApp.fetchProfiles()"
@@ -140,7 +129,6 @@
 
 				<input type="password" name="password" required="1"
 					autocomplete="current-password"
-					dojoType="dijit.form.TextBox"
 					class="input input-text"
 					onchange="UtilityApp.fetchProfiles()"
 					onfocus="UtilityApp.fetchProfiles()"
@@ -158,7 +146,7 @@
 				<fieldset>
 					<label><?= __("Profile:") ?></label>
 
-					<select disabled='disabled' name="profile" id="profile" dojoType='dijit.form.Select'>
+					<select disabled='disabled' name="profile" id="profile">
 						<option><?= __("Default profile") ?></option>
 					</select>
 				</fieldset>
@@ -172,10 +160,6 @@
 						<?= __("Use less traffic") ?></label>
 				</fieldset>
 
-				<div dojoType="dijit.Tooltip" connectId="bw_limit_label" position="below" style="display:none">
-					<?= __("Does not display images in articles, reduces automatic refreshes."); ?>
-				</div>
-
 				<fieldset class="narrow">
 					<label> </label>
 
@@ -184,10 +168,6 @@
 						<?= __("Safe mode") ?>
 					</label>
 				</fieldset>
-
-				<div dojoType="dijit.Tooltip" connectId="safe_mode_label" position="below" style="display:none">
-					<?= __("Uses default theme and prevents all plugins from loading."); ?>
-				</div>
 
 				<?php if (Config::get(Config::SESSION_COOKIE_LIFETIME) > 0) { ?>
 					<fieldset class="narrow">

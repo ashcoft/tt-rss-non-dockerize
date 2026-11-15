@@ -1,7 +1,8 @@
 {
     "compilerOptions": {
-        "target": "ES6",
-        "module": "amd"
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler"
     },
     "include": [
         "js/*.js",

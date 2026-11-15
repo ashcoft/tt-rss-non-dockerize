@@ -10,8 +10,15 @@ import { createPinia } from 'pinia';
 import { createVuetify } from 'vuetify';
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
+import './legacy/pluginCompat.css';
 import App from './App.vue';
 import { api } from './api/client';
+import { installPluginCompat } from './legacy/pluginCompat';
+
+// Install the legacy globals plugin scripts expect, then run them. Done before
+// the app mounts so a plugin's hook callbacks are registered by the time the
+// components fire them.
+installPluginCompat();
 
 // Create Pinia state management
 const pinia = createPinia();

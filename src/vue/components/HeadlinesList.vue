@@ -94,9 +94,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watchPostEffect } from 'vue';
 import type { Headline } from '@/types';
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
+import { runPluginHook, HOOKS } from '@/legacy/pluginCompat';
 
 const props = defineProps<{
   headlines: Headline[];
@@ -124,6 +125,15 @@ const { setupScrollListener } = useInfiniteScroll({
 
 onMounted(() => {
   if (listRef.value) setupScrollListener(listRef.value);
+});
+
+// Let plugin scripts post-process the rendered list (e.g. the note plugin wires
+// its click handlers here). Re-run whenever the set of headlines changes.
+watchPostEffect(() => {
+  // Touch the headline count so the effect re-runs when the list changes.
+  void props.headlines.length;
+  const node = listRef.value;
+  if (node) runPluginHook(HOOKS.HOOK_HEADLINES_RENDERED, node);
 });
 
 

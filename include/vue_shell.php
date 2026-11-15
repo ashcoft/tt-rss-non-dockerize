@@ -19,6 +19,7 @@
 
 /** @var string $csrf_token */
 /** @var bool $authenticated */
+/** @var string $entry manifest key of the HTML entry to emit */
 
 // Reflect the user's locale on <html>. Prefs::USER_LANGUAGE stores values like
 // "en_US"; HTML wants a BCP-47 tag ("en-US"). "auto" and empty mean "no
@@ -97,7 +98,7 @@ if ($authenticated === true) {
 	<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 	<meta name="apple-mobile-web-app-title" content="Tiny Tiny RSS"/>
 
-	<?= VueAssets::tags() ?>
+	<?= VueAssets::tags($entry) ?>
 
 	<style type="text/css">
 		@media (prefers-color-scheme: dark) {
@@ -133,17 +134,26 @@ if ($authenticated !== true) {
 <div id="vue-app"></div>
 
 <?php
-// Plugin JS that used to run under Dojo. It is still emitted for the plugins
-// that ship it, guarded so a failure cannot break the app. Skipped when
+// Plugin JS. The scripts were written against the legacy client, so they are
+// stashed for the Vue bundle's compatibility layer (src/vue/legacy/pluginCompat)
+// to install the globals they expect and then run them. Stashing rather than
+// executing inline guarantees those globals exist first. Skipped when
 // unauthenticated: these hooks assume a loaded user.
 if ($authenticated === true) {
-	foreach (PluginHost::getInstance()->get_plugins() as $n => $p) {
+	$plugin_scripts = [];
+
+	foreach (PluginHost::getInstance()->get_plugins() as $p) {
 		$script = $p->get_js();
 
 		if ($script !== "") {
-			echo "<script type='text/javascript'>try {\n$script\n} catch (e) {\n"
-				. "console.warn('failed to initialize plugin JS: " . $n . "', e);\n}</script>";
+			$plugin_scripts[] = $script;
 		}
+	}
+
+	if (count($plugin_scripts) > 0) {
+		echo "<script type='text/javascript'>window.__plugin_scripts = "
+			. json_encode($plugin_scripts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+			. ";</script>";
 	}
 }
 ?>

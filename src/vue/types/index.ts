@@ -51,6 +51,7 @@ export interface Headline {
   author: string;
   score: number;
   note: string;
+  buttons?: string;
 }
 
 export interface Article {
@@ -74,6 +75,7 @@ export interface Article {
   author: string;
   score: number;
   note: string;
+  buttons?: string;
 }
 
 export interface FeedTreeNode {

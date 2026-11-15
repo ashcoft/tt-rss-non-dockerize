@@ -18,7 +18,7 @@ class Toggle_Sidebar extends Plugin {
 	function hook_main_toolbar_button() {
 		?>
 
-		<button dojoType="dijit.form.Button" onclick="Plugins.Toggle_Sidebar.toggle(this)">
+		<button onclick="Plugins.Toggle_Sidebar.toggle(this)">
 			<i class="material-icons toggle-sidebar-label"
                title="<?= __('Toggle sidebar') ?>">chevron_left</i>
 		</button>

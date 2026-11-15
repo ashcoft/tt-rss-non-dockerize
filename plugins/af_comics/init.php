@@ -58,8 +58,8 @@ class Af_Comics extends Plugin {
 		asort($comics);
 
 		?>
-		<div dojoType="dijit.layout.AccordionPane"
-			title="<i class='material-icons'>photo</i> <?= __('Feeds supported by af_comics') ?>">
+		<div class="prefs-plugin-pane"
+			data-title="<i class='material-icons'>photo</i> <?= __('Feeds supported by af_comics') ?>">
 
 			<h3><?= __("The following comics are currently supported:") ?></h3>
 

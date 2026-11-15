@@ -1,0 +1,66 @@
+/**
+ * Styles for the legacy plugin compatibility layer
+ * (see src/vue/legacy/pluginCompat.ts). The plugin scripts build their own DOM
+ * outside the Vue tree, so these rules are plain global CSS rather than scoped
+ * component styles.
+ */
+
+.vue-notify {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  background: #333;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.vue-notify-error {
+  background: #c62828;
+}
+
+.vue-notify-info {
+  background: #257aa7;
+}
+
+.vue-simple-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.vue-simple-dialog {
+  max-width: 560px;
+  max-height: 80vh;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 4px;
+  background: #fff;
+  color: #212121;
+}
+
+.vue-simple-dialog-title {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.vue-simple-dialog-close {
+  margin-top: 0.75rem;
+}
+
+.article-plugin-buttons {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.article-plugin-buttons i.material-icons {
+  cursor: pointer;
+}

@@ -28,6 +28,8 @@ export interface Headline {
   author: string;
   score: number;
   note: string;
+  /** Plugin-provided article buttons (HOOK_ARTICLE_BUTTON), as an HTML fragment. */
+  buttons: string;
 }
 
 export interface Article {
@@ -51,6 +53,8 @@ export interface Article {
   author: string;
   score: number;
   note: string;
+  /** Plugin-provided article buttons (HOOK_ARTICLE_BUTTON), as an HTML fragment. */
+  buttons: string;
 }
 
 /**

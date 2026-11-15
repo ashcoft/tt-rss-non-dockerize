@@ -48,8 +48,7 @@ Plugins.Share = {
 			content: __("Loading, please wait...")
 		});
 
-		const tmph = dojo.connect(dialog, 'onShow', function () {
-			dojo.disconnect(tmph);
+		dialog.connect('onShow', function () {
 
 			xhr.post("backend.php", App.getPhArgs("share", "shareDialog", {id: id}), (reply) => {
 				dialog.attr('content', reply)

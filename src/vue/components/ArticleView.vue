@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, watchPostEffect } from 'vue';
 import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
+import { runPluginHook, HOOKS } from '@/legacy/pluginCompat';
 
 const props = defineProps<{
   article: Article;
@@ -17,6 +18,17 @@ const noteDraft = ref(props.article.note ?? '');
 const tagDraft = ref<string[]>([...(props.article.tags ?? [])]);
 const tagSuggestions = ref<string[]>([]);
 const saving = ref(false);
+const rootRef = ref<HTMLElement | null>(null);
+
+// Let plugin scripts run against the rendered article. The legacy client fired
+// these after each article was inserted into the DOM; plugins such as
+// shorten_expanded and af_zz_vidmute rely on the element existing.
+watchPostEffect(() => {
+  const node = rootRef.value;
+  if (!node) return;
+  runPluginHook(HOOKS.HOOK_ARTICLE_RENDERED, node);
+  runPluginHook(HOOKS.HOOK_ARTICLE_RENDERED_CDM, node);
+});
 
 // App.vue reuses this component when the selected article changes (no :key),
 // so the drafts must follow the new article. Without this, the previous
@@ -83,7 +95,7 @@ const sanitizedContent = computed(() => {
 </script>
 
 <template>
-  <div class="article-view">
+  <div class="article-view" ref="rootRef">
     <article class="article-content">
       <header class="article-header">
         <div class="article-header-inner">
@@ -143,6 +155,9 @@ const sanitizedContent = computed(() => {
       >
         Save note
       </v-btn>
+
+      <!-- Plugin article buttons (HOOK_ARTICLE_BUTTON) -->
+      <div v-if="article.buttons" class="article-plugin-buttons" v-html="article.buttons" />
 
       <!-- Article metadata footer -->
       <footer class="article-footer">

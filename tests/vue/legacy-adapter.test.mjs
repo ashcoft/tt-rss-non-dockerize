@@ -737,12 +737,12 @@ test('getFilters reads the nested filter tree', async () => {
 
 test('getProfiles unwraps the top-level array body', async () => {
   installGlobals();
-  stubFetch([{ text: JSON.stringify([{ title: 'Default profile', id: 0, active: true }]) }]);
+  stubFetch([{ text: JSON.stringify([{ title: 'Default profile', id: 0, active: true, initialized: true }]) }]);
   const backend = new LegacyBackend();
   backend.setCsrfToken('t');
 
   assert.deepEqual(await endpoints.getProfiles(backend), [
-    { id: 0, title: 'Default profile', active: true },
+    { id: 0, title: 'Default profile', active: true, initialized: true },
   ]);
 });
 
@@ -808,4 +808,325 @@ test('operations without a legacy endpoint fail loudly', () => {
   assert.throws(() => endpoints.purgeFeed(), /purge/i);
   assert.throws(() => endpoints.getPref(), /preference/i);
   assert.throws(() => endpoints.getArticle(), /article/i);
+});
+
+test('getFilterDetails maps the edit payload and defaults absent inverse', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        id: 7,
+        enabled: true,
+        match_any_rule: false,
+        inverse: false,
+        title: 'My filter',
+        rules: [{ reg_exp: 'foo', filter_type: 1, feed_id: ['0'], name: 'foo on Title' }],
+        actions: [{ action_id: 2, action_param: '', name: 'Mark as read' }],
+        filter_types: { 1: 'Title' },
+        action_types: { 2: 'Mark as read' },
+        plugin_actions: {},
+        labels: [{ id: 3, caption: 'News' }],
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFilterDetails(backend, 7);
+  assert.equal(details.id, 7);
+  assert.equal(details.title, 'My filter');
+  assert.deepEqual(details.rules[0].feed_id, ['0']);
+  // The backend omits `inverse` for the "false" case; the adapter fills it in.
+  assert.equal(details.rules[0].inverse, false);
+  assert.equal(details.action_types['2'], 'Mark as read');
+  assert.deepEqual(details.labels, [{ id: 3, caption: 'News' }]);
+});
+
+test('saveFilter sends checkbox fields as "on" and rules/actions as JSON lists', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFilter(backend, 4, {
+    title: 'Test',
+    enabled: true,
+    match_any_rule: false,
+    inverse: true,
+    rules: [{ reg_exp: 'x', filter_type: 1, feed_id: ['0'] }],
+    actions: [{ action_id: 2, action_param: '' }],
+  });
+
+  const body = decodeURIComponent(calls[0].body);
+  // checkbox_to_sql_bool() only recognises the literal "on".
+  assert.ok(body.includes('enabled=on'));
+  assert.ok(body.includes('inverse=on'));
+  assert.ok(body.includes('match_any_rule='));
+  assert.ok(body.includes('rule[]={"reg_exp":"x","filter_type":1,"feed_id":["0"]}'));
+  assert.ok(body.includes('action[]={"action_id":2,"action_param":""}'));
+});
+
+test('testFilter forwards the rule set and reports the match count', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: JSON.stringify({ pre_filtering_count: 2, items: [{ title: 'A' }, { title: 'B' }] }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.testFilter(backend, {
+    match_any_rule: false,
+    inverse: false,
+    rules: [{ reg_exp: 'x', filter_type: 1, feed_id: ['0'] }],
+    offset: 0,
+    limit: 30,
+  });
+
+  assert.equal(result.pre_filtering_count, 2);
+  assert.equal(result.items.length, 2);
+  assert.ok(decodeURIComponent(calls[0].body).includes('method=testFilterDo'));
+});
+
+test('getPrefsJson reports sections, control kinds and boolean field names', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        is_profile: false,
+        sections: [
+          {
+            title: 'General',
+            items: [
+              { name: 'USER_LANGUAGE', kind: 'select', label: 'Language', value: '', options: { en_US: 'English' } },
+              { name: 'ENABLE_API_ACCESS', kind: 'bool', label: 'Enable API', value: '0' },
+              { kind: 'separator' },
+            ],
+          },
+        ],
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const prefs = await endpoints.getPrefsJson(backend);
+  assert.equal(prefs.isProfile, false);
+  assert.equal(prefs.sections[0].items[0].kind, 'select');
+  assert.equal(prefs.sections[0].items[1].kind, 'bool');
+
+  const { values, booleanPrefs } = endpoints.prefFormFields(prefs.sections);
+  assert.equal(values.ENABLE_API_ACCESS, '0');
+  assert.deepEqual(booleanPrefs, ['ENABLE_API_ACCESS']);
+});
+
+test('saveConfig sends the value map plus the boolean_prefs list', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: 'The configuration was saved.' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.saveConfig(backend, { SHORT_DATE_FORMAT: 'M d' }, ['ENABLE_API_ACCESS']);
+  const body = new URLSearchParams(calls[0].body);
+
+  assert.equal(body.get('SHORT_DATE_FORMAT'), 'M d');
+  assert.equal(body.get('boolean_prefs'), 'ENABLE_API_ACCESS');
+  assert.equal(result.reload, false);
+  assert.equal(result.message, 'The configuration was saved.');
+});
+
+test('saveConfig reports the reload sentinel the theme/language case returns', async () => {
+  installGlobals();
+  stubFetch([{ text: 'PREFS_NEED_RELOAD' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.saveConfig(backend, { USER_CSS_THEME: 'night.css' }, []);
+  assert.equal(result.reload, true);
+});
+
+test('getUsers maps the table rows and access-level names', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        users: [
+          { id: 1, login: 'admin', access_level: 10, access_level_name: 'Administrator', num_feeds: 2, created: 'Never', last_login: '14:00' },
+        ],
+        access_level_names: { 10: 'Administrator' },
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const { users, accessLevelNames } = await endpoints.getUsers(backend, { sort: 'login' });
+  assert.equal(users[0].login, 'admin');
+  assert.equal(users[0].num_feeds, 2);
+  assert.equal(accessLevelNames['10'], 'Administrator');
+});
+
+test('getEventLog maps paging and entries', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        page: 0,
+        total_pages: 3,
+        severity: 512,
+        entries: [
+          { errno: 512, errno_name: 'E_USER_WARNING', filename: 'a.php', lineno: 1, errstr: 'boom', context: '', login: 'admin', created_at: '14:00' },
+        ],
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const log = await endpoints.getEventLog(backend, { page: 0, severity: 512 });
+  assert.equal(log.totalPages, 3);
+  assert.equal(log.entries[0].errno_name, 'E_USER_WARNING');
+});
+
+test('getRawFeedTree preserves ids and nesting for reordering', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        items: [
+          { id: 'CAT:-1', bare_id: -1, name: 'Special', type: 'category', items: [{ id: 'FEED:-4', bare_id: -4, name: 'All', type: 'feed' }] },
+          { id: 'CAT:1', bare_id: 1, name: 'News', type: 'category', items: [{ id: 'FEED:2', bare_id: 2, name: 'Example', type: 'feed' }] },
+        ],
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const tree = await endpoints.getRawFeedTree(backend);
+  assert.equal(tree[1].id, 'CAT:1');
+  assert.equal(tree[1].children[0].id, 'FEED:2');
+  assert.equal(tree[1].children[0].type, 'feed');
+});
+
+test('saveFeedOrder emits the nested map savefeedorder walks', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFeedOrder(backend, [
+    {
+      id: 'CAT:1',
+      bare_id: 1,
+      name: 'News',
+      type: 'category',
+      children: [
+        { id: 'FEED:2', bare_id: 2, name: 'A', type: 'feed', children: [] },
+        { id: 'FEED:1', bare_id: 1, name: 'B', type: 'feed', children: [] },
+      ],
+    },
+  ]);
+
+  const payload = JSON.parse(decodeURIComponent(new URLSearchParams(calls[0].body).get('payload')));
+  const root = payload.items.find(entry => entry.id === 'root');
+  const cat = payload.items.find(entry => entry.id === 'CAT:1');
+
+  assert.deepEqual(root.items, [{ _reference: 'CAT:1' }]);
+  assert.deepEqual(cat.items, [{ _reference: 'FEED:2' }, { _reference: 'FEED:1' }]);
+});
+
+test('cloneFilters omits the title unless a single filter is cloned', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }, { text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.cloneFilters(backend, [1], 'My copy');
+  assert.equal(new URLSearchParams(calls[0].body).get('new_filter_title'), 'My copy');
+
+  await endpoints.cloneFilters(backend, [1, 2]);
+  assert.equal(new URLSearchParams(calls[1].body).get('new_filter_title'), null);
+});
+
+test('joinFilters is a no-op for fewer than two filters', async () => {
+  installGlobals();
+  const calls = stubFetch([]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.joinFilters(backend, [1]);
+  assert.equal(calls.length, 0);
+});
+
+test('getAuthInfo maps personal data, app passwords and OTP state', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        full_name: 'Ada',
+        email: 'ada@example.com',
+        can_change_password: true,
+        auth_module: 'auth_internal',
+        otp_enabled: false,
+        otp_available: true,
+        otp_qrcode: 'data:image/svg+xml;base64,AAAA',
+        otp_secret: 'ABCD EFGH',
+        app_passwords: [{ id: 1, title: 'phone', created: '14:00', last_used: 'Never' }],
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const info = await endpoints.getAuthInfo(backend);
+  assert.equal(info.full_name, 'Ada');
+  assert.equal(info.can_change_password, true);
+  assert.equal(info.otp_enabled, false);
+  assert.equal(info.app_passwords[0].title, 'phone');
+  assert.equal(info.otp_secret, 'ABCD EFGH');
+});
+
+test('setOtp reports the OK / ERROR answer verbatim', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: 'OK' }, { text: 'ERROR:Incorrect password' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.equal(await endpoints.setOtp(backend, true, { password: 'p', otp: '123456' }), 'OK');
+  assert.equal(new URLSearchParams(calls[0].body).get('method'), 'otpenable');
+  assert.equal(new URLSearchParams(calls[0].body).get('otp'), '123456');
+
+  const failure = await endpoints.setOtp(backend, false, { password: 'bad' });
+  assert.equal(failure, 'ERROR:Incorrect password');
+  assert.equal(new URLSearchParams(calls[1].body).get('method'), 'otpdisable');
+});
+
+test('getPluginPrefsTabs returns the per-tab HTML fragments', async () => {
+  installGlobals();
+  stubFetch([{ text: JSON.stringify({ tabs: { prefFeeds: '<div>x</div>' } }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.deepEqual(await endpoints.getPluginPrefsTabs(backend), { prefFeeds: '<div>x</div>' });
+});
+
+test('saveUser sends otp_enabled as the checkbox value the handler expects', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveUser(backend, {
+    id: 2,
+    login: 'bob',
+    access_level: 0,
+    email: 'bob@example.com',
+    otp_enabled: true,
+    password: 'secret',
+  });
+
+  const body = new URLSearchParams(calls[0].body);
+  assert.equal(body.get('otp_enabled'), 'on');
+  assert.equal(body.get('login'), 'bob');
+  assert.equal(body.get('password'), 'secret');
 });

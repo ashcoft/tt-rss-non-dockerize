@@ -1,15 +1,13 @@
-/* global Plugins, xhr, __ */
+/* global Plugins, xhr, __, fox */
 
 Plugins.Psql_Trgm = {
 	showRelated: function (id) {
-		const dialog = new dijit.Dialog({
+		const dialog = new fox.SingleUseDialog({
 			title: __("Related articles"),
 			content: __("Loading, please wait...")
 		});
 
-		const tmph = dojo.connect(dialog, "onShow", null, function (/* e */) {
-			dojo.disconnect(tmph);
-
+		dialog.connect("onShow", function (/* e */) {
 			xhr.post("backend.php", {op: 'PluginHandler', plugin: 'af_psql_trgm', method: 'showrelated', id: id}, (reply) => {
 				dialog.attr('content', reply);
 			});
@@ -18,4 +16,3 @@ Plugins.Psql_Trgm = {
 		dialog.show();
 	}
 };
-

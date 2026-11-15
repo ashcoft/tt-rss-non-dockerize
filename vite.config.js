@@ -1,9 +1,8 @@
 /**
  * Vite Configuration for Tiny Tiny RSS
  * 
- * This configuration enables Vite to work alongside the existing Dojo build system.
- * It provides:
- * - Vue dependency optimization (legacy Dojo retains its AMD loader)
+ * This configuration builds the Vue 3 application. It provides:
+ * - Vue dependency optimization
  * - Dev server with HMR for faster development
  * - Proxy to PHP backend for API calls
  * - Asset handling for CSS, fonts, and images
@@ -52,8 +51,11 @@ export default defineConfig({
 
     // Rollup options for better AMD handling
     rollupOptions: {
-      // Entry point for the application
-      input: path.resolve(__dirname, 'src/vue/index.html'),
+      // Entry points: the main app and the preferences app.
+      input: {
+        index: path.resolve(__dirname, 'src/vue/index.html'),
+        prefs: path.resolve(__dirname, 'src/vue/prefs.html'),
+      },
       
       // Keep the existing directory structure for compatibility.
       // Entries without exports are allowed; rolldown (Vite 8) only accepts
@@ -78,13 +80,7 @@ export default defineConfig({
   // Resolve configuration for module aliases
   resolve: {
     alias: {
-      // Dojo module aliases - point to the existing Dojo AMD modules
-      'dojo': path.resolve(__dirname, 'lib/dojo'),
-      'dijit': path.resolve(__dirname, 'lib/dijit'),
-      'fox': path.resolve(__dirname, 'js'),
       
-      // Legacy module paths
-      'lib': path.resolve(__dirname, 'lib'),
       
       // Vue 3 aliases
       '@': path.resolve(__dirname, 'src/vue'),
@@ -192,7 +188,6 @@ export default defineConfig({
           path.resolve(__dirname, 'themes'),
           path.resolve(__dirname, 'themes/light'),
           path.resolve(__dirname, 'themes/night'),
-          path.resolve(__dirname, 'lib/dijit/themes'),
         ],
       },
     },
@@ -233,7 +228,7 @@ export default defineConfig({
   
   // Define global constants
   define: {
-    // Make __dirname available for legacy code
+    // Make __dirname available to the config's own references
     __dirname: JSON.stringify(__dirname),
   },
   

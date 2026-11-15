@@ -11,9 +11,6 @@ export default [
       '.github/**',
       'node_modules/**',
       'dist/**',
-      'lib/dojo/**',
-      'lib/dijit/**',
-      'lib/dojox/**',
       'vendor/**'
     ]
   },
@@ -26,11 +23,7 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: {
-        ...globals.browser,
-
-        // Dojo
-        dojo: 'readonly',
-        dijit: 'readonly'
+        ...globals.browser
       }
     },
 

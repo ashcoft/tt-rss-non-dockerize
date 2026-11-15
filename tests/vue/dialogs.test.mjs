@@ -29,6 +29,9 @@ function requireModule(id) {
 // Local modules the components under test import, mapped to their sources.
 const LOCAL_SOURCES = {
   '@/composables/useInfiniteScroll': '../../src/vue/composables/useInfiniteScroll.ts',
+  '@/legacy/pluginCompat': '../../src/vue/legacy/pluginCompat.ts',
+  // Resolved relative to src/vue/legacy when pluginCompat.ts is compiled.
+  '../utils/runDetached': '../../src/vue/utils/runDetached.ts',
   '../../utils/runDetached': '../../src/vue/utils/runDetached.ts',
 };
 
@@ -52,7 +55,9 @@ function compileComponent(relativePath) {
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
       }).outputText;
       const exports = {};
-      new Function('require', 'exports', compiled)(require, exports);
+      // Nested local modules are resolved through the same map so a helper that
+      // itself imports another local helper still compiles.
+      new Function('require', 'exports', compiled)(localRequire, exports);
       return exports;
     }
     return requireModule(id);
