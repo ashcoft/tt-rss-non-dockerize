@@ -100,12 +100,21 @@ test.describe('Vue front-end', () => {
     await expect(page.getByText('Keyboard shortcuts')).toBeVisible();
   });
 
-  test('renders feed icons for the seeded feeds', async ({ page }) => {
+  test('renders an icon (or RSS fallback) for each seeded feed', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Technology');
     await expect(page.getByText('Hacker News', { exact: true })).toBeVisible({ timeout: 15000 });
-    const icons = page.locator('.feed-icon');
-    expect(await icons.count()).toBeGreaterThan(0);
+
+    // Each feed row shows either its real icon or the RSS glyph fallback once
+    // the icon request settles (the seed data has no cached icons, so the
+    // glyph is the expected steady state here).
+    const rows = page.locator('.feed-list .v-list-item').filter({ hasText: /Hacker News|Ars Technica/ });
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i);
+      await expect(row.locator('.feed-icon, .mdi-rss').first()).toBeVisible();
+    }
   });
 
   test('opens an article in the reading pane', async ({ page }) => {
