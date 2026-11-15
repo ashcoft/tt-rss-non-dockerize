@@ -6,8 +6,9 @@
 entry point.** The reading flow (login, feed tree, headlines, search, view
 modes, sorting, article actions, tags, scoring, feed editing, feed-icon upload,
 feed/category reordering, labels and label colours), content-filter management
-(list, create, edit, delete) and OPML import/export run entirely on Vue 3 +
-Vuetify + Pinia, talking to `backend.php` through the legacy adapter.
+(list, create, edit, delete), OPML import/export and password changes run
+entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
+legacy adapter.
 
 The Dojo stack is **not yet deleted**. What remains:
 
@@ -82,6 +83,10 @@ rather than the clickable item. There is no known blocker here.
   (the Dojo tree payload, built by `buildFeedOrderPayload`) and up/down move
   controls on every feed and category in `FeedTree`. Moving a feed is bounded
   to its own category so a move cannot change membership by accident.
+- **Password changes were missing.** Added `Pref_Prefs/changepassword` in a new
+  Password tab in `PreferencesDialog`. The handler answers with an HTML
+  fragment; `parsePrefsResult` treats an `alert-danger` block as failure and
+  strips the wrapper for the message.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -89,8 +94,8 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers only a handful of user preferences, not feed preferences or plugin
-  settings.
+  covers only a handful of user preferences and password changes, not feed
+  preferences or plugin settings.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).

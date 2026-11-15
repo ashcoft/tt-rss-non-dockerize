@@ -1117,3 +1117,35 @@ test('saveFeedOrder posts the JSON payload to savefeedorder', async () => {
     { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
   ]);
 });
+
+test('changePassword posts the three fields and reads a notice as success', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: '<div class="alert alert-info" id="">Password changed.</div>' },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.changePassword(backend, 'old', 'new', 'new');
+
+  const body = calls[0].body;
+  assert.ok(body.includes('method=changepassword'));
+  assert.ok(body.includes('old_password=old'));
+  assert.ok(body.includes('new_password=new'));
+  assert.ok(body.includes('confirm_password=new'));
+  assert.deepEqual(result, { ok: true, message: 'Password changed.' });
+});
+
+test('changePassword reads an alert-danger block as a failure', async () => {
+  installGlobals();
+  stubFetch([
+    { text: '<div class="alert alert-danger" id="">Entered passwords do not match.</div>' },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.changePassword(backend, 'old', 'new', 'other');
+
+  assert.equal(result.ok, false);
+  assert.equal(result.message, 'Entered passwords do not match.');
+});
