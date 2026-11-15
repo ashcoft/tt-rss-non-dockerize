@@ -534,8 +534,13 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
                     WHERE post_id = 1 AND content_type = 'image/jpeg'");
 
         $remote = 'https://example.com/photo.jpg';
+
+        // DiskCache keys are sha1(content_url); this is a cache key, not a
+        // security boundary, so match the production algorithm exactly.
+        $key = sha1($remote); // NOSONAR
+
         $cache = DiskCache::instance('images');
-        $cache->put(sha1($remote), base64_decode(
+        $cache->put($key, base64_decode(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
 
         try {
@@ -544,8 +549,8 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
             $this->assertStringStartsWith(Config::get_self_url() . '/', $preview,
                 'a cached image is served from this installation');
         } finally {
-            if ($cache->exists(sha1($remote))) {
-                $cache->remove(sha1($remote));
+            if ($cache->exists($key) === true) {
+                $cache->remove($key);
             }
         }
     }
