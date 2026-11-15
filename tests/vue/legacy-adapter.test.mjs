@@ -1167,3 +1167,16 @@ test('catchupFeed sends the feed, is_cat flag and time window', async () => {
   assert.ok(calls[1].body.includes('is_cat=1'));
   assert.ok(calls[1].body.includes('mode=all'));
 });
+
+test('getHotkeyHelp returns the raw HTML fragment', async () => {
+  installGlobals();
+  const html = "<ul class='panel hotkeys-help'><li><div class='hk'><code>j</code></div></li></ul>";
+  const calls = stubFetch([{ text: html }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const help = await endpoints.getHotkeyHelp(backend);
+
+  assert.ok(calls[0].body.includes('method=hotkeyHelp'));
+  assert.equal(help, html);
+});

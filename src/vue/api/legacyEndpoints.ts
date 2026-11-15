@@ -1045,6 +1045,16 @@ export async function removeFeedIcon(backend: LegacyBackend, feedId: number): Pr
 }
 
 /**
+ * The keyboard-shortcuts help. `RPC/hotkeyHelp` prints an HTML fragment
+ * (the hotkey map formatted as a list), so the raw body is returned for the
+ * caller to sanitize and display.
+ */
+export async function getHotkeyHelp(backend: LegacyBackend): Promise<string> {
+  const response = await backend.call('RPC', 'hotkeyHelp');
+  return response.raw;
+}
+
+/**
  * Build the tree payload `Pref_Feeds/savefeedorder` expects.
  *
  * The handler walks `items` keyed by node id: the root node lists the
