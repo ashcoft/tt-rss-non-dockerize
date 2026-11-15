@@ -169,6 +169,12 @@ INSERT INTO ttrss_enclosures (content_url, content_type, title, duration, width,
 
 SELECT setval(pg_get_serial_sequence('ttrss_enclosures', 'id'), (SELECT MAX(id) FROM ttrss_enclosures));
 
+-- 5d. Full-text search vector. tt-rss builds `tsvector_combined` from the
+-- article title and the HTML-stripped content (see Article::_set_content);
+-- the seed inserts rows directly, so populate it here or search matches nothing.
+UPDATE ttrss_entries
+SET tsvector_combined = to_tsvector('english', coalesce(title, '') || ' ' || regexp_replace(coalesce(content, ''), '<[^>]+>', ' ', 'g'));
+
 -- 5c. Label assignments: test-label-1 on articles 1 and 9.
 INSERT INTO ttrss_user_labels2 (label_id, article_id) VALUES
 (1, 1),
