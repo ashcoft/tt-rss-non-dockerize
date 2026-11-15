@@ -1,8 +1,3 @@
-Thumbs.db
-/.env
-/docker-compose.override.yml
-/.app_is_ready
-/messages.mo
 /node_modules
 # CI and Netlify install with pnpm; pnpm-lock.yaml is the only lockfile
 /package-lock.json
@@ -23,3 +18,8 @@ Thumbs.db
 /.rector-tmp
 /.tools/
 /version_static.txt
+
+# Playwright artifacts
+/test-results
+/playwright-report
+/.playwright

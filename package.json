@@ -26,6 +26,7 @@
     "type-check": "tsc --noEmit",
     "lint:vue": "eslint src/vue",
     "test:vue": "node --test tests/vue/*.test.mjs",
+    "test:e2e": "playwright test",
     "lint:css": "stylelint 'lib/flat-ttrss/**/*.css' 'plugins/**/*.css' 'themes/**/*.less'",
     "lint:js": "eslint js src plugins",
     "phpunit": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.0",
     "@semantic-release/git": "^11.0.1",
