@@ -52,4 +52,15 @@ export default function globalSetup(): void {
   } catch (err) {
     console.warn('[e2e] could not clear leftover E2E filters:', (err as Error).message);
   }
+
+  // Likewise drop any tags an E2E run added.
+  try {
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_tags WHERE tag_name LIKE 'e2e%'"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
+  } catch (err) {
+    console.warn('[e2e] could not clear leftover E2E tags:', (err as Error).message);
+  }
 }
