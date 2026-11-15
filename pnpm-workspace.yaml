@@ -4,6 +4,11 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
 overrides:
+  # GHSA-g3hv-75wg-m249 again, in the copy of minimatch bundled inside the npm
+  # CLI. Bundled dependencies cannot be overridden and no npm release ships the
+  # fixed 11.0.1, so the npm CLI itself is dropped. It is only a dependency of
+  # @semantic-release/npm, a plugin .releaserc.json does not load.
+  '@semantic-release/npm>npm': '-'
   esbuild@>=0 <0.28.1: '0.28.1'
   # GHSA-g3hv-75wg-m249: globparts amplification in firstPhasePreProcess().
   # Every dependent (eslint, @eslint/config-array, typescript-estree) asks for
