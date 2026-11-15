@@ -12,6 +12,7 @@
           <v-tab value="edit">Edit Feed</v-tab>
           <v-tab value="remove">Remove / Purge</v-tab>
           <v-tab value="categories">Categories</v-tab>
+          <v-tab value="opml">OPML</v-tab>
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
@@ -136,6 +137,36 @@
               </v-list-item>
             </v-list>
           </v-window-item>
+
+          <!-- OPML import / export -->
+          <v-window-item value="opml">
+            <p class="text-subtitle-2 mb-2">Import</p>
+            <v-file-input
+              v-model="opmlFile"
+              label="OPML file"
+              accept=".opml,.xml,text/xml,application/xml"
+              density="compact"
+              hide-details
+              class="mb-2"
+            />
+            <v-btn
+              color="primary"
+              :disabled="!opmlFile"
+              :loading="busy"
+              @click="runDetached(importOpmlFile(), 'import OPML')"
+            >
+              Import OPML
+            </v-btn>
+            <v-card v-if="opmlResult" variant="outlined" class="pa-3 mt-3">
+              <div class="opml-result" v-html="sanitizedOpmlResult" />
+            </v-card>
+
+            <v-divider class="my-4" />
+
+            <p class="text-subtitle-2 mb-2">Export</p>
+            <v-checkbox v-model="opmlIncludeSettings" label="Include tt-rss settings" hide-details density="compact" />
+            <v-btn class="mt-2" prepend-icon="mdi-download" @click="exportOpml">Export OPML</v-btn>
+          </v-window-item>
         </v-window>
 
         <v-alert v-if="message" :type="messageType" variant="tonal" density="compact" class="mt-4">
@@ -152,7 +183,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import DOMPurify from 'dompurify';
 import { useFeedsStore, type Category } from '../../stores';
+import { runDetached } from '../../utils/runDetached';
+import api from '../../api/client';
 import {
   FEED_PURGE_INTERVALS,
   FEED_UPDATE_INTERVALS,
@@ -179,6 +213,14 @@ const editFeedId = ref<number | null>(null);
 const editDetails = ref<FeedDetails | null>(null);
 const updateIntervals = FEED_UPDATE_INTERVALS;
 const purgeIntervals = FEED_PURGE_INTERVALS;
+
+// OPML import / export
+const opmlFile = ref<File | File[] | null>(null);
+const opmlResult = ref('');
+const opmlIncludeSettings = ref(true);
+
+/** The import log is an HTML fragment; sanitize it before rendering. */
+const sanitizedOpmlResult = computed(() => DOMPurify.sanitize(opmlResult.value));
 
 const categoryOptions = computed(() => feedStore.categories);
 
@@ -270,6 +312,31 @@ const deleteCategory = async (cat: Category) => {
   const ok = await feedStore.deleteCategory(cat.id);
   busy.value = false;
   if (!ok) notify(feedStore.error ?? 'Failed to delete category', 'error');
+};
+
+const importOpmlFile = async () => {
+  // v-file-input yields an array when `multiple` is set; this one is single.
+  const file = Array.isArray(opmlFile.value) ? opmlFile.value[0] : opmlFile.value;
+  if (!file) return;
+  busy.value = true;
+  try {
+    const response = await api.importOpml(file);
+    if (response.status === 0) {
+      opmlResult.value = response.content;
+      notify('OPML imported');
+      await feedStore.loadFeeds();
+    } else {
+      notify(response.error ?? 'Failed to import OPML', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
+};
+
+const exportOpml = () => {
+  // The export is a GET that sets Content-Disposition; navigate so the browser
+  // handles the download instead of fetch returning the XML as text.
+  window.open(api.opmlExportUrl(opmlIncludeSettings.value), '_blank', 'noreferrer');
 };
 
 // Use emit instead of $emit for v-model binding

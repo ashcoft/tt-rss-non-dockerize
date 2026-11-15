@@ -137,7 +137,7 @@ const CSRF_IGNORED = new Set([
 
 /** Append one parameter, expanding arrays into repeated `key[]` entries. */
 const appendParam = (
-  body: URLSearchParams,
+  body: URLSearchParams | FormData,
   key: string,
   value: LegacyParams[string]
 ): void => {
@@ -201,6 +201,38 @@ export class LegacyBackend {
     return { body: parsed, raw };
   }
 
+  /**
+   * Invoke `op`/`method` with a multipart body (file upload). `params` become
+   * form fields and `file` is sent under `fileField`. The CSRF token is added
+   * as a field, since it cannot go in the query string for a POST.
+   */
+  async upload(
+    op: string,
+    method: string,
+    params: LegacyParams,
+    fileField: string,
+    file: Blob,
+    fileName = 'upload'
+  ): Promise<LegacyResponse> {
+    const form = new FormData();
+    form.set('op', op);
+    form.set('method', method);
+    for (const [key, value] of Object.entries(params)) {
+      appendParam(form, key, value);
+    }
+    if (LegacyBackend.requiresCsrf(op, method)) {
+      form.set('csrf_token', await this.resolveCsrfToken(op, method));
+    }
+    form.set(fileField, file, fileName);
+
+    const response = await this.sendMultipart(op, method, form);
+    const raw = await response.text();
+    const parsed = parseBody(raw);
+    throwIfBackendError(parsed);
+
+    return { body: parsed, raw };
+  }
+
   /** Methods listed in CSRF_IGNORED may be called before a session exists. */
   private static requiresCsrf(op: string, method: string): boolean {
     return !CSRF_IGNORED.has(`${op}/${method}`.toLowerCase());
@@ -233,6 +265,32 @@ export class LegacyBackend {
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
+      });
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      throw new LegacyProtocolError(`${op}->${method} request failed: ${detail}`);
+    }
+
+    if (!response.ok) {
+      throw new LegacyProtocolError(`${op}->${method} returned HTTP ${response.status}.`);
+    }
+
+    return response;
+  }
+
+  /** POST a multipart body. The browser sets the Content-Type boundary. */
+  private async sendMultipart(
+    op: string,
+    method: string,
+    form: FormData
+  ): Promise<Response> {
+    let response: Response;
+
+    try {
+      response = await fetch(this.baseUrl, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
       });
     } catch (cause) {
       const detail = cause instanceof Error ? cause.message : String(cause);
