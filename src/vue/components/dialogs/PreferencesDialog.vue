@@ -202,6 +202,10 @@ const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: 
   { name: 'fresh_article_max_age', type: 'string', label: 'Maximum age of fresh articles (hours)' },
   { name: 'recently_read_max_age', type: 'string', label: 'Maximum age of recently read articles (hours)' },
   { name: 'debug_headline_ids', type: 'bool', label: 'Show article and feed IDs in the headlines buffer' },
+  { name: 'digest_enable', type: 'bool', label: 'Enable digest (daily email of new/unread headlines)' },
+  { name: 'digest_catchup', type: 'bool', label: 'Mark digest articles as read when sent' },
+  { name: 'digest_preferred_time', type: 'string', label: 'Try to send the digest around this time (UTC, HH:MM)' },
+  { name: 'digest_min_score', type: 'string', label: 'Only include articles with at least this score' },
 ];
 
 /** Map a UI pref key back to the Prefs::* name `RPC/setpref` expects. */
