@@ -16,11 +16,32 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm run build        # vite build
 corepack pnpm run type-check   # tsc --noEmit
 corepack pnpm run test:vue     # node --test tests/vue/*.test.mjs
+corepack pnpm run test:e2e     # Playwright against a running instance
 corepack pnpm run lint:vue     # eslint src/vue
 corepack pnpm run lint:js      # eslint js src plugins
 ```
 
-Run all five before finishing a frontend change; CI runs them on every PR.
+Run the first six before finishing a frontend change; CI runs them on every PR.
+
+### End-to-end tests
+
+`pnpm run test:e2e` drives the built app in a real browser (Playwright +
+Chromium). It needs a running tt-rss instance whose `index.php` serves the
+Vue bundle (`pnpm run build` first). Point it at the instance with
+`E2E_BASE_URL`; the tests skip themselves when it is unreachable, so they never
+break a unit run. Set `TTRSS_DB_*` and the global setup re-seeds the database
+from `tests_integration/seed.sql` before the run (the tests mutate state).
+
+```bash
+# One way to stand up an instance for E2E (see also tests_integration/run.sh):
+TTRSS_DB_HOST=localhost TTRSS_DB_PORT=55432 TTRSS_DB_NAME=ttrss_test \
+TTRSS_DB_USER=ttrss_test TTRSS_DB_PASS=ttrss_test TTRSS_SINGLE_USER_MODE=1 \
+  php ./update.php --update-schema=force-yes
+E2E_BASE_URL=http://127.0.0.1:8080 corepack pnpm run test:e2e
+```
+
+Note: `TTRSS_SINGLE_USER_MODE=1` serves the app to an already-authenticated
+session, so the login form is bypassed; the spec handles both cases.
 
 ## Frontend architecture
 

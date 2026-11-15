@@ -144,6 +144,14 @@ modes and all four sort orders return correctly ordered results.
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).
 
+### End-to-end verification
+
+`tests/e2e/frontend.spec.ts` (Playwright) drives the built app against a real
+`index.php` + `backend.php` instance, so the migration can be checked in a
+browser rather than only by unit tests. It caught a real bug: a Vuetify menu
+nested inside a `v-list-group` activator had its clicks swallowed by the row's
+select handler (fixed by using plain action buttons).
+
 ### How the adapter works
 
 | Module | Responsibility |
