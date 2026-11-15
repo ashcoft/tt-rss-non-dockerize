@@ -566,6 +566,24 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   }
 
   /** Set the score for an article. */
+  /** Set the score on several articles at once (one RPC/setArticleScore). */
+  async function setScoreFor(articleIds: number[], score: number): Promise<void> {
+    if (articleIds.length === 0) return;
+    const ids = new Set(articleIds);
+    try {
+      await api.setArticleScore(articleIds, score);
+      for (const headline of headlines.value) {
+        if (ids.has(headline.id)) headline.score = score;
+      }
+      if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
+        selectedArticle.value.score = score;
+      }
+    } catch (err) {
+      console.error('Failed to set score:', err);
+      throw err;
+    }
+  }
+
   async function setScore(articleId: number, score: number): Promise<void> {
     try {
       await api.setArticleScore([articleId], score);
@@ -628,6 +646,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     updateTags,
     suggestTags,
     setScore,
+    setScoreFor,
     setViewMode,
     setOrderBy,
     setSearchQuery,
