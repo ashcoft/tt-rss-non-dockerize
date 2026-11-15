@@ -98,6 +98,16 @@ const sanitizedContent = computed(() => {
           <span class="feed">{{ article.feed_title }}</span>
           <span v-if="article.author" class="author">by {{ article.author }}</span>
           <time :datetime="article.updated">{{ article.updated }}</time>
+          <!-- Comments link, mirroring the legacy article header. -->
+          <a
+            v-if="article.comments_count > 0 || article.comments_link"
+            class="comments"
+            :href="article.comments_link || article.link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ({{ article.comments_count }} {{ article.comments_count === 1 ? 'comment' : 'comments' }})
+          </a>
         </div>
       </header>
       
@@ -201,6 +211,15 @@ const sanitizedContent = computed(() => {
   gap: 1rem;
   color: #666;
   font-size: 0.875rem;
+}
+
+.article-meta .comments {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.article-meta .comments:hover {
+  text-decoration: underline;
 }
 
 .article-body {
