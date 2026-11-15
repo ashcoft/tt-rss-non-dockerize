@@ -91,7 +91,12 @@ rather than the clickable item. There is no known blocker here.
   `purge_unread_articles`, `show_content_preview` and `vfeed_group_by_feed`
   were listed in the dialog but absent from `RPC/sanityCheck` init-params,
   their only read endpoint, so the dialog always showed them empty/false.
-  `RPC::_make_init_params()` now exposes them.
+  `RPC::_make_init_params()` now exposes them, and the dialog also surfaces
+  the seven other preferences that endpoint already returned
+  (`combined_display_mode`, `cdm_enable_grid`, `on_catchup_show_next_feed`,
+  `hide_read_shows_special`, `fresh_article_max_age`,
+  `recently_read_max_age`, `debug_headline_ids`). A Vue test asserts every
+  preference the dialog lists is present in init-params.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -99,7 +104,7 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers only a handful of user preferences and password changes, not feed
+  covers the common user preferences (and password changes) but not feed
   preferences or plugin settings.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.

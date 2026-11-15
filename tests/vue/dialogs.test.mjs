@@ -168,3 +168,32 @@ for (const [label, flags, expected] of [
     assert.equal(container.listeners.has('scroll'), false);
   });
 }
+
+test('every preference the dialog lists is exposed by RPC/sanityCheck', () => {
+  // RPC/sanityCheck init-params is the only endpoint that returns preference
+  // values. A preference listed in the dialog but absent here renders blank,
+  // and saving it silently overwrites the real value with a default.
+  const dialogSource = readFileSync(
+    fileURLToPath(new URL('../../src/vue/components/dialogs/PreferencesDialog.vue', import.meta.url)),
+    'utf8'
+  );
+  const rpcSource = readFileSync(
+    fileURLToPath(new URL('../../classes/RPC.php', import.meta.url)),
+    'utf8'
+  );
+
+  const dialogPrefs = [...dialogSource.matchAll(/name: '([a-z_]+)'/g)].map((m) => m[1]);
+  assert.ok(dialogPrefs.length > 0, 'expected to find preference names in the dialog');
+
+  // Restrict to the _make_init_params() method so unrelated Prefs:: uses in
+  // RPC.php do not mask a missing entry.
+  const methodStart = rpcSource.indexOf('function _make_init_params');
+  assert.ok(methodStart > -1, 'could not locate _make_init_params in RPC.php');
+  const methodBody = rpcSource.slice(methodStart, rpcSource.indexOf('private function image_to_base64', methodStart));
+  const exposed = new Set(
+    [...methodBody.matchAll(/Prefs::([A-Z_]+)/g)].map((m) => m[1].toLowerCase())
+  );
+
+  const missing = dialogPrefs.filter((name) => !exposed.has(name));
+  assert.deepEqual(missing, [], `these dialog preferences are not in init-params: ${missing.join(', ')}`);
+});

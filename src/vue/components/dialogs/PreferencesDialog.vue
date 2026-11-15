@@ -180,15 +180,22 @@ interface EditablePref {
 // The subset of TT-RSS user preferences surfaced in the UI. The keys are the
 // lowercased Prefs::* names as they appear in RPC/sanityCheck init-params.
 const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: string }> = [
+  { name: 'combined_display_mode', type: 'bool', label: 'Combined mode (flat list instead of separate panels)' },
+  { name: 'cdm_enable_grid', type: 'bool', label: 'Grid view on wider screens (if always expanded)' },
   { name: 'purge_old_days', type: 'string', label: 'Purge articles older than (days)' },
   { name: 'purge_unread_articles', type: 'bool', label: 'Purge unread articles' },
   { name: 'enable_feed_cats', type: 'bool', label: 'Enable feed categories' },
   { name: 'show_content_preview', type: 'bool', label: 'Show content preview in headlines' },
   { name: 'hide_read_feeds', type: 'bool', label: 'Hide read feeds in the feed list' },
+  { name: 'hide_read_shows_special', type: 'bool', label: 'Always show special feeds while hiding read feeds' },
   { name: 'feeds_sort_by_unread', type: 'bool', label: 'Sort feeds by unread count' },
   { name: 'confirm_feed_catchup', type: 'bool', label: 'Confirm before marking a feed as read' },
+  { name: 'on_catchup_show_next_feed', type: 'bool', label: 'Automatically show next feed after marking one as read' },
   { name: 'cdm_auto_catchup', type: 'bool', label: 'Automatically mark articles as read in combined mode' },
   { name: 'vfeed_group_by_feed', type: 'bool', label: 'Group headlines by feed' },
+  { name: 'fresh_article_max_age', type: 'string', label: 'Maximum age of fresh articles (hours)' },
+  { name: 'recently_read_max_age', type: 'string', label: 'Maximum age of recently read articles (hours)' },
+  { name: 'debug_headline_ids', type: 'bool', label: 'Show article and feed IDs in the headlines buffer' },
 ];
 
 /** Map a UI pref key back to the Prefs::* name `RPC/setpref` expects. */
