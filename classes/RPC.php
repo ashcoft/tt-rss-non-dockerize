@@ -108,7 +108,7 @@ class RPC extends Handler_Protected {
 			'runtime-info' => static::_make_runtime_info()
 		];
 
-		print json_encode($reply);
+		print json_encode($reply, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 	}
 
 	function getAllCounters(): void {
@@ -127,10 +127,18 @@ class RPC extends Handler_Protected {
 			&& !Prefs::get(Prefs::DISABLE_CONDITIONAL_COUNTERS, $_SESSION['uid'], $_SESSION['profile'] ?? null) ?
 			Counters::get_conditional($feed_ids, $label_ids) : Counters::get_all();
 
-		print json_encode([
+		$reply = [
 			'counters' => $counters,
 			'seq' => $seq,
-		]);
+		];
+
+		// the periodic poll asks for all counters; piggyback runtime info on it so the
+		// main UI doesn't need a separate request every minute (partial refreshes
+		// after marking articles etc. don't need it)
+		if ($feed_ids === null)
+			$reply['runtime-info'] = static::_make_runtime_info();
+
+		print json_encode($reply, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 	}
 
 	/* GET["cmode"] = 0 - mark as read, 1 - as unread, 2 - toggle */
