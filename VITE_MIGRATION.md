@@ -131,6 +131,13 @@ rather than the clickable item. There is no known blocker here.
 - **"Mark above/below as read" was missing.** The article panel now offers both
   actions, backed by a store helper that collects the unread ids on the chosen
   side of the article.
+- **Article attachments were missing.** The adapter dropped the backend's
+  `enclosures` payload, so podcast audio, video and file attachments never
+  appeared. They are now mapped and rendered in the reading pane (audio/video
+  inline, the rest as links).
+- **Bulk actions were incomplete.** Beyond mark-read/delete, the selection bar
+  now offers open-original, toggle unread/starred/published and set-score, and
+  per-feed row actions mark a feed read or open the edit dialog.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
