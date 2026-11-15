@@ -328,12 +328,31 @@ class Feeds extends Handler_Protected {
 				// Extract article image for preview. Use the unfiltered list:
 				// 'entries' drops the media:thumbnail when a player is inlined,
 				// but that thumbnail is exactly the image this preview wants.
-				[$article_image] = Article::_get_image(
-					$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
-					$line["content"],
-					$line["site_url"] ?? '',
-					$line
-				);
+				//
+				// The client renders this as a plain <img>, so it has to honor the same
+				// restrictions as the article body: "Do not embed media" (global and per
+				// feed) and bandwidth saving mode. Otherwise a reader who disabled media
+				// still contacts the image host from a collapsed row. A private/loopback
+				// host is refused as well, matching Sanitizer's body-image check, so a
+				// hostile feed cannot point the preview at the local network.
+				$image_preview_allowed = empty($_SESSION["bw_limit"]) &&
+					!Prefs::get(Prefs::STRIP_IMAGES, $_SESSION['uid'], $profile) &&
+					!sql_bool_to_bool($line["hide_images"]);
+
+				if ($image_preview_allowed) {
+					[$article_image] = Article::_get_image(
+						$line["enclosures"]['preview_entries'] ?? $line["enclosures"]['entries'],
+						$line["content"],
+						$line["site_url"] ?? '',
+						$line
+					);
+
+					if ($article_image && UrlHelper::has_disallowed_ip($article_image))
+						$article_image = '';
+				} else {
+					$article_image = '';
+				}
+
 				$line["image_preview"] = $article_image ?: '';
 
 				$line["updated_long"] = TimeHelper::make_local_datetime($line["updated"]);

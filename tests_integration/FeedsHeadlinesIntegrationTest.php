@@ -460,6 +460,72 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
         }
     }
 
+    /**
+     * "Do not embed media" must also suppress the headline preview: the client
+     * renders it as a plain <img>, so an image host would still be contacted
+     * from a collapsed row even though the reader disabled media.
+     */
+    public function test_headlines_image_preview_respects_strip_images(): void {
+        Prefs::set(Prefs::STRIP_IMAGES, true, 1, null);
+
+        try {
+            $this->assertSame('', $this->previewForFeedOne(),
+                'no preview is emitted while "Do not embed media" is on');
+        } finally {
+            Prefs::set(Prefs::STRIP_IMAGES, false, 1, null);
+        }
+    }
+
+    /**
+     * The per-feed "Do not embed media" switch suppresses the preview too.
+     */
+    public function test_headlines_image_preview_respects_feed_hide_images(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_feeds SET hide_images = true WHERE id = 1");
+
+        try {
+            $this->assertSame('', $this->previewForFeedOne(),
+                'no preview is emitted while the feed hides media');
+        } finally {
+            $pdo->exec("UPDATE ttrss_feeds SET hide_images = false WHERE id = 1");
+        }
+    }
+
+    /**
+     * A private/loopback image host is refused, so a hostile feed cannot use
+     * the preview to make the reader's browser probe the local network.
+     */
+    public function test_headlines_image_preview_rejects_private_host(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'http://127.0.0.1:8080/evil.png'
+                    WHERE post_id = 1 AND content_type = 'image/jpeg'");
+
+        $this->assertSame('', $this->previewForFeedOne(),
+            'a loopback image URL is not used as the preview');
+    }
+
+    /**
+     * Render feed 1's headlines and return the first article's preview URL.
+     */
+    private function previewForFeedOne(): string {
+        [$override_order, $skip_first_id_check] = Feeds::_order_to_override_query('date_reverse');
+
+        $method = new ReflectionMethod('Feeds', '_format_headlines_list');
+        $method->setAccessible(true);
+
+        $ret = $method->invoke(new Feeds(['feed' => 1]), 1, '', 'all_articles', 30, false,
+            0, $override_order, true, null, $skip_first_id_check, 'date_reverse');
+
+        foreach ($ret[4]['content'] as $row) {
+            if (is_array($row) === true && ($row['id'] ?? 0) === 1) {
+                return (string) ($row['image_preview'] ?? '');
+            }
+        }
+
+        return '';
+    }
+
     // ── Feed with no articles for owner ──
 
     public function test_get_headlines_feed_not_subscribed(): void {
