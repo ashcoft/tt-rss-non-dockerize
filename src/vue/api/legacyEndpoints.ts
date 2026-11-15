@@ -1043,3 +1043,53 @@ export async function uploadFeedIcon(
 export async function removeFeedIcon(backend: LegacyBackend, feedId: number): Promise<void> {
   await backend.call('Pref_Feeds', 'removeIcon', { feed_id: feedId });
 }
+
+/**
+ * Build the tree payload `Pref_Feeds/savefeedorder` expects.
+ *
+ * The handler walks `items` keyed by node id: the root node lists the
+ * uncategorized feeds and the categories in display order, and each category
+ * node lists its feeds. Every leaf is a `{_reference}` pointing at a
+ * `FEED:<id>` or `CAT:<id>`.
+ */
+export function buildFeedOrderPayload(
+  categories: Array<{ id: number }>,
+  feeds: Array<{ id: number; cat_id?: number | null }>
+): { items: Array<Record<string, unknown>> } {
+  const rootItems: Array<Record<string, unknown>> = [];
+  const catItems = new Map<number, Array<Record<string, unknown>>>();
+
+  for (const category of categories) {
+    catItems.set(category.id, []);
+  }
+
+  for (const feed of feeds) {
+    const reference = { _reference: `FEED:${feed.id}` };
+    const bucket = feed.cat_id != null ? catItems.get(feed.cat_id) : undefined;
+    if (bucket) {
+      bucket.push(reference);
+    } else {
+      rootItems.push(reference);
+    }
+  }
+
+  for (const category of categories) {
+    rootItems.push({
+      id: `CAT:${category.id}`,
+      _reference: `CAT:${category.id}`,
+      items: catItems.get(category.id) ?? [],
+    });
+  }
+
+  return { items: [{ id: 'root', items: rootItems }] };
+}
+
+/** Persist the feed/category tree order and category membership. */
+export async function saveFeedOrder(
+  backend: LegacyBackend,
+  categories: Array<{ id: number }>,
+  feeds: Array<{ id: number; cat_id?: number | null }>
+): Promise<void> {
+  const payload = JSON.stringify(buildFeedOrderPayload(categories, feeds));
+  await backend.call('Pref_Feeds', 'savefeedorder', { payload });
+}

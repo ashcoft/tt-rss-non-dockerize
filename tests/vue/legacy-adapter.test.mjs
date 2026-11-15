@@ -1063,3 +1063,57 @@ test('removeFeedIcon calls removeIcon for the feed', async () => {
   assert.ok(calls[0].body.includes('method=removeIcon'));
   assert.ok(calls[0].body.includes('feed_id=7'));
 });
+
+test('buildFeedOrderPayload groups feeds under their categories', () => {
+  const payload = endpoints.buildFeedOrderPayload(
+    [{ id: 3 }, { id: 4 }],
+    [
+      { id: 7, cat_id: null },
+      { id: 9, cat_id: 3 },
+      { id: 10, cat_id: 4 },
+      { id: 11, cat_id: null },
+    ]
+  );
+
+  assert.deepEqual(payload, {
+    items: [
+      {
+        id: 'root',
+        items: [
+          { _reference: 'FEED:7' },
+          { _reference: 'FEED:11' },
+          { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
+          { id: 'CAT:4', _reference: 'CAT:4', items: [{ _reference: 'FEED:10' }] },
+        ],
+      },
+    ],
+  });
+});
+
+test('buildFeedOrderPayload keeps empty categories and drops unknown cat_ids', () => {
+  const payload = endpoints.buildFeedOrderPayload(
+    [{ id: 3 }],
+    [{ id: 9, cat_id: 99 }]
+  );
+
+  assert.deepEqual(payload.items[0].items, [
+    { _reference: 'FEED:9' },
+    { id: 'CAT:3', _reference: 'CAT:3', items: [] },
+  ]);
+});
+
+test('saveFeedOrder posts the JSON payload to savefeedorder', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFeedOrder(backend, [{ id: 3 }], [{ id: 9, cat_id: 3 }]);
+
+  const body = calls[0].body;
+  assert.ok(body.includes('method=savefeedorder'));
+  const payload = JSON.parse(decodeURIComponent(/payload=([^&]*)/.exec(body)[1]));
+  assert.deepEqual(payload.items[0].items, [
+    { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
+  ]);
+});

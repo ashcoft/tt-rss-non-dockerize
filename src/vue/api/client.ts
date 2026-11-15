@@ -156,6 +156,16 @@ class ApiClient {
     }, false);
   }
 
+  async saveFeedOrder(
+    categories: Array<{ id: number }>,
+    feeds: Array<{ id: number; cat_id?: number | null }>
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFeedOrder(legacyBackend, categories, feeds);
+      return true;
+    }, false);
+  }
+
   async catchupFeed(feedId: number | string, isCat = false): Promise<ApiResponse<boolean>> {
     return this.wrap(async () => {
       await endpoints.catchupFeed(legacyBackend, feedId, isCat);

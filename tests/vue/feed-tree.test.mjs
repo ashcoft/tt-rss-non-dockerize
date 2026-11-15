@@ -87,12 +87,24 @@ function mountFeedTree(props) {
       ]);
     },
   }));
+  const buttons = [];
+  // VBtn records its props (including onClick and title) so a test can invoke
+  // the reorder handlers.
+  app.component('VBtn', defineComponent({
+    inheritAttrs: false,
+    setup(_props, { attrs, slots }) {
+      return () => {
+        buttons.push(attrs);
+        return h('btn', null, slots.default?.());
+      };
+    },
+  }));
   for (const name of ['VTextField', 'VList', 'VIcon', 'VChip']) {
     app.component(name, passthrough);
   }
 
   app.mount({ children: [] });
-  return items;
+  return { items, buttons };
 }
 
 const feeds = [
@@ -100,7 +112,7 @@ const feeds = [
 ];
 
 test('FeedTree emits select with the feed id when an uncategorized feed is clicked', async () => {
-  const items = mountFeedTree({
+  const { items } = mountFeedTree({
     feeds,
     categories: [],
     labels: [],
@@ -120,7 +132,7 @@ test('FeedTree emits select with the feed id when an uncategorized feed is click
 });
 
 test('FeedTree emits select with isCat true for a category item', async () => {
-  const items = mountFeedTree({
+  const { items } = mountFeedTree({
     feeds: [{ id: 9, title: 'In Cat', unread: 1, cat_id: 3 }],
     categories: [{ id: 3, title: 'News', unread: 1, parent_id: null }],
     labels: [],
@@ -137,4 +149,46 @@ test('FeedTree emits select with isCat true for a category item', async () => {
   catItem.onClick();
 
   assert.deepEqual(selected, [[3, true]]);
+});
+
+test('FeedTree emits reorder when a feed move button is clicked', async () => {
+  const reorders = [];
+  const { buttons } = mountFeedTree({
+    feeds: [{ id: 7, title: 'Alpha Feed', unread: 3, cat_id: null }],
+    categories: [],
+    labels: [],
+    onReorder: (kind, id, delta) => { reorders.push([kind, id, delta]); },
+  });
+
+  await nextTick();
+
+  const up = buttons.find((b) => b.title === 'Move feed up');
+  const down = buttons.find((b) => b.title === 'Move feed down');
+  assert.ok(up, 'expected a move-up button');
+  assert.ok(down, 'expected a move-down button');
+
+  // The buttons use @click.stop, so the handler expects an event.
+  const event = { stopPropagation() {} };
+  up.onClick(event);
+  down.onClick(event);
+
+  assert.deepEqual(reorders, [['feed', 7, -1], ['feed', 7, 1]]);
+});
+
+test('FeedTree emits reorder for categories', async () => {
+  const reorders = [];
+  const { buttons } = mountFeedTree({
+    feeds: [],
+    categories: [{ id: 3, title: 'News', unread: 0, parent_id: null }],
+    labels: [],
+    onReorder: (kind, id, delta) => { reorders.push([kind, id, delta]); },
+  });
+
+  await nextTick();
+
+  const up = buttons.find((b) => b.title === 'Move category up');
+  assert.ok(up, 'expected a move-category-up button');
+  up.onClick({ stopPropagation() {} });
+
+  assert.deepEqual(reorders, [['category', 3, -1]]);
 });
