@@ -87,6 +87,11 @@ rather than the clickable item. There is no known blocker here.
   Password tab in `PreferencesDialog`. The handler answers with an HTML
   fragment; `parsePrefsResult` treats an `alert-danger` block as failure and
   strips the wrapper for the message.
+- **Four preferences rendered blank.** `purge_old_days`,
+  `purge_unread_articles`, `show_content_preview` and `vfeed_group_by_feed`
+  were listed in the dialog but absent from `RPC/sanityCheck` init-params,
+  their only read endpoint, so the dialog always showed them empty/false.
+  `RPC::_make_init_params()` now exposes them.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
