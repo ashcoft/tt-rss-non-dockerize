@@ -161,6 +161,20 @@ test('toggleStarred splits a mixed selection into star and unstar calls', async 
   assert.equal(store.headlines.value[2].is_marked, false);
 });
 
+test('unreadRelativeTo returns only the unread ids on the requested side', () => {
+  const store = storeWith([10, 20, 30, 40]);
+  // Mark 10 and 30 as read.
+  store.headlines.value[0].is_read = true;
+  store.headlines.value[2].is_read = true;
+
+  // Above 30: 10 (read) and 20 (unread) -> only 20.
+  assert.deepEqual(store.unreadRelativeTo(30, true), [20]);
+  // Below 20: 30 (read) and 40 (unread) -> only 40.
+  assert.deepEqual(store.unreadRelativeTo(20, false), [40]);
+  // Unknown id yields nothing.
+  assert.deepEqual(store.unreadRelativeTo(999, true), []);
+});
+
 test('reset clears the cursor', () => {
   const store = storeWith([10, 20]);
   store.setCursor(20);
