@@ -548,6 +548,44 @@ export async function removeLabel(backend: LegacyBackend, labelId: number): Prom
   await backend.call('Pref_Labels', 'remove', { ids: labelId });
 }
 
+/**
+ * Rename a label. `Pref_Labels/save` echoes the caption it actually stored:
+ * the new one on success, or the unchanged old one when the new caption is
+ * empty or already taken. It prints nothing when the id does not belong to the
+ * user, so the caller cannot distinguish that from a silent success.
+ */
+export async function renameLabel(
+  backend: LegacyBackend,
+  labelId: number,
+  caption: string
+): Promise<string> {
+  const response = await backend.call('Pref_Labels', 'save', { id: labelId, caption });
+  return response.raw.trim();
+}
+
+/**
+ * Set a label's foreground and background colours. `Pref_Labels/colorset`
+ * takes `kind: 'fg'` or `'bg'` with a single `color`, or any other kind with
+ * `fg` and `bg` together; the latter is used here so both update in one call.
+ */
+export async function setLabelColors(
+  backend: LegacyBackend,
+  labelId: number,
+  fgColor: string,
+  bgColor: string
+): Promise<void> {
+  await backend.call('Pref_Labels', 'colorset', {
+    ids: labelId,
+    fg: fgColor,
+    bg: bgColor,
+  });
+}
+
+/** Clear a label's custom colours, restoring the theme defaults. */
+export async function resetLabelColors(backend: LegacyBackend, labelId: number): Promise<void> {
+  await backend.call('Pref_Labels', 'colorreset', { ids: labelId });
+}
+
 export async function setArticleLabel(
   backend: LegacyBackend,
   labelId: number,

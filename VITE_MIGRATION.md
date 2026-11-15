@@ -4,9 +4,10 @@
 
 **`index.php` now serves the Vue app; the Dojo client is no longer the main
 entry point.** The reading flow (login, feed tree, headlines, search, view
-modes, sorting, article actions, tags, scoring, feed editing, labels) and
-content-filter management (list, create, edit, delete) run entirely on Vue 3 +
-Vuetify + Pinia, talking to `backend.php` through the legacy adapter.
+modes, sorting, article actions, tags, scoring, feed editing, labels and label
+colours) and content-filter management (list, create, edit, delete) run
+entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
+legacy adapter.
 
 The Dojo stack is **not yet deleted**. What remains:
 
@@ -66,15 +67,18 @@ rather than the clickable item. There is no known blocker here.
   plugin-action pickers, and the rule feed/category multi-select. Rules and
   actions are sent as repeated `rule[]`/`action[]` JSON strings; checkbox
   fields go through `checkbox_to_sql_bool()` (the literal string "on").
+- **Label editing was missing.** Labels could only be created and deleted.
+  Added `Pref_Labels/save` (rename, which echoes the caption actually stored),
+  `colorset` and `colorreset` (foreground/background), wired into `LabelsDialog`.
 
-All four were verified against the live backend, including that all six view
+All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
 
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers only a handful of user preferences, not feed preferences, label
-  colours, or plugin settings.
+  covers only a handful of user preferences, not feed preferences or plugin
+  settings.
 - **Drag and drop** reordering of feeds and categories.
 - **OPML import/export** and feed-icon upload.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).

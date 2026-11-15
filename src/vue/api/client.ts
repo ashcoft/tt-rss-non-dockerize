@@ -279,6 +279,29 @@ class ApiClient {
     }, false);
   }
 
+  /** Rename a label; resolves to the caption the backend actually stored. */
+  async renameLabel(labelId: number, caption: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.renameLabel(legacyBackend, labelId, caption), '');
+  }
+
+  async setLabelColors(
+    labelId: number,
+    fgColor: string,
+    bgColor: string
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.setLabelColors(legacyBackend, labelId, fgColor, bgColor);
+      return true;
+    }, false);
+  }
+
+  async resetLabelColors(labelId: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetLabelColors(legacyBackend, labelId);
+      return true;
+    }, false);
+  }
+
   async setLabelForArticles(
     labelId: number,
     articleIds: number[],

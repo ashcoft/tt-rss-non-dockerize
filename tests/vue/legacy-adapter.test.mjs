@@ -714,6 +714,58 @@ test('getLabels reads the nested label tree', async () => {
   ]);
 });
 
+test('renameLabel returns the caption the backend actually stored', async () => {
+  installGlobals();
+  // Pref_Labels/save prints the stored caption as plain text, not JSON.
+  const calls = stubFetch([{ text: 'New Name' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const stored = await endpoints.renameLabel(backend, 1, 'New Name');
+
+  assert.ok(calls[0].body.includes('method=save'));
+  assert.ok(calls[0].body.includes('id=1'));
+  assert.ok(calls[0].body.includes('caption=New+Name'));
+  assert.equal(stored, 'New Name');
+});
+
+test('renameLabel reports the unchanged caption when the backend rejects it', async () => {
+  installGlobals();
+  // A duplicate or empty caption makes the backend echo the old caption.
+  stubFetch([{ text: 'Old Name' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  assert.equal(await endpoints.renameLabel(backend, 1, 'Old Name'), 'Old Name');
+});
+
+test('setLabelColors sends fg and bg in one colorset call', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.setLabelColors(backend, 7, '#ff0000', '#00ff00');
+
+  const body = calls[0].body;
+  assert.ok(body.includes('method=colorset'));
+  assert.ok(body.includes('ids=7'));
+  assert.ok(body.includes('fg=%23ff0000'));
+  assert.ok(body.includes('bg=%2300ff00'));
+});
+
+test('resetLabelColors calls colorreset for the label', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.resetLabelColors(backend, 7);
+
+  assert.ok(calls[0].body.includes('method=colorreset'));
+  assert.ok(calls[0].body.includes('ids=7'));
+});
+
 test('getFilters reads the nested filter tree', async () => {
   installGlobals();
   const payload = {
