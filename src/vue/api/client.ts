@@ -166,9 +166,13 @@ class ApiClient {
     }, false);
   }
 
-  async catchupFeed(feedId: number | string, isCat = false): Promise<ApiResponse<boolean>> {
+  async catchupFeed(
+    feedId: number | string,
+    isCat = false,
+    mode = 'all'
+  ): Promise<ApiResponse<boolean>> {
     return this.wrap(async () => {
-      await endpoints.catchupFeed(legacyBackend, feedId, isCat);
+      await endpoints.catchupFeed(legacyBackend, feedId, isCat, mode);
       return true;
     }, false);
   }

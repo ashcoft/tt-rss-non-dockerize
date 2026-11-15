@@ -7,12 +7,27 @@
           @click="handleAction('refresh')"
           title="Refresh"
         />
-        <v-btn
-          icon="mdi-check-all"
-          @click="handleAction('catchup')"
-          title="Mark all as read"
-        />
       </v-btn-toggle>
+
+      <!-- Mark as read: the default marks everything; the menu items carry the
+           time window the backend accepts (1day/1week/2week). -->
+      <v-menu>
+        <template #activator="{ props }">
+          <v-btn v-bind="props" prepend-icon="mdi-check-all" title="Mark as read">
+            Read
+            <v-icon end>mdi-chevron-down</v-icon>
+          </v-btn>
+        </template>
+        <v-list>
+          <v-list-item
+            v-for="item in catchupOptions"
+            :key="item.value"
+            @click="handleAction('catchup', item.value)"
+          >
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
 
       <v-text-field
         v-model="searchQuery"
@@ -150,6 +165,15 @@ const actionOptions = [
   { title: 'Edit Feed', value: 'edit', icon: 'mdi-pencil' },
   { title: 'Delete Feed', value: 'delete', icon: 'mdi-delete' },
   { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' }
+];
+
+// Mirrors the legacy #main-catchup-dropdown: the empty value marks everything,
+// the others only articles older than the window.
+const catchupOptions = [
+  { title: 'All articles', value: 'all' },
+  { title: 'Older than one day', value: '1day' },
+  { title: 'Older than one week', value: '1week' },
+  { title: 'Older than two weeks', value: '2week' },
 ];
 
 // Computed

@@ -260,10 +260,10 @@ function asSearchPayload(payload: unknown): SearchPayload {
 }
 
 /** Mark the current feed (or category) as read and refresh the list. */
-const catchupCurrentFeed = async (feedId: number | string, isCat: boolean) => {
+const catchupCurrentFeed = async (feedId: number | string, isCat: boolean, mode = 'all') => {
   showMessage('Marking feed as read...', 'info');
 
-  if (!(await feedsStore.catchupFeed(feedId, isCat))) {
+  if (!(await feedsStore.catchupFeed(feedId, isCat, mode))) {
     showMessage('Failed to mark feed as read', 'error');
     return;
   }
@@ -371,7 +371,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
       break;
     case 'catchup':
-      await catchupCurrentFeed(feedId, isCat);
+      // The toolbar may send a time window ('1day'/'1week'/'2week'); the
+      // keyboard shortcut sends none, which means "all".
+      await catchupCurrentFeed(feedId, isCat, typeof payload === 'string' ? payload : 'all');
       break;
     case 'search':
       await runSearch(payload, feedId, isCat);

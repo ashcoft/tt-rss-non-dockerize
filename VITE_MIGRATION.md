@@ -97,6 +97,10 @@ rather than the clickable item. There is no known blocker here.
   `hide_read_shows_special`, `fresh_article_max_age`,
   `recently_read_max_age`, `debug_headline_ids`). A Vue test asserts every
   preference the dialog lists is present in init-params.
+- **Catchup time windows were missing.** The toolbar only offered "mark all as
+  read". Added the legacy `#main-catchup-dropdown` options
+  (`all`/`1day`/`1week`/`2week`) to `Toolbar`, threaded through the store and
+  client to `RPC/catchupFeed`'s `mode`.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
