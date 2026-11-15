@@ -358,14 +358,29 @@ const handleArticleClose = () => {
 /** Bulk actions from the headlines selection bar. */
 const handleBulkAction = async (action: string, ids: number[]) => {
   if (ids.length === 0) return;
-  if (action === 'mark_read') {
-    await headlinesStore.markAsRead(ids);
-    showMessage(`${ids.length} article(s) marked as read`, 'success');
-  } else if (action === 'delete') {
-    await headlinesStore.deleteArticles(ids);
-    showMessage(`${ids.length} article(s) deleted`, 'success');
-  } else {
-    showMessage(`Unknown bulk action: ${action}`, 'warning');
+  switch (action) {
+    case 'mark_read':
+      await headlinesStore.markAsRead(ids);
+      showMessage(`${ids.length} article(s) marked as read`, 'success');
+      break;
+    case 'toggle_unread':
+      await headlinesStore.toggleUnread(ids);
+      showMessage(`${ids.length} article(s) toggled unread`, 'success');
+      break;
+    case 'toggle_starred':
+      await headlinesStore.toggleStarred(ids);
+      showMessage(`${ids.length} article(s) toggled starred`, 'success');
+      break;
+    case 'toggle_published':
+      await headlinesStore.togglePublished(ids);
+      showMessage(`${ids.length} article(s) toggled published`, 'success');
+      break;
+    case 'delete':
+      await headlinesStore.deleteArticles(ids);
+      showMessage(`${ids.length} article(s) deleted`, 'success');
+      break;
+    default:
+      showMessage(`Unknown bulk action: ${action}`, 'warning');
   }
 };
 
