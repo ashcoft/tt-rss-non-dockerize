@@ -131,6 +131,18 @@
           :value="String(feed.id)"
           @click="handleSelect(String(feed.id))"
         >
+          <template #prepend>
+            <img
+              v-if="!iconFailed.has(feed.id)"
+              :src="feedIconUrl(feed.id)"
+              class="feed-icon"
+              width="16"
+              height="16"
+              alt=""
+              @error="iconFailed.add(feed.id)"
+            />
+            <v-icon v-else size="16">mdi-rss</v-icon>
+          </template>
           <template #append>
             <v-chip
               v-if="feed.unread > 0"
@@ -175,6 +187,18 @@
           :value="String(feed.id)"
           @click="handleSelect(String(feed.id))"
         >
+          <template #prepend>
+            <img
+              v-if="!iconFailed.has(feed.id)"
+              :src="feedIconUrl(feed.id)"
+              class="feed-icon"
+              width="16"
+              height="16"
+              alt=""
+              @error="iconFailed.add(feed.id)"
+            />
+            <v-icon v-else size="16">mdi-rss</v-icon>
+          </template>
           <template #append>
             <v-chip
               v-if="feed.unread > 0"
@@ -217,12 +241,15 @@ interface Props {
   hideRead?: boolean;
   /** Currently selected feed, kept visible while hiding read feeds. */
   activeFeedId?: number | string | null;
+  /** Base URL of public.php, which streams each feed's icon. */
+  iconsUrl?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   labels: () => [],
   hideRead: false,
-  activeFeedId: null
+  activeFeedId: null,
+  iconsUrl: '/public.php'
 });
 
 const emit = defineEmits<{
@@ -233,6 +260,13 @@ const emit = defineEmits<{
 
 // State
 const searchQuery = ref('');
+// Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
+// broken icon does not hide the rest.
+const iconFailed = ref(new Set<number>());
+
+/** URL that streams a feed's cached icon (public.php?op=feed_icon). */
+const feedIconUrl = (feedId: number): string =>
+  `${props.iconsUrl}?op=feed_icon&id=${feedId}`;
 
 // Special feeds (built-in). IDs mirror the Feeds::FEED_* constants in
 // classes/Feeds.php and must not be renumbered.
@@ -334,5 +368,11 @@ const handleSelect = (index: string) => {
   height: 8px;
   border-radius: 50%;
   margin-right: 0.5rem;
+}
+
+.feed-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 </style>
