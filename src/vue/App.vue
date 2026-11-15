@@ -12,6 +12,7 @@
         <v-btn icon="mdi-theme-light-dark" variant="text" @click="toggleTheme" title="Toggle light/dark theme" />
         <v-btn icon="mdi-cog" variant="text" @click="prefsOpen = true" title="Preferences" />
         <v-btn icon="mdi-plus-box" variant="text" @click="feedsDialogOpen = true" title="Manage feeds" />
+        <v-btn icon="mdi-keyboard" variant="text" @click="hotkeyHelpOpen = true" title="Keyboard shortcuts" />
         <v-btn icon="mdi-logout" variant="text" @click="onLogout" title="Log out" />
       </header>
 
@@ -84,6 +85,7 @@
     <ManageFeedsDialog v-model="feedsDialogOpen" />
     <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
     <PreferencesDialog v-model="prefsOpen" />
+    <HotkeyHelpDialog v-model="hotkeyHelpOpen" />
 
     <v-snackbar
       v-model="snackbar"
@@ -112,6 +114,7 @@ import LoginForm from './components/LoginForm.vue';
 import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
 import LabelsDialog from './components/dialogs/LabelsDialog.vue';
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
+import HotkeyHelpDialog from './components/dialogs/HotkeyHelpDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
 import { runDetached } from './utils/runDetached';
 
@@ -129,6 +132,7 @@ const sidebarOpen = ref(false);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
+const hotkeyHelpOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
 
@@ -411,6 +415,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
         'info'
       );
       break;
+    case 'hotkeyHelp':
+      hotkeyHelpOpen.value = true;
+      break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
   }
@@ -445,6 +452,9 @@ useKeyboard({
   },
   onCatchup: () => {
     runDetached(handleToolbarAction('catchup'), 'catchup');
+  },
+  onHelp: () => {
+    hotkeyHelpOpen.value = true;
   },
 });
 

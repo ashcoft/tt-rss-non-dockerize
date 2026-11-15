@@ -406,6 +406,11 @@ class ApiClient {
     return endpoints.opmlExportUrl(includeSettings);
   }
 
+  /** Keyboard-shortcuts help as an HTML fragment (sanitize before display). */
+  async getHotkeyHelp(): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.getHotkeyHelp(legacyBackend), '');
+  }
+
   // ============================================
   // Account
   // ============================================

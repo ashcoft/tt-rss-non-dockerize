@@ -106,6 +106,9 @@ rather than the clickable item. There is no known blocker here.
   `HIDE_READ_FEEDS`/`HIDE_READ_SHOWS_SPECIAL` from init-params and persists
   changes via `RPC/setpref`, and `FeedTree` hides feeds with no unread
   articles (keeping the active feed visible).
+- **Keyboard-shortcuts help was missing.** Added `RPC/hotkeyHelp` behind a new
+  `HotkeyHelpDialog`, opened from a header button, the `?` shortcut and the
+  toolbar action menu. The HTML fragment is DOMPurify-sanitized before render.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.

@@ -43,6 +43,12 @@ function compileComponent(relativePath) {
   const module = { exports: {} };
   const localRequire = (id) => {
     if (id.includes('api/client')) return { default: {} };
+    // DOMPurify needs a DOM; a passthrough stub is enough for the render tests.
+    // __esModule makes the transpiled `import DOMPurify from 'dompurify'` read
+    // our `default` rather than double-wrapping it.
+    if (id === 'dompurify') {
+      return { __esModule: true, default: { sanitize: (value) => value } };
+    }
     // The Pinia stores pull in a large dependency graph that this renderer
     // does not need; a minimal stub is enough for the dialog under test.
     if (id === '../../stores' || id === '../stores') {
@@ -124,7 +130,7 @@ function mount(Component, extraProps = {}) {
   return { app, root, updates, dialog: () => dialogProps };
 }
 
-for (const name of ['LabelsDialog', 'PreferencesDialog']) {
+for (const name of ['LabelsDialog', 'PreferencesDialog', 'HotkeyHelpDialog']) {
   test(`${name} forwards dialog updates without mutating its prop`, async () => {
     const Component = compileComponent(`../../src/vue/components/dialogs/${name}.vue`);
     const mounted = mount(Component);
