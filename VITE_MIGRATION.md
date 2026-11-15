@@ -109,6 +109,9 @@ rather than the clickable item. There is no known blocker here.
 - **Keyboard-shortcuts help was missing.** Added `RPC/hotkeyHelp` behind a new
   `HotkeyHelpDialog`, opened from a header button, the `?` shortcut and the
   toolbar action menu. The HTML fragment is DOMPurify-sanitized before render.
+- **Feed icons were missing.** The tree showed a generic RSS glyph for every
+  feed. It now renders each feed's icon from `public.php?op=feed_icon` (base
+  URL from `icons_url` in init-params), falling back to the glyph on error.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.

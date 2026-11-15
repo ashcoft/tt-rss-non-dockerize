@@ -40,9 +40,14 @@ const FeedTree = compileComponent('../../src/vue/components/FeedTree.vue');
  */
 function mountFeedTree(props) {
   const items = [];
+  const elements = [];
 
   const renderer = createRenderer({
-    createElement: (tag) => ({ tag, children: [], props: {} }),
+    createElement: (tag) => {
+      const node = { tag, children: [], props: {} };
+      elements.push(node);
+      return node;
+    },
     createText: (text) => ({ text }),
     createComment: (text) => ({ text }),
     setText: (node, text) => { node.text = text; },
@@ -104,7 +109,7 @@ function mountFeedTree(props) {
   }
 
   app.mount({ children: [] });
-  return { items, buttons };
+  return { items, buttons, elements };
 }
 
 const feeds = [
@@ -227,4 +232,19 @@ test('FeedTree keeps the active feed visible while hiding read feeds', async () 
 
   const titles = items.map((i) => i.title);
   assert.ok(titles.includes('Read Feed'), `active read feed must stay visible, saw: ${titles}`);
+});
+
+test('FeedTree renders each feed icon from the public.php endpoint', async () => {
+  const { elements } = mountFeedTree({
+    feeds: [{ id: 7, title: 'Alpha Feed', unread: 1, cat_id: null }],
+    categories: [],
+    labels: [],
+    iconsUrl: '/public.php',
+  });
+
+  await nextTick();
+
+  const icon = elements.find((e) => e.tag === 'img' && String(e.props.src ?? '').includes('feed_icon'));
+  assert.ok(icon, `expected a feed icon img, saw: ${JSON.stringify(elements.map((e) => [e.tag, e.props.src]))}`);
+  assert.equal(icon.props.src, '/public.php?op=feed_icon&id=7');
 });

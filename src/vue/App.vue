@@ -24,6 +24,7 @@
             :labels="labelsStore.labels"
             :hide-read="feedsStore.hideReadFeeds"
             :active-feed-id="feedsStore.currentFeedId"
+            :icons-url="feedsStore.iconsUrl"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
             @reorder="handleFeedReorder"

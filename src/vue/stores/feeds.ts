@@ -37,6 +37,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const hideReadFeeds = ref(false);
   /** HIDE_READ_SHOWS_SPECIAL: keep special feeds visible while hiding read. */
   const hideReadShowsSpecial = ref(true);
+  /** Base URL of public.php, from init-params; used for feed icons. */
+  const iconsUrl = ref('/public.php');
 
   // Getters
   const feedsByCategory = computed((): FeedsByCategoryMap => {
@@ -340,6 +342,11 @@ export const useFeedsStore = defineStore('feeds', () => {
       const params = response.content;
       hideReadFeeds.value = Number(params.hide_read_feeds) === 1;
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
+      // public.php streams a feed's icon; the backend tells us the base URL so
+      // the app works behind a sub-path install.
+      if (typeof params.icons_url === 'string' && params.icons_url !== '') {
+        iconsUrl.value = params.icons_url;
+      }
     } catch (err) {
       console.error('Failed to load display preferences:', err);
     }
@@ -392,6 +399,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     currentIsCat,
     hideReadFeeds,
     hideReadShowsSpecial,
+    iconsUrl,
     
     // Getters
     feedsByCategory,
