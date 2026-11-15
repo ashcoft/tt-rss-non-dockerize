@@ -297,9 +297,13 @@ class UrlHelper {
 	 *
 	 * @param string|array{scheme?: string, host?: string, port?: int} $url_or_tokens URL or pre-parsed URL tokens array
 	 * @param bool $validate_resolved_ip whether to perform additional validation by resolving the host to an IP and validating that IP
+	 * @param bool $allow_private_on_standard_ports when false, RFC1918/ULA addresses are rejected on every port, not only
+	 *   on nonstandard ones. Callers handing the URL to the browser for a feed-controlled resource pass false: a private
+	 *   target on port 80/443 is still a probe of the reader's local network.
 	 * @return bool true if the URL should be rejected, false otherwise
 	 */
-	static function has_disallowed_ip(string|array $url_or_tokens, bool $validate_resolved_ip = false): bool {
+	static function has_disallowed_ip(string|array $url_or_tokens, bool $validate_resolved_ip = false,
+			bool $allow_private_on_standard_ports = true): bool {
 		$tokens = is_array($url_or_tokens) ? $url_or_tokens : parse_url($url_or_tokens);
 
 		if (empty($tokens['host']))
@@ -307,7 +311,7 @@ class UrlHelper {
 
 		$host = trim(strtolower($tokens['host']), '[].');
 		$port = $tokens['port'] ?? null;
-		$is_standard_port = ($port === null || $port === 80 || $port === 443);
+		$is_standard_port = $allow_private_on_standard_ports && ($port === null || $port === 80 || $port === 443);
 
 		if ($host === '' || $host === 'localhost')
 			return true;

@@ -506,7 +506,55 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
     }
 
     /**
-     * Render feed 1's headlines and return the first article's preview URL.
+     * A private address on a standard port is refused too: the check must not
+     * rely on the port, since 80/443 reach the same local services.
+     */
+    public function test_headlines_image_preview_rejects_private_host_on_standard_port(): void {
+        $pdo = Db::pdo();
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'http://192.168.1.1/evil.png'
+                    WHERE post_id = 1 AND content_type = 'image/jpeg'");
+
+        $this->assertSame('', $this->previewForFeedOne(),
+            'a private image URL is refused even on the default port');
+    }
+
+    /**
+     * tt-rss's own cache URLs carry the installation's address, which is
+     * loopback or private on a local install. Those must survive the host
+     * check, or caching an image would remove its preview.
+     */
+    public function test_headlines_image_preview_keeps_same_installation_cache_url(): void {
+        $pdo = Db::pdo();
+
+        // Point article 1's image enclosure at a public host, then cache it so
+        // _get_image() rewrites the URL to this installation's own public.php.
+        $pdo->exec("UPDATE ttrss_enclosures
+                    SET content_url = 'https://example.com/photo.jpg'
+                    WHERE post_id = 1 AND content_type = 'image/jpeg'");
+
+        $remote = 'https://example.com/photo.jpg';
+        $cache = DiskCache::instance('images');
+        $cache->put(sha1($remote), base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+
+        try {
+            $preview = $this->previewForFeedOne();
+
+            $this->assertStringStartsWith(Config::get_self_url() . '/', $preview,
+                'a cached image is served from this installation');
+        } finally {
+            if ($cache->exists(sha1($remote))) {
+                $cache->remove(sha1($remote));
+            }
+        }
+    }
+
+    /**
+     * Render feed 1's headlines and return article 1's `image_preview` value.
+     *
+     * Fails when article 1 is absent, so a row that stopped being generated
+     * cannot be mistaken for a preview that was deliberately suppressed.
      */
     private function previewForFeedOne(): string {
         [$override_order, $skip_first_id_check] = Feeds::_order_to_override_query('date_reverse');
@@ -519,11 +567,14 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
 
         foreach ($ret[4]['content'] as $row) {
             if (is_array($row) === true && ($row['id'] ?? 0) === 1) {
-                return (string) ($row['image_preview'] ?? '');
+                $this->assertArrayHasKey('image_preview', $row,
+                    'article 1 must carry an image_preview key');
+
+                return (string) $row['image_preview'];
             }
         }
 
-        return '';
+        $this->fail('article 1 was not returned by _format_headlines_list');
     }
 
     // ── Feed with no articles for owner ──

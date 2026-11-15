@@ -332,9 +332,6 @@ class Feeds extends Handler_Protected {
 				// The client renders this as a plain <img>, so it has to honor the same
 				// restrictions as the article body: "Do not embed media" (global and per
 				// feed) and bandwidth saving mode. Otherwise a reader who disabled media
-				// still contacts the image host from a collapsed row. A private/loopback
-				// host is refused as well, matching Sanitizer's body-image check, so a
-				// hostile feed cannot point the preview at the local network.
 				$image_preview_allowed = empty($_SESSION["bw_limit"]) &&
 					!Prefs::get(Prefs::STRIP_IMAGES, $_SESSION['uid'], $profile) &&
 					!sql_bool_to_bool($line["hide_images"]);
@@ -347,8 +344,17 @@ class Feeds extends Handler_Protected {
 						$line
 					);
 
-					if ($article_image && UrlHelper::has_disallowed_ip($article_image))
+					// A private target is refused on every port, so a hostile feed cannot
+					// use the preview to probe the reader's local network. _get_image() may
+					// already have replaced a remote image with one of our own cache URLs,
+					// and those legitimately carry the installation's own address; the
+					// browser is already talking to that host, so same-installation URLs
+					// are trusted.
+					if ($article_image &&
+							!str_starts_with($article_image, Config::get_self_url() . '/') &&
+					 		UrlHelper::has_disallowed_ip($article_image, false, false)) {
 						$article_image = '';
+					}
 				} else {
 					$article_image = '';
 				}
