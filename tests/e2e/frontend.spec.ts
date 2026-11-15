@@ -99,7 +99,8 @@ test.describe('Vue front-end', () => {
     await login(page);
     await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Keyboard shortcuts')).toBeVisible();
+    // The dialog title and the help content both mention "Keyboard shortcuts".
+    await expect(page.getByRole('dialog').getByText('Keyboard shortcuts').first()).toBeVisible();
   });
 
   test('renders an icon (or RSS fallback) for each seeded feed', async ({ page }) => {
