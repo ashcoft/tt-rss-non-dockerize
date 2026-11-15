@@ -21,6 +21,8 @@
             :feeds="feedsStore.feeds"
             :categories="feedsStore.categories"
             :labels="labelsStore.labels"
+            :hide-read="feedsStore.hideReadFeeds"
+            :active-feed-id="feedsStore.currentFeedId"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
             @reorder="handleFeedReorder"
@@ -184,7 +186,12 @@ const stopPolling = () => {
 // Auth flow (Phase 3)
 const onLoggedIn = async () => {
   showMessage('Welcome back!', 'success');
-  await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
+  await Promise.all([
+    feedsStore.loadFeeds(),
+    feedsStore.loadDisplayPrefs(),
+    labelsStore.loadLabels(),
+    loadSearchLanguages(),
+  ]);
   startPolling();
 };
 
@@ -396,6 +403,13 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     case 'edit':
     case 'delete':
       feedsDialogOpen.value = true;
+      break;
+    case 'toggleHideRead':
+      await feedsStore.toggleHideRead();
+      showMessage(
+        feedsStore.hideReadFeeds ? 'Hiding read feeds' : 'Showing read feeds',
+        'info'
+      );
       break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');

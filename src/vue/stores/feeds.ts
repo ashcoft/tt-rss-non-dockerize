@@ -33,6 +33,10 @@ export const useFeedsStore = defineStore('feeds', () => {
   /** null means nothing is selected; 0 is the valid Archived feed. */
   const currentFeedId = ref<number | string | null>(null);
   const currentIsCat = ref(false);
+  /** HIDE_READ_FEEDS: hide feeds with no unread articles in the tree. */
+  const hideReadFeeds = ref(false);
+  /** HIDE_READ_SHOWS_SPECIAL: keep special feeds visible while hiding read. */
+  const hideReadShowsSpecial = ref(true);
 
   // Getters
   const feedsByCategory = computed((): FeedsByCategoryMap => {
@@ -311,6 +315,36 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
+  /** Toggle the HIDE_READ_FEEDS preference and persist it. */
+  async function toggleHideRead(): Promise<boolean> {
+    const next = !hideReadFeeds.value;
+    try {
+      const response = await api.setPref('HIDE_READ_FEEDS', next ? '1' : '0');
+      if (response.status === 0) {
+        hideReadFeeds.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
+    }
+  }
+
+  /** Read the display preferences the tree needs from RPC/sanityCheck. */
+  async function loadDisplayPrefs(): Promise<void> {
+    try {
+      const response = await api.getInitParams();
+      if (response.status !== 0) return;
+      const params = response.content;
+      hideReadFeeds.value = Number(params.hide_read_feeds) === 1;
+      hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
+    } catch (err) {
+      console.error('Failed to load display preferences:', err);
+    }
+  }
+
   /**
    * Move a feed one position up/down within its category group, then persist.
    *
@@ -356,6 +390,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     error,
     currentFeedId,
     currentIsCat,
+    hideReadFeeds,
+    hideReadShowsSpecial,
     
     // Getters
     feedsByCategory,
@@ -379,6 +415,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     saveOrder,
     moveFeed,
     moveCategory,
+    toggleHideRead,
+    loadDisplayPrefs,
     reset,
   };
 });

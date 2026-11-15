@@ -101,6 +101,11 @@ rather than the clickable item. There is no known blocker here.
   read". Added the legacy `#main-catchup-dropdown` options
   (`all`/`1day`/`1week`/`2week`) to `Toolbar`, threaded through the store and
   client to `RPC/catchupFeed`'s `mode`.
+- **Hide-read-feeds was missing.** The feed tree always showed every feed.
+  Added the legacy "toggle hide read feeds" action: the store reads
+  `HIDE_READ_FEEDS`/`HIDE_READ_SHOWS_SPECIAL` from init-params and persists
+  changes via `RPC/setpref`, and `FeedTree` hides feeds with no unread
+  articles (keeping the active feed visible).
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.

@@ -192,3 +192,39 @@ test('FeedTree emits reorder for categories', async () => {
 
   assert.deepEqual(reorders, [['category', 3, -1]]);
 });
+
+test('FeedTree hides read feeds when hideRead is set', async () => {
+  const { items } = mountFeedTree({
+    feeds: [
+      { id: 7, title: 'Unread Feed', unread: 2, cat_id: null },
+      { id: 8, title: 'Read Feed', unread: 0, cat_id: null },
+    ],
+    categories: [],
+    labels: [],
+    hideRead: true,
+  });
+
+  await nextTick();
+
+  const titles = items.map((i) => i.title);
+  assert.ok(titles.includes('Unread Feed'), `expected the unread feed, saw: ${titles}`);
+  assert.ok(!titles.includes('Read Feed'), `read feed should be hidden, saw: ${titles}`);
+});
+
+test('FeedTree keeps the active feed visible while hiding read feeds', async () => {
+  const { items } = mountFeedTree({
+    feeds: [
+      { id: 7, title: 'Unread Feed', unread: 2, cat_id: null },
+      { id: 8, title: 'Read Feed', unread: 0, cat_id: null },
+    ],
+    categories: [],
+    labels: [],
+    hideRead: true,
+    activeFeedId: 8,
+  });
+
+  await nextTick();
+
+  const titles = items.map((i) => i.title);
+  assert.ok(titles.includes('Read Feed'), `active read feed must stay visible, saw: ${titles}`);
+});

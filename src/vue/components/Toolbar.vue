@@ -164,7 +164,8 @@ const sortOptions = [
 const actionOptions = [
   { title: 'Edit Feed', value: 'edit', icon: 'mdi-pencil' },
   { title: 'Delete Feed', value: 'delete', icon: 'mdi-delete' },
-  { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' }
+  { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' },
+  { title: 'Toggle hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' }
 ];
 
 // Mirrors the legacy #main-catchup-dropdown: the empty value marks everything,
