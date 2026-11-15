@@ -440,6 +440,7 @@ const Headlines = {
 				if (hl.active) {
 					new_row.classList.add('active');
 					Article.unpack(new_row);
+					Article.syncImagePreview(new_row);
 
 					if (App.isCombinedMode())
 						Article.cdmMoveToId(id, {noscroll: true});
@@ -515,8 +516,13 @@ const Headlines = {
 			row_class += App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
 
 			const comments = Article.formatComments(hl);
+
+			// The thumbnail repeats the image the body already shows, so it belongs to a
+			// collapsed row only. Core themes hide it with CSS, but a theme installed
+			// under themes.local carries no such rules, so the expanded state is set here
+			// and Article.syncImagePreview() maintains it from then on.
 			const imagePreview = hl.image_preview
-				? `<img class="cdm-image-preview" src="${App.escapeHtml(hl.image_preview)}" alt="" loading="lazy" onclick="Headlines.click(event, ${hl.id})">`
+				? `<img class="cdm-image-preview" src="${App.escapeHtml(hl.image_preview)}" alt="" loading="lazy"${App.getInitParam("cdm_expanded") ? ' style="display : none"' : ''} onclick="Headlines.click(event, ${hl.id})">`
 				: '';
 
 			row = `<div class="cdm ${row_class} ${Article.getScoreClass(hl.score)}"
