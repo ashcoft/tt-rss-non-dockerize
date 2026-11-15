@@ -19,6 +19,9 @@ const tagDraft = ref<string[]>([...(props.article.tags ?? [])]);
 const tagSuggestions = ref<string[]>([]);
 const saving = ref(false);
 
+/** Attachments the backend reports for this article. */
+const attachments = computed(() => props.article.enclosures ?? []);
+
 // App.vue reuses this component when the selected article changes (no :key),
 // so the drafts must follow the new article. Without this, the previous
 // article's note or tags stay on screen and would be saved onto the new one.
@@ -100,6 +103,18 @@ const sanitizedContent = computed(() => {
       
       <!-- Content is sanitized client-side using DOMPurify for XSS prevention -->
       <div class="article-body" v-html="sanitizedContent"></div>
+
+      <!-- Attachments (enclosures): playable audio/video inline, others linked. -->
+      <div v-if="attachments.length > 0" class="article-attachments">
+        <h3>Attachments</h3>
+        <div v-for="(enc, index) in attachments" :key="index" class="attachment">
+          <audio v-if="enc.content_type.startsWith('audio/')" :src="enc.content_url" controls />
+          <video v-else-if="enc.content_type.startsWith('video/')" :src="enc.content_url" controls />
+          <a v-else :href="enc.content_url" target="_blank" rel="noopener noreferrer">
+            {{ enc.title || enc.content_url }}
+          </a>
+        </div>
+      </div>
       
       <!-- Tags and score (parity with the Dojo article header) -->
       <v-divider class="my-3" />
@@ -193,6 +208,24 @@ const sanitizedContent = computed(() => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.article-attachments {
+  padding: 0 1rem;
+}
+
+.article-attachments h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+
+.attachment {
+  margin-bottom: 0.5rem;
+}
+
+.attachment audio,
+.attachment video {
+  max-width: 100%;
 }
 
 .article-tags {
