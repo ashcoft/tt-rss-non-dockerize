@@ -995,3 +995,28 @@ test('operations without a legacy endpoint fail loudly', () => {
   assert.throws(() => endpoints.getPref(), /preference/i);
   assert.throws(() => endpoints.getArticle(), /article/i);
 });
+
+test('opmlExportUrl builds the export URL and honours include_settings', () => {
+  assert.equal(endpoints.opmlExportUrl(false), '/backend.php?op=OPML&method=export');
+  assert.equal(
+    endpoints.opmlExportUrl(true),
+    '/backend.php?op=OPML&method=export&include_settings=1'
+  );
+});
+
+test('importOpml uploads the file as multipart with the CSRF token', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: 'Imported 2 feeds.<br/>' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const log = await endpoints.importOpml(backend, new Blob(['<opml/>']));
+
+  const body = calls[0].body;
+  assert.ok(body instanceof FormData);
+  assert.equal(body.get('op'), 'Pref_Feeds');
+  assert.equal(body.get('method'), 'importOpml');
+  assert.equal(body.get('csrf_token'), 't');
+  assert.ok(body.get('opml_file') instanceof Blob);
+  assert.equal(log, 'Imported 2 feeds.<br/>');
+});

@@ -365,6 +365,20 @@ class ApiClient {
   }
 
   // ============================================
+  // OPML
+  // ============================================
+
+  /** Import an OPML file; resolves to the backend's plain-text import log. */
+  async importOpml(file: Blob): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.importOpml(legacyBackend, file), '');
+  }
+
+  /** URL that streams an OPML export (navigate to it to download). */
+  opmlExportUrl(includeSettings: boolean): string {
+    return endpoints.opmlExportUrl(includeSettings);
+  }
+
+  // ============================================
   // Internal
   // ============================================
 

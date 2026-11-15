@@ -973,3 +973,34 @@ export function getArticle(): never {
 export function purgeFeed(): never {
   throw new LegacyUnsupportedOperation('purging a feed (run update.php --purge-feed)');
 }
+
+/**
+ * Import an OPML file. `Pref_Feeds/importOpml` prints a plain-text (HTML
+ * fragment) log of what it did, so the raw body is returned for display.
+ */
+export async function importOpml(backend: LegacyBackend, file: Blob): Promise<string> {
+  const response = await backend.upload(
+    'Pref_Feeds',
+    'importOpml',
+    {},
+    'opml_file',
+    file,
+    'import.opml'
+  );
+  return response.raw;
+}
+
+/**
+ * Build the URL that streams an OPML export.
+ *
+ * `OPML/export` is a GET that sets `Content-Disposition: attachment`, so it
+ * must be navigated to rather than fetched (fetch would return the bytes as a
+ * string). It is in `csrf_ignore()`, so no token is needed.
+ */
+export function opmlExportUrl(includeSettings: boolean): string {
+  const params = new URLSearchParams({ op: 'OPML', method: 'export' });
+  if (includeSettings) {
+    params.set('include_settings', '1');
+  }
+  return `/backend.php?${params.toString()}`;
+}
