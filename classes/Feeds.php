@@ -944,7 +944,7 @@ class Feeds extends Handler_Protected {
 			$sth = $pdo->prepare("SELECT COUNT(post_int_id) AS unread
 				FROM ttrss_tags,ttrss_user_entries,ttrss_entries
 				WHERE tag_name = ? AND post_int_id = int_id AND ref_id = ttrss_entries.id
-				AND $unread_qpart AND ttrss_tags.owner_uid = ,");
+				AND $unread_qpart AND ttrss_tags.owner_uid = ?");
 
 			$sth->execute([$feed, $owner_uid]);
 			$row = $sth->fetch();
