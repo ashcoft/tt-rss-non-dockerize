@@ -138,6 +138,10 @@ rather than the clickable item. There is no known blocker here.
 - **Bulk actions were incomplete.** Beyond mark-read/delete, the selection bar
   now offers open-original, toggle unread/starred/published and set-score, and
   per-feed row actions mark a feed read or open the edit dialog.
+- **Label selection loaded the wrong feed.** Clicking a label requested the raw
+  positive label id, which `Feeds/view` treats as a regular feed. It now uses
+  the synthetic id `LABEL_BASE_INDEX - 1 - labelId`, matching
+  `Labels::label_to_feed_id()`. Found with the E2E suite.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
