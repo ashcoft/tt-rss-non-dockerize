@@ -60,6 +60,37 @@
               <v-text-field v-model="editDetails.title" label="Title" />
               <v-text-field v-model="editDetails.feed_url" label="Feed URL" />
               <v-text-field v-model="editDetails.site_url" label="Site URL" />
+              <div class="d-flex align-center ga-3 mb-3">
+                <v-avatar size="40" rounded>
+                  <v-img v-if="iconPreviewUrl" :src="iconPreviewUrl" alt="Feed icon" />
+                  <v-icon v-else icon="mdi-rss" />
+                </v-avatar>
+                <v-file-input
+                  v-model="iconFile"
+                  label="Custom icon"
+                  accept="image/*"
+                  density="compact"
+                  hide-details
+                  style="max-width: 280px"
+                />
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  :disabled="!iconFile"
+                  :loading="busy"
+                  @click="runDetached(uploadIcon(), 'upload icon')"
+                >
+                  Upload
+                </v-btn>
+                <v-btn
+                  size="small"
+                  variant="text"
+                  :loading="busy"
+                  @click="runDetached(resetIcon(), 'reset icon')"
+                >
+                  Reset
+                </v-btn>
+              </div>
               <v-select
                 v-model="editDetails.cat_id"
                 :items="categoryOptions"
@@ -190,6 +221,8 @@ import api from '../../api/client';
 import {
   FEED_PURGE_INTERVALS,
   FEED_UPDATE_INTERVALS,
+  ICON_FILE_TOO_LARGE,
+  ICON_UPLOAD_SUCCESS,
   type FeedDetails,
 } from '../../api/legacyEndpoints';
 
@@ -218,6 +251,10 @@ const purgeIntervals = FEED_PURGE_INTERVALS;
 const opmlFile = ref<File | File[] | null>(null);
 const opmlResult = ref('');
 const opmlIncludeSettings = ref(true);
+
+// Feed icon upload
+const iconFile = ref<File | File[] | null>(null);
+const iconPreviewUrl = ref('');
 
 /** The import log is an HTML fragment; sanitize it before rendering. */
 const sanitizedOpmlResult = computed(() => DOMPurify.sanitize(opmlResult.value));
@@ -280,11 +317,57 @@ const createCategory = async () => {
 
 const loadFeedDetails = async (feedId: number | null) => {
   editDetails.value = null;
+  iconPreviewUrl.value = '';
+  iconFile.value = null;
   if (feedId === null) return;
   busy.value = true;
   editDetails.value = await feedStore.loadFeedDetails(feedId);
   busy.value = false;
-  if (!editDetails.value) notify(feedStore.error ?? 'Failed to load feed', 'error');
+  if (!editDetails.value) {
+    notify(feedStore.error ?? 'Failed to load feed', 'error');
+  } else {
+    // public.php?op=feed_icon streams the stored icon; a timestamp makes the
+    // browser re-fetch it after an upload or reset.
+    iconPreviewUrl.value = `/public.php?op=feed_icon&id=${feedId}&ts=${Date.now()}`;
+  }
+};
+
+const uploadIcon = async () => {
+  if (!editDetails.value) return;
+  const file = Array.isArray(iconFile.value) ? iconFile.value[0] : iconFile.value;
+  if (!file) return;
+  busy.value = true;
+  try {
+    const response = await api.uploadFeedIcon(editDetails.value.id, file);
+    const result = response.status === 0 ? response.content : null;
+    if (result?.rc === ICON_UPLOAD_SUCCESS) {
+      iconPreviewUrl.value = result.iconUrl;
+      iconFile.value = null;
+      notify('Icon updated');
+    } else if (result?.rc === ICON_FILE_TOO_LARGE) {
+      notify('Icon file is too large', 'error');
+    } else {
+      notify(response.error ?? 'Failed to upload icon', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
+};
+
+const resetIcon = async () => {
+  if (!editDetails.value) return;
+  busy.value = true;
+  try {
+    const response = await api.removeFeedIcon(editDetails.value.id);
+    if (response.status === 0) {
+      iconPreviewUrl.value = `/public.php?op=feed_icon&id=${editDetails.value.id}&ts=${Date.now()}`;
+      notify('Icon reset');
+    } else {
+      notify(response.error ?? 'Failed to reset icon', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
 };
 
 const saveFeedChanges = async () => {

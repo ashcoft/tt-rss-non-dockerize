@@ -1004,3 +1004,42 @@ export function opmlExportUrl(includeSettings: boolean): string {
   }
   return `/backend.php?${params.toString()}`;
 }
+
+/** Result codes `Pref_Feeds/uploadIcon` returns. */
+export const ICON_UPLOAD_SUCCESS = 'E_ICON_UPLOAD_SUCCESS';
+export const ICON_UPLOAD_FAILED = 'E_ICON_UPLOAD_FAILED';
+export const ICON_FILE_TOO_LARGE = 'E_ICON_FILE_TOO_LARGE';
+export const ICON_RENAME_FAILED = 'E_ICON_RENAME_FAILED';
+
+export interface IconUploadResult {
+  rc: string;
+  /** Cache-busted URL for the stored icon; empty when the upload failed. */
+  iconUrl: string;
+}
+
+/**
+ * Upload a custom feed icon. `Pref_Feeds/uploadIcon` returns
+ * `{rc, icon_url}`; the URL carries a `?ts=` cache-buster so the browser
+ * re-fetches the new image.
+ */
+export async function uploadFeedIcon(
+  backend: LegacyBackend,
+  feedId: number,
+  file: Blob
+): Promise<IconUploadResult> {
+  const response = await backend.upload(
+    'Pref_Feeds',
+    'uploadIcon',
+    { feed_id: feedId },
+    'icon_file',
+    file,
+    'icon'
+  );
+  const body = requireBody(response, 'Pref_Feeds/uploadIcon');
+  return { rc: asString(body.rc), iconUrl: asString(body.icon_url) };
+}
+
+/** Remove a feed's custom icon, restoring the auto-detected favicon. */
+export async function removeFeedIcon(backend: LegacyBackend, feedId: number): Promise<void> {
+  await backend.call('Pref_Feeds', 'removeIcon', { feed_id: feedId });
+}

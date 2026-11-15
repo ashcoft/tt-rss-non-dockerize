@@ -4,10 +4,10 @@
 
 **`index.php` now serves the Vue app; the Dojo client is no longer the main
 entry point.** The reading flow (login, feed tree, headlines, search, view
-modes, sorting, article actions, tags, scoring, feed editing, labels and label
-colours), content-filter management (list, create, edit, delete) and OPML
-import/export run entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php`
-through the legacy adapter.
+modes, sorting, article actions, tags, scoring, feed editing, feed-icon upload,
+labels and label colours), content-filter management (list, create, edit,
+delete) and OPML import/export run entirely on Vue 3 + Vuetify + Pinia, talking
+to `backend.php` through the legacy adapter.
 
 The Dojo stack is **not yet deleted**. What remains:
 
@@ -75,6 +75,9 @@ rather than the clickable item. There is no known blocker here.
   `OPML/export` download URL, wired into a new OPML tab in `ManageFeedsDialog`.
   The import log is an HTML fragment and is sanitized with DOMPurify before
   rendering.
+- **Feed-icon upload was missing.** Added `Pref_Feeds/uploadIcon` (multipart,
+  returns `{rc, icon_url}`) and `removeIcon`, wired into the Edit Feed tab with
+  a live preview from `public.php?op=feed_icon`.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -85,7 +88,6 @@ modes and all four sort orders return correctly ordered results.
   covers only a handful of user preferences, not feed preferences or plugin
   settings.
 - **Drag and drop** reordering of feeds and categories.
-- **Feed-icon upload.**
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
 - **Combined-display / grid modes** and the article toolbar's plugin buttons.
 - **Deleting the Dojo libraries themselves** (blocked on the above).

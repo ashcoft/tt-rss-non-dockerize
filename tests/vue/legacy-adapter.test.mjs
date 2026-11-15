@@ -1020,3 +1020,46 @@ test('importOpml uploads the file as multipart with the CSRF token', async () =>
   assert.ok(body.get('opml_file') instanceof Blob);
   assert.equal(log, 'Imported 2 feeds.<br/>');
 });
+
+test('uploadFeedIcon posts the icon as multipart and reads the result code', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: JSON.stringify({ rc: 'E_ICON_UPLOAD_SUCCESS', icon_url: '/public.php?op=feed_icon&id=7&ts=1' }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.uploadFeedIcon(backend, 7, new Blob(['png']));
+
+  const body = calls[0].body;
+  assert.ok(body instanceof FormData);
+  assert.equal(body.get('method'), 'uploadIcon');
+  assert.equal(body.get('feed_id'), '7');
+  assert.equal(body.get('csrf_token'), 't');
+  assert.ok(body.get('icon_file') instanceof Blob);
+  assert.equal(result.rc, endpoints.ICON_UPLOAD_SUCCESS);
+  assert.equal(result.iconUrl, '/public.php?op=feed_icon&id=7&ts=1');
+});
+
+test('uploadFeedIcon surfaces a too-large result code', async () => {
+  installGlobals();
+  stubFetch([{ text: JSON.stringify({ rc: 'E_ICON_FILE_TOO_LARGE', icon_url: '' }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.uploadFeedIcon(backend, 7, new Blob(['png']));
+
+  assert.equal(result.rc, endpoints.ICON_FILE_TOO_LARGE);
+});
+
+test('removeFeedIcon calls removeIcon for the feed', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.removeFeedIcon(backend, 7);
+
+  assert.ok(calls[0].body.includes('method=removeIcon'));
+  assert.ok(calls[0].body.includes('feed_id=7'));
+});
