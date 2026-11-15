@@ -91,42 +91,7 @@ const Headlines = {
 			Headlines.syncModified(modified);
 		});
 	}),
-	/**
-	 * Diff a single headline mutation into the pending operations, keyed by what changed.
-	 */
-	diffMutation(m, ops) {
-		Headlines.diffField(m, 'marked', ops.marked, ops.unmarked);
-		Headlines.diffField(m, 'published', ops.published, ops.unpublished);
-		Headlines.diffField(m, 'unread', ops.unread, ops.read);
-		Headlines.diffField(m, 'selected', ops.select, ops.deselect, 'row');
-		Headlines.diffField(m, 'active', ops.activate, ops.deactivate, 'row');
-
-		if (m.old.score !== m.new.score) {
-			const score = m.new.score;
-
-			ops.rescore[score] = ops.rescore[score] || [];
-			ops.rescore[score].push(m.id);
-		}
-	},
-	/**
-	 * Push a headline's id (or row) onto the matching list when the given field changed.
-	 */
-	diffField(m, field, whenTrue, whenFalse, key = 'id') {
-		if (m.old[field] !== m.new[field])
-			m.new[field] ? whenTrue.push(m[key]) : whenFalse.push(m[key]);
-	},
-	/**
-	 * Sync the row checkboxes, optionally skipping rows carrying a given class.
-	 */
-	setRowCheckbox(rows, checked, skipClass) {
-		rows.forEach((row) => {
-			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
-
-			if (cb && (!skipClass || !row.classList.contains(skipClass)))
-				cb.attr('checked', checked);
-		});
-	},
-	syncModified(modified) {
+	syncModified: function (modified) {
 		const ops = {
 			marked: [],
 			unmarked: [],
@@ -141,83 +106,119 @@ const Headlines = {
 			rescore: {},
 		};
 
-		modified.forEach((m) => {
-			Headlines.diffMutation(m, ops);
-		});
+		modified.forEach(function (m) {
+			if (m.old.marked !== m.new.marked)
+				m.new.marked ? ops.marked.push(m.id) : ops.unmarked.push(m.id);
 
-		Headlines.setRowCheckbox(ops.select, true, null);
-		Headlines.setRowCheckbox(ops.deselect, false, 'active');
-		Headlines.setRowCheckbox(ops.activate, true, null);
-		Headlines.setRowCheckbox(ops.deactivate, false, 'Selected');
+			if (m.old.published !== m.new.published)
+				m.new.published ? ops.published.push(m.id) : ops.unpublished.push(m.id);
 
-		const promises = Headlines.buildMutationPromises(ops);
+			if (m.old.unread !== m.new.unread)
+				m.new.unread ? ops.unread.push(m.id) : ops.read.push(m.id);
 
-		Promise.allSettled(promises).then((results) => {
-			Headlines.handleMutationResults(results);
-		});
-	},
-	/**
-	 * Build the RPC promises for the pending headline operations.
-	 */
-	buildMutationPromises(ops) {
-		const promises = [];
+			if (m.old.selected !== m.new.selected)
+				m.new.selected ? ops.select.push(m.row) : ops.deselect.push(m.row);
 
-		/** Queue an RPC call for a non-empty list of ids. */
-		const add = (list, method, cmode) => {
-			if (list.length !== 0)
-				promises.push(xhr.post("backend.php",
-					{op: "RPC", method, "ids[]": list, cmode}));
-		};
+			if (m.old.active !== m.new.active)
+				m.new.active ? ops.activate.push(m.row) : ops.deactivate.push(m.row);
 
-		add(ops.unmarked, "markSelected", 0);
-		add(ops.marked, "markSelected", 1);
-		add(ops.unpublished, "publishSelected", 0);
-		add(ops.published, "publishSelected", 1);
-		add(ops.read, "catchupSelected", 0);
-		add(ops.unread, "catchupSelected", 1);
+			if (m.old.score !== m.new.score) {
+				const score = m.new.score;
 
-		Object.keys(ops.rescore).forEach((score) => {
-			promises.push(xhr.post("backend.php",
-				{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score}));
-		});
-
-		return promises;
-	},
-	/**
-	 * Merge mutation results into feed/label counters and notify plugins.
-	 */
-	handleMutationResults(results) {
-		let feeds = [];
-		let labels = [];
-
-		results.forEach((res) => {
-			const obj = Headlines.parseMutationResult(res);
-
-			if (obj) {
-				feeds = feeds.concat(obj.feeds || []);
-				labels = labels.concat(obj.labels || []);
+				ops.rescore[score] = ops.rescore[score] || [];
+				ops.rescore[score].push(m.id);
 			}
 		});
 
-		if (feeds.length > 0) {
-			Feeds.requestCounters(feeds, labels);
+		ops.select.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb)
+				cb.attr('checked', true);
+		});
+
+		ops.deselect.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb && !row.classList.contains('active'))
+				cb.attr('checked', false);
+		});
+
+		ops.activate.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb)
+				cb.attr('checked', true);
+		});
+
+		ops.deactivate.forEach((row) => {
+			const cb = dijit.getEnclosingWidget(row.querySelector(".rchk"));
+
+			if (cb && !row.classList.contains('Selected'))
+				cb.attr('checked', false);
+		});
+
+		const promises = [];
+		if (ops.unmarked.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "markSelected", "ids[]": ops.unmarked, cmode: 0}));
+
+		if (ops.marked.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "markSelected", "ids[]": ops.marked, cmode: 1}));
+
+		if (ops.unpublished.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.unpublished, cmode: 0}));
+
+		if (ops.published.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "publishSelected", "ids[]": ops.published, cmode: 1}));
+
+		if (ops.read.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "catchupSelected", "ids[]": ops.read, cmode: 0}));
+
+		if (ops.unread.length !== 0)
+			promises.push(xhr.post("backend.php",
+				{op: "RPC", method: "catchupSelected", "ids[]": ops.unread, cmode: 1}));
+
+		const scores = Object.keys(ops.rescore);
+
+		if (scores.length !== 0) {
+			scores.forEach((score) => {
+				promises.push(xhr.post("backend.php",
+					{op: "Article", method: "setScore", "ids[]": ops.rescore[score], score: score}));
+			});
 		}
 
-		PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
-	},
-	/**
-	 * Parse a single mutation result, returning null when it cannot be parsed.
-	 */
-	parseMutationResult(res) {
-		if (!res)
-			return null;
+		Promise.allSettled(promises).then((results) => {
+			let feeds = [];
+			let labels = [];
 
-		try {
-			return JSON.parse(res.value);
-		} catch (e) {
-			console.warn('Error parsing mutation result:', e, res);
-			return null;
-		}
+			results.forEach((res) => {
+				if (res) {
+					try {
+						const obj = JSON.parse(res.value);
+
+						if (obj.feeds)
+							feeds = feeds.concat(obj.feeds);
+
+						if (obj.labels)
+							labels = labels.concat(obj.labels);
+
+					} catch (e) {
+						console.warn('Error parsing mutation result:', e, res);
+					}
+				}
+			});
+
+			if (feeds.length > 0) {
+				Feeds.requestCounters(feeds, labels);
+			}
+
+			PluginHost.run(PluginHost.HOOK_HEADLINE_MUTATIONS_SYNCED, results);
+		});
 	},
 	click: function (event, id, in_body) {
 		in_body = in_body || false;
@@ -345,13 +346,13 @@ const Headlines = {
 			}
 		}
 	},
-	scrollHandler: function (/*event*/) { // skipcq: JS-R1005
+	scrollHandler: function (/*event*/) {
 		try {
 			if (!Feeds.infscroll_disabled && !Feeds.infscroll_in_progress) {
 				const hsp = document.getElementById("headlines-spacer");
 				const container = document.getElementById("headlines-frame");
 
-				if (hsp?.previousSibling) {
+				if (hsp && hsp.previousSibling) {
 					const last_row = hsp.previousSibling;
 
 					// invoke lazy load if last article in buffer is nearly visible OR is active
@@ -470,7 +471,7 @@ const Headlines = {
 	// CheckBox widget (pinned by dijit.registry) plus every row the
 	// MutationObserver still references — DOM nodes and listeners then grow
 	// unbounded across navigation.
-	teardownRows() {
+	teardownRows: function () {
 		dijit.registry.findWidgets(document.getElementById("headlines-frame"))
 			.forEach((w) => w.destroyRecursive());
 		this.row_observer.disconnect();
@@ -478,115 +479,114 @@ const Headlines = {
 		this.sticky_content_observer.disconnect();
 		this.unpack_observer.disconnect();
 	},
-	_buildRowClasses(hl, vfeedEnabled) {
-		let classes = "";
-		if (hl.marked) classes += " marked";
-		if (hl.published) classes += " published";
-		if (hl.unread) classes += " Unread";
-		if (vfeedEnabled) classes += " vgrlf";
-		return classes;
-	},
-	_renderVgroupHeader(hl) {
-		const vgrhdr = `<div data-feed-id='${hl.feed_id}' class='feed-title'>
-				<div class="pull-right icon-feed" title="${App.escapeHtml(hl.feed_title)}"
-					onclick="Feeds.open({feed:${hl.feed_id}})">${Feeds.renderIcon(hl.feed_id, hl.has_icon)}</div>
-				<a class="title" title="${__('Open site')}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.site_url))}">${hl.feed_title}</a>
-				<a class="catchup" title="${__('mark feed as read')}" onclick="Feeds.catchupFeedInGroup(${hl.feed_id})" href="#">
-					<i class="icon-done material-icons">done_all</i>
-				</a>
-			</div>`;
-		const tmp = document.createElement("div");
-		tmp.innerHTML = vgrhdr;
-		document.getElementById("headlines-frame").appendChild(tmp.firstChild);
-		this.vgroup_last_feed = hl.feed_id;
-	},
-	_renderCdmRow(hl, rowClass) { // skipcq: JS-R1005
-		const expanded = App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
-		const comments = Article.formatComments(hl);
-		const imagePreview = hl.image_preview
-			? `<img class="cdm-image-preview" src="${App.escapeHtml(hl.image_preview)}" alt="" loading="lazy" onclick="Headlines.click(event, ${hl.id})">`
-			: '';
-		const debugIds = App.getInitParam("debug_headline_ids")
-			? `<span class="text-muted small">A: ${hl.id} F: ${hl.feed_id}</span>`
-			: '';
-		const langAttr = hl.lang ? App.escapeHtml(hl.lang) : 'en';
+	render: function (headlines, hl) {
+		let row_class = "";
 
-		return `<div class="cdm ${rowClass}${expanded} ${Article.getScoreClass(hl.score)}"
-				id="RROW-${hl.id}"
-				data-article-id="${hl.id}"
-				data-orig-feed-id="${hl.feed_id}"
-				data-orig-feed-title="${App.escapeHtml(hl.feed_title)}"
-				data-is-packed="1"
-				data-score="${hl.score}"
-				data-article-title="${App.escapeHtml(hl.title)}"
-				onmouseover="Article.mouseIn(${hl.id})"
-				onmouseout="Article.mouseOut(${hl.id})">
-				<div class="header-sticky-guard"></div>
-				<div class="header">
-					<div class="left">
-						<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this)" class='rchk'>
-						<i class="marked-pic marked-${hl.id} material-icons" onclick="Headlines.toggleMark(${hl.id})">star</i>
-						<i class="pub-pic pub-${hl.id} material-icons" onclick="Headlines.togglePub(${hl.id})">rss_feed</i>
-					</div>
+		if (hl.marked) row_class += " marked";
+		if (hl.published) row_class += " published";
+		if (hl.unread) row_class += " Unread";
+		if (headlines.vfeed_group_enabled) row_class += " vgrlf";
 
-					<span onclick="return Headlines.click(event, ${hl.id});" data-article-id="${hl.id}" class="titleWrap hlMenuAttach">
-						${debugIds}
-						<a class="title" title="${App.escapeHtml(hl.title)}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.link))}">
-							${hl.title}</a>
-						<span class="author">${hl.author}</span>
-						${Article.renderLabels(hl.id, hl.labels)}
-						${hl.cdm_excerpt ? hl.cdm_excerpt : ""}
-					</span>
+		if (headlines.vfeed_group_enabled && hl.feed_title && this.vgroup_last_feed !== hl.feed_id) {
+			const vgrhdr = `<div data-feed-id='${hl.feed_id}' class='feed-title'>
+									<div class="pull-right icon-feed" title="${App.escapeHtml(hl.feed_title)}"
+										onclick="Feeds.open({feed:${hl.feed_id}})">${Feeds.renderIcon(hl.feed_id, hl.has_icon)}</div>
+									<a class="title" title="${__('Open site')}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.site_url))}">${hl.feed_title}</a>
+									<a class="catchup" title="${__('mark feed as read')}" onclick="Feeds.catchupFeedInGroup(${hl.feed_id})" href="#">
+										<i class="icon-done material-icons">done_all</i>
+									</a>
+								</div>`
 
-					<a class="feed vfeedMenuAttach" style="background-color: ${hl.feed_bg_color}" data-feed-id="${hl.feed_id}"
-						title="${__('Open site')}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.site_url))}">${hl.feed_title}</a>
+			const tmp = document.createElement("div");
+			tmp.innerHTML = vgrhdr;
 
-					<span class="updated" title="${hl.imported}">${hl.updated}</span>
+			document.getElementById("headlines-frame").appendChild(tmp.firstChild);
 
-					<div class="right">
-						<i class="material-icons icon-grid-span" title="${__("Span all columns")}" onclick="Article.cdmToggleGridSpan(${hl.id})">fullscreen</i>
-						<i class="material-icons icon-score" title="${hl.score}" onclick="Article.setScore(${hl.id}, this)">${Article.getScorePic(hl.score)}</i>
+			this.vgroup_last_feed = hl.feed_id;
+		}
 
-						<span class="icon-feed" title="${App.escapeHtml(hl.feed_title)}" onclick="Feeds.open({feed:${hl.feed_id}})">
-							${Feeds.renderIcon(hl.feed_id, hl.has_icon)}
-						</span>
-					</div>
+		let row;
 
-				</div>
+		if (App.isCombinedMode()) {
+			row_class += App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
 
-				${imagePreview}
+			const comments = Article.formatComments(hl);
 
-				<div class="content" onclick="return Headlines.click(event, ${hl.id}, true);">
-					${Article.renderNote(hl.id, hl.note)}
-					<div class="content-inner" lang="${langAttr}">
-						<div class="text-center text-muted">
-							${__("Loading, please wait...")}
-						</div>
-					</div>
+			row = `<div class="cdm ${row_class} ${Article.getScoreClass(hl.score)}"
+						id="RROW-${hl.id}"
+						data-article-id="${hl.id}"
+						data-orig-feed-id="${hl.feed_id}"
+						data-orig-feed-title="${App.escapeHtml(hl.feed_title)}"
+						data-is-packed="1"
+						data-score="${hl.score}"
+						data-article-title="${App.escapeHtml(hl.title)}"
+						onmouseover="Article.mouseIn(${hl.id})"
+						onmouseout="Article.mouseOut(${hl.id})">
+						<div class="header-sticky-guard"></div>
+						<div class="header">
+							<div class="left">
+								<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this, arguments[0])" class='rchk'>
+								<i class="marked-pic marked-${hl.id} material-icons" onclick="Headlines.toggleMark(${hl.id})">star</i>
+								<i class="pub-pic pub-${hl.id} material-icons" onclick="Headlines.togglePub(${hl.id})">rss_feed</i>
+							</div>
 
-					<!-- intermediate: unstyled, kept for compatibility -->
-					<div class="intermediate"></div>
+							<span onclick="return Headlines.click(event, ${hl.id});" data-article-id="${hl.id}" class="titleWrap hlMenuAttach">
+								${App.getInitParam("debug_headline_ids") ? `<span class="text-muted small">A: ${hl.id} F: ${hl.feed_id}</span>` : ""}
+								<a class="title" title="${App.escapeHtml(hl.title)}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.link))}">
+									${hl.title}</a>
+								<span class="author">${hl.author}</span>
+								${Article.renderLabels(hl.id, hl.labels)}
+								${hl.cdm_excerpt ? hl.cdm_excerpt : ""}
+							</span>
 
-					<div class="footer" onclick="event.stopPropagation()">
+							<a class="feed vfeedMenuAttach" style="background-color: ${hl.feed_bg_color}" data-feed-id="${hl.feed_id}"
+								title="${__('Open site')}" target="_blank" rel="noopener noreferrer" href="${App.escapeHtml(App.sanitizeUrl(hl.site_url))}">${hl.feed_title}</a>
 
-						<div class="left">
-							${hl.buttons_left}
-							<i class="material-icons">label_outline</i>
-							${Article.renderTags(hl.id, hl.tags)}
-							<a title="${__("Edit tags for this article")}" href="#"
-								onclick="Article.editTags(${hl.id})">(+)</a>
-							${comments}
+							<span class="updated" title="${hl.imported}">${hl.updated}</span>
+
+							<div class="right">
+								<i class="material-icons icon-grid-span" title="${__("Span all columns")}" onclick="Article.cdmToggleGridSpan(${hl.id})">fullscreen</i>
+								<i class="material-icons icon-score" title="${hl.score}" onclick="Article.setScore(${hl.id}, this)">${Article.getScorePic(hl.score)}</i>
+
+								<span class="icon-feed" title="${App.escapeHtml(hl.feed_title)}" onclick="Feeds.open({feed:${hl.feed_id}})">
+									${Feeds.renderIcon(hl.feed_id, hl.has_icon)}
+								</span>
+							</div>
+
 						</div>
 
-						<div class="right">
-							${hl.buttons}
+						<div class="content" onclick="return Headlines.click(event, ${hl.id}, true);">
+							${Article.renderNote(hl.id, hl.note)}
+							<div class="content-inner" lang="${hl.lang ? App.escapeHtml(hl.lang) : 'en'}">
+								<div class="text-center text-muted">
+									${__("Loading, please wait...")}
+								</div>
+							</div>
+
+							<!-- intermediate: unstyled, kept for compatibility -->
+							<div class="intermediate"></div>
+
+							<div class="footer" onclick="event.stopPropagation()">
+
+								<div class="left">
+									${hl.buttons_left}
+									<i class="material-icons">label_outline</i>
+									${Article.renderTags(hl.id, hl.tags)}
+									<a title="${__("Edit tags for this article")}" href="#"
+										onclick="Article.editTags(${hl.id})">(+)</a>
+									${comments}
+								</div>
+
+								<div class="right">
+									${hl.buttons}
+								</div>
+							</div>
 						</div>
-					</div>
-				</div>
-			</div>`;
-	},
-	_renderRegularRow(hl, rowClass) {
-			return `<div class="hl ${rowClass} ${Article.getScoreClass(hl.score)}"
+					</div>`;
+
+
+		} else {
+			row = `<div class="hl ${row_class} ${Article.getScoreClass(hl.score)}"
 				id="RROW-${hl.id}"
 				data-orig-feed-id="${hl.feed_id}"
 				data-orig-feed-title="${App.escapeHtml(hl.feed_title)}"
@@ -596,7 +596,7 @@ const Headlines = {
 				onmouseover="Article.mouseIn(${hl.id})"
 				onmouseout="Article.mouseOut(${hl.id})">
 			<div class="left">
-				<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this)" class='rchk'>
+				<input dojoType="dijit.form.CheckBox" type="checkbox" onclick="Headlines.onRowChecked(this, arguments[0])" class='rchk'>
 					<i class="marked-pic marked-${hl.id} material-icons" onclick="Headlines.toggleMark(${hl.id})">star</i>
 					<i class="pub-pic pub-${hl.id} material-icons" onclick="Headlines.togglePub(${hl.id})">rss_feed</i>
 			</div>
@@ -616,23 +616,10 @@ const Headlines = {
 			</div>
 			<div class="right">
 				<i class="material-icons icon-score" title="${hl.score}" onclick="Article.setScore(${hl.id}, this)">${Article.getScorePic(hl.score)}</i>
+				<span onclick="Feeds.open({feed:${hl.feed_id}})" class="icon-feed" title="${App.escapeHtml(hl.feed_title)}">${Feeds.renderIcon(hl.feed_id, hl.has_icon)}</span>
 			</div>
 			</div>
-		</div>`;
-	},
-	render(headlines, hl) {
-		const vfeedEnabled = headlines.vfeed_group_enabled;
-		const rowClass = this._buildRowClasses(hl, vfeedEnabled);
-
-		if (vfeedEnabled && hl.feed_title && this.vgroup_last_feed !== hl.feed_id) {
-			this._renderVgroupHeader(hl);
-		}
-
-		let row;
-		if (App.isCombinedMode()) {
-			row = this._renderCdmRow(hl, rowClass);
-		} else {
-			row = this._renderRegularRow(hl, rowClass);
+		`;
 		}
 
 		const tmp = document.createElement("div");
@@ -657,7 +644,7 @@ const Headlines = {
 			}
 		}
 	},
-	renderToolbar: function(headlines) { // skipcq: JS-R1005
+	renderToolbar: function(headlines) {
 
 		const tb = headlines['toolbar'];
 		const search_query = Feeds._search_query ? Feeds._search_query.query : "";
@@ -730,7 +717,7 @@ const Headlines = {
 		dojo.parser.parse(target.domNode);
 
 		this._headlinesSelectClickHandle = dojo.connect(dijit.byId("headlines-select-articles-dropdown"), 'onItemClick',
-			(item) => { // skipcq: JS-R1005
+			(item) => {
 				const action = item.option.value;
 
 				switch (action) {
@@ -774,7 +761,7 @@ const Headlines = {
 			}
 		);
 	},
-	onLoaded: function (reply, offset, append) { // skipcq: JS-R1005
+	onLoaded: function (reply, offset, append) {
 		let is_cat;
 		let feed_id;
 
@@ -872,12 +859,12 @@ const Headlines = {
 				Headlines.updateCurrentUnread();
 
 			} else if (headlines_count > 0 && feed_id === Feeds.getActive() && is_cat === Feeds.activeIsCat()) {
-				const frame = dijit.byId("headlines-frame");
+				const c = dijit.byId("headlines-frame");
 
 				let hsp = document.getElementById("headlines-spacer");
 
 				if (hsp)
-					frame.domNode.removeChild(hsp);
+					c.domNode.removeChild(hsp);
 
 				let headlines_appended = 0;
 
@@ -906,7 +893,7 @@ const Headlines = {
 				// clear out hsp contents in case there's a power-hungry svg icon rotating there
 				hsp.innerHTML = "";
 
-				frame.domNode.appendChild(hsp);
+				c.domNode.appendChild(hsp);
 
 				this.initHeadlinesMenu();
 
@@ -974,7 +961,7 @@ const Headlines = {
 
 		toolbar.setValues({order_by: order_by});
 	},
-	selectionToggleUnread: function (params = {}) { // skipcq: JS-R1005
+	selectionToggleUnread: function (params = {}) {
 		const cmode = params.cmode !== undefined ? params.cmode : 2;
 		const no_error = params.no_error || false;
 		const ids = params.ids || Headlines.getSelected();
@@ -1032,7 +1019,7 @@ const Headlines = {
 	togglePub: function (id) {
 		document.getElementById(`RROW-${id}`)?.classList.toggle('published');
 	},
-	move: function (mode, params = {}) { // skipcq: JS-R1005
+	move: function (mode, params = {}) {
 		const no_expand = params.no_expand || false;
 		const force_previous = params.force_previous || this.default_force_previous;
 		const force_to_top = params.force_to_top || this.default_force_to_top;
@@ -1126,7 +1113,7 @@ const Headlines = {
 			count > 0 ? Element.show(elem) : Element.hide(elem);
 		}
 	},
-	toggleUnread: function (id, cmode) { // skipcq: JS-R1005
+	toggleUnread: function (id, cmode) {
 		const row = document.getElementById(`RROW-${id}`);
 
 		if (row) {
@@ -1234,8 +1221,19 @@ const Headlines = {
 
 		return rv;
 	},
-	onRowChecked: function (elem) {
+	onRowChecked: function (elem, event) {
 		const row = elem.domNode.closest("div[id*=RROW]");
+		const id = parseInt(row.getAttribute('data-article-id'));
+		const last_id = this._last_checked_id;
+
+		this._last_checked_id = id;
+
+		if (event?.shiftKey && last_id && document.getElementById(`RROW-${last_id}`)) {
+			const mode = row.classList.contains('active') || elem.attr('checked') ? 'all' : 'none';
+
+			Headlines.getRange(last_id, id).forEach((range_id) => Headlines.select(mode, range_id));
+			return;
+		}
 
 		// do not allow unchecking active article checkbox
 		if (row.classList.contains('active')) {
@@ -1249,7 +1247,7 @@ const Headlines = {
 			row.classList.remove('Selected');
 		}
 	},
-	getRange: function (start, stop) { // skipcq: JS-R1005
+	getRange: function (start, stop) {
 		if (start === stop)
 			return [start];
 
@@ -1276,7 +1274,7 @@ const Headlines = {
 
 		return results;
 	},
-	select: function (mode, articleId) { // skipcq: JS-R1005
+	select: function (mode, articleId) {
 		// mode = all,none,unread,invert,marked,published
 		let query = "#headlines-frame > div[id*=RROW]";
 
@@ -1335,7 +1333,7 @@ const Headlines = {
 
 		Headlines.selectionToggleUnread({ids: rows, cmode: 0});
 	},
-	catchupRelativeTo: function (below, id) { // skipcq: JS-R1005
+	catchupRelativeTo: function (below, id) {
 
 		if (!id) id = Article.getActive();
 
@@ -1351,9 +1349,9 @@ const Headlines = {
 		if (!below) {
 			for (let i = 0; i < visible_ids.length; i++) {
 				if (visible_ids[i] !== id) {
-					const element = document.getElementById(`RROW-${visible_ids[i]}`);
+					const e = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (element?.classList.contains('Unread')) {
+					if (e && e.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1363,9 +1361,9 @@ const Headlines = {
 		} else {
 			for (let i = visible_ids.length - 1; i >= 0; i--) {
 				if (visible_ids[i] !== id) {
-					const element = document.getElementById(`RROW-${visible_ids[i]}`);
+					const e = document.getElementById(`RROW-${visible_ids[i]}`);
 
-					if (element?.classList.contains('Unread')) {
+					if (e && e.classList.contains('Unread')) {
 						ids_to_mark.push(visible_ids[i]);
 					}
 				} else {
@@ -1382,8 +1380,8 @@ const Headlines = {
 			if (App.getInitParam("confirm_feed_catchup") !== 1 || confirm(msg)) {
 
 				for (let i = 0; i < ids_to_mark.length; i++) {
-					const element = document.getElementById(`RROW-${ids_to_mark[i]}`);
-					element.classList.remove('Unread');
+					const e = document.getElementById(`RROW-${ids_to_mark[i]}`);
+					e.classList.remove('Unread');
 				}
 			}
 		}
@@ -1413,7 +1411,7 @@ const Headlines = {
 			});
 		}
 	},
-	scrollToArticleId: function (id) { // skipcq: JS-R1005
+	scrollToArticleId: function (id) {
 		const container = document.getElementById("headlines-frame");
 		const row = document.getElementById(`RROW-${id}`);
 
@@ -1508,7 +1506,7 @@ const Headlines = {
 
 		const labels = App.getInitParam("labels");
 
-		if (labels?.length) {
+		if (labels && labels.length) {
 
 			menu.addChild(new dijit.MenuSeparator());
 

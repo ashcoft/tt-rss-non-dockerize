@@ -2469,6 +2469,8 @@ class Feeds extends Handler_Protected {
 			31 => __('1 month old'),
 			60 => __('2 months old'),
 			90 => __('3 months old'),
+			180 => __('6 months old'),
+			365 => __('1 year old'),
 		];
 	}
 
