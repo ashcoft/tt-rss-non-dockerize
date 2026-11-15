@@ -405,9 +405,20 @@ const Headlines = {
 
 		container.classList.add(App.isCombinedMode() ? 'cdm' : 'normal');
 		container.setAttribute("data-enable-grid", App.getInitParam("cdm_enable_grid") ? "true" : "false");
+\t\t// Ensure data-enable-grid has a valid value even if init param is missing
+\t\tif (!container.hasAttribute("data-enable-grid")) {
+\t\t\tcontainer.setAttribute("data-enable-grid", "false");
+\t\t}
 		container.setAttribute("data-headlines-count", parseInt(headlines_count));
 		container.setAttribute("data-is-cdm", App.isCombinedMode() ? "true" : "false");
 		container.setAttribute("data-is-cdm-expanded", App.getInitParam("cdm_expanded"));
+\t\t// Ensure data-is-cdm-expanded has a valid boolean value
+\t\tif (container.hasAttribute("data-is-cdm-expanded")) {
+\t\t\tconst val = container.getAttribute("data-is-cdm-expanded");
+\t\t\tcontainer.setAttribute("data-is-cdm-expanded", val ? "true" : "false");
+\t\t} else {
+\t\t\tcontainer.setAttribute("data-is-cdm-expanded", "false");
+\t\t}
 
 		// for floating title because it's placed outside of headlines-frame
 		document.getElementById('main').classList.remove('expandable', 'expanded');
