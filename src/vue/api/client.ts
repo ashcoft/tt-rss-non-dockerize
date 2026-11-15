@@ -142,6 +142,20 @@ class ApiClient {
     return this.wrap(() => Promise.resolve(endpoints.purgeFeed()), false);
   }
 
+  async uploadFeedIcon(
+    feedId: number,
+    file: Blob
+  ): Promise<ApiResponse<endpoints.IconUploadResult | null>> {
+    return this.wrap(() => endpoints.uploadFeedIcon(legacyBackend, feedId, file), null);
+  }
+
+  async removeFeedIcon(feedId: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.removeFeedIcon(legacyBackend, feedId);
+      return true;
+    }, false);
+  }
+
   async catchupFeed(feedId: number | string, isCat = false): Promise<ApiResponse<boolean>> {
     return this.wrap(async () => {
       await endpoints.catchupFeed(legacyBackend, feedId, isCat);
