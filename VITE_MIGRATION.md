@@ -159,9 +159,14 @@ modes and all four sort orders return correctly ordered results.
 
 `tests/e2e/frontend.spec.ts` (Playwright) drives the built app against a real
 `index.php` + `backend.php` instance, so the migration can be checked in a
-browser rather than only by unit tests. It caught a real bug: a Vuetify menu
-nested inside a `v-list-group` activator had its clicks swallowed by the row's
-select handler (fixed by using plain action buttons).
+browser rather than only by unit tests. It has caught real bugs that unit tests
+missed: a Vuetify menu nested inside a `v-list-group` activator whose clicks
+were swallowed by the row's select handler, and label clicks requesting the raw
+positive label id (the backend treats that as a regular feed).
+
+The seed was also fixed so search works: `ttrss_entries.tsvector_combined`
+(the full-text vector tt-rss builds from the title and stripped content) was
+left NULL, so every query matched nothing.
 
 ### How the adapter works
 
