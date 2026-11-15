@@ -1054,6 +1054,65 @@ export async function getHotkeyHelp(backend: LegacyBackend): Promise<string> {
   return response.raw;
 }
 
+export interface PluginInfo {
+  name: string;
+  is_local: boolean;
+  system_enabled: boolean;
+  user_enabled: boolean;
+  has_data: boolean;
+  is_system: boolean;
+  version: string;
+  author: string;
+  description: string;
+  more_info: string;
+}
+
+export interface PluginsList {
+  plugins: PluginInfo[];
+  /** Whether the current user may install/update/uninstall plugins. */
+  isAdmin: boolean;
+}
+
+/**
+ * `Pref_Prefs/getPluginsList` returns every plugin with its enabled state.
+ * System plugins are enabled by config and cannot be toggled per user.
+ */
+export async function getPluginsList(backend: LegacyBackend): Promise<PluginsList> {
+  const response = await backend.call('Pref_Prefs', 'getPluginsList');
+  const body = requireBody(response, 'Pref_Prefs/getPluginsList');
+  const rows = expectArray(body.plugins, 'Pref_Prefs/getPluginsList.plugins');
+
+  const plugins = rows.map((raw) => {
+    const plugin = expectObject(raw, 'Pref_Prefs/getPluginsList.plugin');
+    return {
+      name: asString(plugin.name),
+      is_local: asBoolean(plugin.is_local),
+      system_enabled: asBoolean(plugin.system_enabled),
+      user_enabled: asBoolean(plugin.user_enabled),
+      has_data: asBoolean(plugin.has_data),
+      is_system: asBoolean(plugin.is_system),
+      version: asString(plugin.version),
+      author: asString(plugin.author),
+      description: asString(plugin.description),
+      more_info: asString(plugin.more_info),
+    } satisfies PluginInfo;
+  });
+
+  return { plugins, isAdmin: asBoolean(body.is_admin) };
+}
+
+/**
+ * Persist the user's enabled-plugin list. `Pref_Prefs/setplugins` replaces the
+ * stored list with the names given; system plugins are managed by config and
+ * must not be included.
+ */
+export async function setEnabledPlugins(
+  backend: LegacyBackend,
+  names: string[]
+): Promise<void> {
+  await backend.call('Pref_Prefs', 'setplugins', { plugins: names });
+}
+
 /**
  * Build the tree payload `Pref_Feeds/savefeedorder` expects.
  *

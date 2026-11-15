@@ -1196,3 +1196,72 @@ test('deleteArticles sends a comma-delimited ids list and skips empty input', as
   assert.ok(calls[0].body.includes('method=delete'));
   assert.ok(calls[0].body.includes('ids=1%2C2%2C3'));
 });
+
+test('getPluginsList maps the plugin payload', async () => {
+  installGlobals();
+  const payload = {
+    plugins: [
+      {
+        name: 'auth_internal',
+        is_local: false,
+        system_enabled: true,
+        user_enabled: true,
+        has_data: false,
+        is_system: true,
+        version: '1.0',
+        author: 'fox',
+        description: 'Internal authentication',
+        more_info: '',
+      },
+      {
+        name: 'note',
+        is_local: true,
+        system_enabled: false,
+        user_enabled: true,
+        has_data: true,
+        is_system: false,
+        version: '',
+        author: 'fox',
+        description: 'Article notes',
+        more_info: 'https://tt-rss.org',
+      },
+    ],
+    is_admin: true,
+  };
+  const calls = stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const list = await endpoints.getPluginsList(backend);
+
+  assert.ok(calls[0].body.includes('method=getPluginsList'));
+  assert.equal(list.isAdmin, true);
+  assert.equal(list.plugins.length, 2);
+  assert.deepEqual(list.plugins[0], {
+    name: 'auth_internal',
+    is_local: false,
+    system_enabled: true,
+    user_enabled: true,
+    has_data: false,
+    is_system: true,
+    version: '1.0',
+    author: 'fox',
+    description: 'Internal authentication',
+    more_info: '',
+  });
+  assert.equal(list.plugins[1].more_info, 'https://tt-rss.org');
+});
+
+test('setEnabledPlugins posts the plugin names as plugins[]', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.setEnabledPlugins(backend, ['note', 'share']);
+
+  const body = calls[0].body;
+  assert.ok(body.includes('method=setplugins'));
+  assert.ok(body.includes('plugins%5B%5D=note'));
+  assert.ok(body.includes('plugins%5B%5D=share'));
+});
