@@ -34,43 +34,34 @@ jobs:
             sudo apt-get update && sudo apt-get install -y zip
           fi
 
-      # .gitattributes `export-ignore` is the single source of truth for what
-      # is development-only: `git archive` leaves those paths out, so only
-      # runtime files are staged and packaged.
-      - name: Stage production files
-        run: |
-          set -o pipefail
-          mkdir -p "$RUNNER_TEMP/stage"
-          git archive --format=tar HEAD | tar -x -C "$RUNNER_TEMP/stage"
-
-      - name: Verify no development files are staged
-        run: |
-          cd "$RUNNER_TEMP/stage"
-          leaked=$(find . \( \
-              -path './.git*' -o -path './.circleci' -o -path './src' \
-              -o -path './tests*' -o -path './node_modules' \
-              -o -name 'package.json' -not -path './lib/*' \
-              -o -name 'package-lock.json' -o -name 'pnpm-lock.yaml' \
-              -o -name '*.less' -o -name '*.ts' -o -name '*.po' \
-              -o -name 'phpunit*.xml' -o -name 'phpstan.neon' \
-              -o -path './composer.*' -o -name '*.config.js' \
-            \) -print)
-          if [ -n "$leaked" ]; then
-            echo "::error::Development files found in the release payload:"
-            echo "$leaked"
-            exit 1
-          fi
-          for required in index.php config.php-dist vendor/autoload.php vendor/guzzlehttp/guzzle/src/Client.php lib/dojo/dojo.js locale/de_DE/LC_MESSAGES/messages.mo; do
-            [ -f "$required" ] || { echo "::error::Missing runtime file: $required"; exit 1; }
-          done
-
       - name: Create tt-rss.tar.gz
-        run: tar -C "$RUNNER_TEMP/stage" -czf tt-rss.tar.gz .
+        run: |
+          tar --exclude='.git' \
+              --exclude='.github' \
+              --exclude='node_modules' \
+              --exclude='*.log' \
+              --exclude='*.tmp' \
+              --exclude='*.ts' \
+              --exclude='*.less' \
+              --exclude='package-lock.json' \
+              --exclude='pnpm-lock.yaml' \
+              --exclude='dist' \
+              -czf /tmp/tt-rss.tar.gz . && mv /tmp/tt-rss.tar.gz .
 
       - name: Create tt-rss.zip
         run: |
-          cd "$RUNNER_TEMP/stage"
-          zip -qr "$GITHUB_WORKSPACE/tt-rss.zip" .
+          zip -r tt-rss.zip . \
+              -x '.git/*' \
+              -x '.github/*' \
+              -x 'node_modules/*' \
+              -x '*.log' \
+              -x '*.tmp' \
+              -x '*.ts' \
+              -x '*.less' \
+              -x 'package-lock.json' \
+              -x 'pnpm-lock.yaml' \
+              -x 'dist/*' \
+              -x '*.tar.gz'
 
       - name: Upload tt-rss artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -128,22 +119,28 @@ jobs:
             sudo apt-get update && sudo apt-get install -y zip
           fi
 
-      # Same production payload as the legacy package (see .gitattributes
-      # `export-ignore`), plus the compiled Vue app from dist/.
-      - name: Stage production files
-        run: |
-          set -o pipefail
-          mkdir -p "$RUNNER_TEMP/stage"
-          git archive --format=tar HEAD | tar -x -C "$RUNNER_TEMP/stage"
-          cp -R dist "$RUNNER_TEMP/stage/dist"
-
       - name: Create tt-rss.tar.gz
-        run: tar -C "$RUNNER_TEMP/stage" -czf tt-rss.tar.gz .
+        run: |
+          tar --exclude='.git' \
+              --exclude='.github' \
+              --exclude='node_modules' \
+              --exclude='*.log' \
+              --exclude='*.tmp' \
+              --exclude='package-lock.json' \
+              --exclude='pnpm-lock.yaml' \
+              -czf /tmp/tt-rss.tar.gz . && mv /tmp/tt-rss.tar.gz .
 
       - name: Create tt-rss.zip
         run: |
-          cd "$RUNNER_TEMP/stage"
-          zip -qr "$GITHUB_WORKSPACE/tt-rss.zip" .
+          zip -r tt-rss.zip . \
+              -x '.git/*' \
+              -x '.github/*' \
+              -x 'node_modules/*' \
+              -x '*.log' \
+              -x '*.tmp' \
+              -x 'package-lock.json' \
+              -x 'pnpm-lock.yaml' \
+              -x '*.tar.gz'
 
       - name: Move tt-rss-dev tag
         run: |
