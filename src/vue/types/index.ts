@@ -74,6 +74,15 @@ export interface Article {
   author: string;
   score: number;
   note: string;
+  /** Attachments (podcast audio, video, files) offered by the reading pane. */
+  enclosures?: Array<{
+    content_url: string;
+    content_type: string;
+    title: string;
+    duration: string;
+    width: number;
+    height: number;
+  }>;
 }
 
 export interface FeedTreeNode {

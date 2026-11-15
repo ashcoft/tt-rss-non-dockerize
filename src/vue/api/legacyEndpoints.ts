@@ -53,6 +53,15 @@ export interface AdaptedCategory {
   parent_id: number | null;
 }
 
+export interface AdaptedEnclosure {
+  content_url: string;
+  content_type: string;
+  title: string;
+  duration: string;
+  width: number;
+  height: number;
+}
+
 export interface AdaptedHeadline {
   id: number;
   guid: string;
@@ -74,6 +83,8 @@ export interface AdaptedHeadline {
   author: string;
   score: number;
   note: string;
+  /** Attachments the backend reports as `enclosures.entries`. */
+  enclosures: AdaptedEnclosure[];
 }
 
 export interface AdaptedLabel {
@@ -289,6 +300,14 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
   const unread = asBoolean(line.unread);
   const comments = asString(line.comments);
 
+  // `enclosures` is `{formatted, entries, preview_entries}`; the entries are the
+  // attachment list the reading pane offers.
+  const enclosuresRaw = line.enclosures;
+  const enclosureEntries =
+    typeof enclosuresRaw === 'object' && enclosuresRaw !== null && Array.isArray((enclosuresRaw as Record<string, unknown>).entries)
+      ? ((enclosuresRaw as Record<string, unknown>).entries as unknown[])
+      : [];
+
   return {
     id: asNumber(line.id),
     // The legacy list does not return `guid`; it is dropped from the payload.
@@ -312,6 +331,17 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
     author: asString(line.author),
     score: asNumber(line.score),
     note: asString(line.note),
+    enclosures: enclosureEntries.map((raw) => {
+      const enc = expectObject(raw, 'Feeds/view.headline.enclosure');
+      return {
+        content_url: asString(enc.content_url),
+        content_type: asString(enc.content_type),
+        title: asString(enc.title),
+        duration: asString(enc.duration),
+        width: asNumber(enc.width),
+        height: asNumber(enc.height),
+      };
+    }),
   };
 }
 

@@ -121,10 +121,12 @@ test.describe('Vue front-end', () => {
 
   test('opens an article in the reading pane', async ({ page }) => {
     await login(page);
-    await expandCategory(page, 'Technology');
-    await page.getByText('Hacker News', { exact: true }).click();
+    // "All Articles" includes read items, so this test does not depend on
+    // running before the ones that mark articles read.
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
 
-    const headline = page.getByText('Show HN: I built a distributed task queue in Rust');
+    const headline = page.getByText('PostgreSQL 18 released with major performance improvements');
     await expect(headline).toBeVisible({ timeout: 15000 });
     await headline.click();
 
@@ -164,6 +166,26 @@ test.describe('Vue front-end', () => {
     await row.getByRole('button', { name: 'Mark feed as read' }).click();
 
     await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
+  });
+
+  test('renders article attachments (enclosures)', async ({ page }) => {
+    await login(page);
+
+    // Use the "All Articles" special feed: it includes read articles, so this
+    // test does not depend on running before the one that opens an article.
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    const headline = page.getByText('Show HN: I built a distributed task queue in Rust');
+    await expect(headline).toBeVisible({ timeout: 15000 });
+    await headline.click();
+
+    // The seeded article has an mp4 enclosure (played inline) and an image
+    // enclosure (shown as a link).
+    const attachments = page.locator('.article-attachments');
+    await expect(attachments).toBeVisible({ timeout: 15000 });
+    await expect(attachments.locator('video')).toHaveCount(1);
+    await expect(attachments.locator('a')).toContainText('Thumbnail');
   });
 
   test('bulk-sets a score on the selected headlines', async ({ page }) => {

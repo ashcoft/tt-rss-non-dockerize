@@ -398,6 +398,55 @@ test('getHeadlines maps legacy rows and derives read state from `unread`', async
   assert.equal(headline.updated, '14:05', 'localised date string is passed through');
   assert.equal(headline.comments_count, 2);
   assert.deepEqual(headline.tags, ['news']);
+  // No enclosures in the payload -> an empty list, never undefined.
+  assert.deepEqual(headline.enclosures, []);
+});
+
+test('getHeadlines maps enclosure entries', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 42,
+      content: [
+        {
+          id: 42,
+          title: 'Podcast episode',
+          unread: false,
+          enclosures: {
+            formatted: '',
+            entries: [
+              {
+                content_url: 'https://example.com/ep.mp3',
+                content_type: 'audio/mpeg',
+                title: 'Episode 1',
+                duration: '12:34',
+                width: 0,
+                height: 0,
+              },
+            ],
+            preview_entries: [],
+          },
+        },
+      ],
+    },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+
+  assert.deepEqual(page.headlines[0].enclosures, [
+    {
+      content_url: 'https://example.com/ep.mp3',
+      content_type: 'audio/mpeg',
+      title: 'Episode 1',
+      duration: '12:34',
+      width: 0,
+      height: 0,
+    },
+  ]);
 });
 
 test('getHeadlines searches via `query`, not `search`', async () => {
