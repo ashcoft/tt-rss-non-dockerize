@@ -175,6 +175,12 @@ SELECT setval(pg_get_serial_sequence('ttrss_enclosures', 'id'), (SELECT MAX(id) 
 UPDATE ttrss_entries
 SET tsvector_combined = to_tsvector('english', coalesce(title, '') || ' ' || regexp_replace(coalesce(content, ''), '<[^>]+>', ' ', 'g'));
 
+-- 5e. Give article 2 a comment thread so the article header's comments link
+-- is exercised.
+UPDATE ttrss_entries
+SET comments = 'https://news.ycombinator.com/item?id=40002', num_comments = 2
+WHERE id = 2;
+
 -- 5c. Label assignments: test-label-1 on articles 1 and 9.
 INSERT INTO ttrss_user_labels2 (label_id, article_id) VALUES
 (1, 1),

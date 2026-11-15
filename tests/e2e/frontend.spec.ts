@@ -58,6 +58,28 @@ async function expandCategory(page: Page, title: string): Promise<void> {
   await header.click();
 }
 
+/**
+ * Switch the "Show" view mode. The default (adaptive) hides read articles, so
+ * tests that need a specific article must select "All Articles" to include it
+ * regardless of what earlier tests marked read.
+ */
+async function setViewMode(page: Page, name: string): Promise<void> {
+  const show = page.getByRole('combobox', { name: 'Show' });
+  const option = page.getByRole('option', { name });
+
+  // Opening the Vuetify select can race its transition; retry until the option
+  // is on screen, then pick it.
+  await expect(async () => {
+    if (!(await option.isVisible())) {
+      await show.focus();
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(option).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+
+  await option.click();
+}
+
 test.describe('Vue front-end', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!(await backendReachable(page)), 'no tt-rss backend reachable at baseURL');
@@ -126,6 +148,7 @@ test.describe('Vue front-end', () => {
     // running before the ones that mark articles read.
     await expandCategory(page, 'Special');
     await page.getByText('All Articles', { exact: true }).click();
+    await setViewMode(page, 'All Articles');
 
     const headline = page.getByText('PostgreSQL 18 released with major performance improvements');
     await expect(headline).toBeVisible({ timeout: 15000 });
@@ -265,6 +288,27 @@ test.describe('Vue front-end', () => {
     const titles = page.locator('.headlines-list-content .v-list-item-title');
     await expect(titles).toHaveCount(2, { timeout: 15000 });
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
+  });
+
+  test('shows the comments link for an article with comments', async ({ page }) => {
+    await login(page);
+    // Search finds the article regardless of read state, unlike the default
+    // (adaptive) list which hides articles earlier tests marked read.
+    const searchBox = page.getByPlaceholder('Search articles...');
+    await searchBox.fill('PostgreSQL');
+    await searchBox.press('Enter');
+
+    const row = page
+      .locator('.headlines-list-content .v-list-item')
+      .filter({ hasText: 'PostgreSQL 18' })
+      .first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.locator('.headline-title').click();
+
+    // The seed gives "PostgreSQL 18" a two-comment thread.
+    await expect(page.locator('.article-meta .comments')).toContainText('2 comments', {
+      timeout: 15000,
+    });
   });
 
   test('adds a tag to an article', async ({ page }) => {

@@ -120,6 +120,7 @@ import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
 import HotkeyHelpDialog from './components/dialogs/HotkeyHelpDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
 import { runDetached } from './utils/runDetached';
+import { FEED_ALL } from './api/legacyEndpoints';
 
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
@@ -302,19 +303,22 @@ const catchupCurrentFeed = async (feedId: number | string, isCat: boolean, mode 
  */
 const runSearch = async (
   payload: string | number | object | undefined,
-  feedId: number | string,
+  feedId: number | string | null,
   isCat: boolean
 ) => {
   const { query, language } = asSearchPayload(payload);
 
   if (typeof query === 'string' && query.trim()) {
-    await headlinesStore.search(query.trim(), feedId, isCat, language);
+    // Nothing selected yet: search across all feeds, which is what the legacy
+    // client does (a null feed id would reach the backend as `feed=null`).
+    const target = feedId ?? FEED_ALL;
+    await headlinesStore.search(query.trim(), target, isCat, language);
     showMessage(`Searching for "${query}"`, 'info');
     return;
   }
 
   headlinesStore.setSearchQuery('');
-  await headlinesStore.loadHeadlines(feedId, isCat);
+  await headlinesStore.loadHeadlines(feedId ?? FEED_ALL, isCat);
 };
 
 const handleHeadlineSelect = async (headline: Headline) => {
