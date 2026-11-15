@@ -4,9 +4,9 @@
 
 **`index.php` now serves the Vue app; the Dojo client is no longer the main
 entry point.** The reading flow (login, feed tree, headlines, search, view
-modes, sorting, article actions, tags, scoring, feed editing, labels) runs
-entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
-legacy adapter.
+modes, sorting, article actions, tags, scoring, feed editing, labels) and
+content-filter management (list, create, edit, delete) run entirely on Vue 3 +
+Vuetify + Pinia, talking to `backend.php` through the legacy adapter.
 
 The Dojo stack is **not yet deleted**. What remains:
 
@@ -60,6 +60,12 @@ rather than the clickable item. There is no known blocker here.
   title-only save wiped `feed_url` and `site_url`. `saveFeed` therefore
   re-reads the record and merges, and round-trips `auth_login`/`auth_pass`
   so per-feed HTTP auth survives.
+- **Filter creation/editing was missing.** The Filters tab only listed and
+  deleted. Added `Pref_Filters/edit`, `editSave` and `add` (the `FilterEditorDialog`),
+  with rule/action editing, the filter-type and action vocabularies, label and
+  plugin-action pickers, and the rule feed/category multi-select. Rules and
+  actions are sent as repeated `rule[]`/`action[]` JSON strings; checkbox
+  fields go through `checkbox_to_sql_bool()` (the literal string "on").
 
 All four were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -67,10 +73,8 @@ modes and all four sort orders return correctly ordered results.
 ### Still on Dojo
 
 - **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers only a handful of user preferences, not feed preferences, filter
-  rule creation/editing, label colours, or plugin settings.
-- **Filter management.** Listing and deleting exist; creating and editing
-  rules do not.
+  covers only a handful of user preferences, not feed preferences, label
+  colours, or plugin settings.
 - **Drag and drop** reordering of feeds and categories.
 - **OPML import/export** and feed-icon upload.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
@@ -140,8 +144,8 @@ shell. Two details are easy to get wrong:
 ### Next production gate
 
 Removing the Dojo libraries requires the items under "Still on Dojo", in this
-order: filter creation/editing, the preference screens, then drag-and-drop and
-OPML. Do not weaken authentication or CSRF checks to make the frontend work.
+order: the preference screens, then drag-and-drop and OPML. Do not weaken
+authentication or CSRF checks to make the frontend work.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.

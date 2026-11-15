@@ -735,6 +735,140 @@ test('getFilters reads the nested filter tree', async () => {
   ]);
 });
 
+test('getFilterDetails maps the edit payload onto the editor shape', async () => {
+  installGlobals();
+  // Captured shape of Pref_Filters/edit: the rule keeps feed_id as an array of
+  // strings ("0" means all feeds, "CAT:<id>" a category) and every action
+  // carries both action_param and action_param_label.
+  const payload = {
+    id: 3,
+    enabled: true,
+    match_any_rule: false,
+    inverse: false,
+    title: 'My Filter',
+    rules: [
+      { reg_exp: 'foo', filter_type: 1, feed_id: ['0'], name: 'Title matches foo' },
+      { reg_exp: 'bar', filter_type: 3, feed_id: ['CAT:2'], inverse: true },
+    ],
+    actions: [
+      { action_id: 2, action_param: '', action_param_label: '' },
+      { action_id: 7, action_param: 'Important', action_param_label: 'Important' },
+    ],
+    filter_types: { 1: 'Title', 3: 'Title or Content' },
+    action_types: { 2: 'Mark as read', 7: 'Assign label' },
+    plugin_actions: { 'note:setnote': 'note: set note' },
+    labels: [{ id: 5, caption: 'Important' }],
+  };
+  const calls = stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFilterDetails(backend, 3);
+
+  assert.ok(calls[0].body.includes('method=edit'));
+  assert.ok(calls[0].body.includes('id=3'));
+  assert.equal(details.title, 'My Filter');
+  assert.deepEqual(details.rules, [
+    { reg_exp: 'foo', filter_type: 1, feed_id: ['0'], inverse: false },
+    { reg_exp: 'bar', filter_type: 3, feed_id: ['CAT:2'], inverse: true },
+  ]);
+  assert.deepEqual(details.actions, [
+    { action_id: 2, action_param: '', action_param_label: '' },
+    { action_id: 7, action_param: 'Important', action_param_label: 'Important' },
+  ]);
+  assert.deepEqual(details.filterTypes, { 1: 'Title', 3: 'Title or Content' });
+  assert.deepEqual(details.actionTypes, { 2: 'Mark as read', 7: 'Assign label' });
+  assert.deepEqual(details.pluginActions, { 'note:setnote': 'note: set note' });
+  assert.deepEqual(details.labels, [{ id: 5, caption: 'Important' }]);
+});
+
+test('getFilterDetails defaults an empty template (id 0) to safe values', async () => {
+  installGlobals();
+  // Pref_Filters/edit with id 0 returns the rule/action vocabularies and labels
+  // but no rules or actions, so the editor must default them to empty arrays.
+  const payload = {
+    id: 0,
+    enabled: true,
+    match_any_rule: false,
+    inverse: false,
+    title: '',
+    rules: [],
+    actions: [],
+    filter_types: { 1: 'Title' },
+    action_types: { 2: 'Mark as read' },
+    plugin_actions: {},
+    labels: [],
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const details = await endpoints.getFilterDetails(backend, 0);
+
+  assert.equal(details.id, 0);
+  assert.deepEqual(details.rules, []);
+  assert.deepEqual(details.actions, []);
+  assert.equal(details.enabled, true);
+});
+
+test('saveFilter sends editSave with JSON-encoded rules and actions', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFilter(backend, {
+    id: 3,
+    enabled: true,
+    match_any_rule: false,
+    inverse: false,
+    title: 'My Filter',
+    rules: [{ reg_exp: 'foo', filter_type: 1, feed_id: ['0'], inverse: false }],
+    actions: [{ action_id: 7, action_param: 'Important', action_param_label: 'Important' }],
+    filterTypes: {},
+    actionTypes: {},
+    pluginActions: {},
+    labels: [],
+  });
+
+  const body = calls[0].body;
+  assert.ok(body.includes('method=editSave'));
+  assert.ok(body.includes('id=3'));
+  // Checkbox fields must be the literal "on" that checkbox_to_sql_bool() accepts.
+  assert.ok(body.includes('enabled=on'));
+  assert.ok(!body.includes('match_any_rule=on'));
+  const rule = JSON.parse(decodeURIComponent(/rule%5B%5D=([^&]*)/.exec(body)[1]));
+  assert.deepEqual(rule, { reg_exp: 'foo', filter_type: 1, feed_id: ['0'], inverse: false });
+  const action = JSON.parse(decodeURIComponent(/action%5B%5D=([^&]*)/.exec(body)[1]));
+  assert.deepEqual(action, { action_id: 7, action_param: 'Important', action_param_label: 'Important' });
+});
+
+test('saveFilter uses add (not editSave) for a new filter', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: '' }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.saveFilter(backend, {
+    id: 0,
+    enabled: true,
+    match_any_rule: false,
+    inverse: false,
+    title: 'Brand New',
+    rules: [],
+    actions: [],
+    filterTypes: {},
+    actionTypes: {},
+    pluginActions: {},
+    labels: [],
+  });
+
+  assert.ok(calls[0].body.includes('method=add'));
+  assert.ok(!calls[0].body.includes('method=editSave'));
+  // A new filter has no id to send.
+  assert.ok(!calls[0].body.includes('id='));
+});
+
 test('getProfiles unwraps the top-level array body', async () => {
   installGlobals();
   stubFetch([{ text: JSON.stringify([{ title: 'Default profile', id: 0, active: true }]) }]);

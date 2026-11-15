@@ -42,6 +42,16 @@
           </v-window-item>
 
           <v-window-item value="filters">
+            <div class="d-flex justify-end mb-2">
+              <v-btn
+                size="small"
+                prepend-icon="mdi-plus"
+                variant="tonal"
+                @click="openFilterEditor(null)"
+              >
+                New filter
+              </v-btn>
+            </div>
             <div v-if="loadingFilters" class="text-center py-6">
               <v-progress-circular indeterminate color="primary" />
             </div>
@@ -52,6 +62,13 @@
                   {{ filter.enabled !== false ? 'Enabled' : 'Disabled' }}
                 </v-list-item-subtitle>
                 <template #append>
+                  <v-btn
+                    icon="mdi-pencil"
+                    size="small"
+                    variant="text"
+                    title="Edit filter"
+                    @click="openFilterEditor(filterId(filter))"
+                  />
                   <v-btn
                     icon="mdi-delete"
                     size="small"
@@ -77,6 +94,12 @@
         <v-btn @click="closeDialog">Close</v-btn>
       </v-card-actions>
     </v-card>
+
+    <FilterEditorDialog
+      v-model="filterEditorOpen"
+      :filter-id="editingFilterId"
+      @saved="onFilterSaved"
+    />
   </v-dialog>
 </template>
 
@@ -84,6 +107,7 @@
 import { ref, watch } from 'vue';
 import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
+import FilterEditorDialog from './FilterEditorDialog.vue';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
@@ -93,6 +117,10 @@ const loadingPrefs = ref(false);
 const loadingFilters = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
+
+// Filter editor dialog state
+const filterEditorOpen = ref(false);
+const editingFilterId = ref<number | null>(null);
 
 interface EditablePref {
   name: string;
@@ -191,6 +219,16 @@ async function loadFilters() {
 const filterId = (filter: Record<string, unknown>) => Number(filter.id ?? filter.filter_id ?? 0);
 const filterTitle = (filter: Record<string, unknown>) =>
   String(filter.title ?? filter.name ?? `Filter #${filterId(filter)}`);
+
+function openFilterEditor(id: number | null): void {
+  editingFilterId.value = id;
+  filterEditorOpen.value = true;
+}
+
+function onFilterSaved(): void {
+  notify('Filter saved');
+  runDetached(loadFilters(), 'reload filters');
+}
 
 async function deleteFilter(filter: Record<string, unknown>) {
   try {
