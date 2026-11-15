@@ -37,7 +37,6 @@
 # honors these rules, so production tarballs/zips (and the release workflow)
 # contain only runtime files.
 # ---------------------------------------------------------------------------
-.circleci/ export-ignore
 .codacy.yml export-ignore
 .deepsource.toml export-ignore
 .editorconfig export-ignore
@@ -47,18 +46,13 @@
 .npmrc export-ignore
 .releaserc.json export-ignore
 .snyk export-ignore
-.sonarcloud.properties export-ignore
 .stylelintrc.json export-ignore
 CONTRIBUTING.md export-ignore
-SECURITY.md export-ignore
 VITE_MIGRATION.md export-ignore
-/composer.json export-ignore
-/composer.lock export-ignore
 eslint.config.js export-ignore
 gulpfile.js export-ignore
 jsconfig.json export-ignore
 package.json export-ignore
-package-lock.json export-ignore
 phpstan.neon export-ignore
 phpunit.integration.xml export-ignore
 phpunit.xml export-ignore
@@ -74,42 +68,16 @@ tests_functional/ export-ignore
 tests_integration/ export-ignore
 
 # Vue/Vite development sources (production uses the compiled output)
-/src/ export-ignore
+src/ export-ignore
 js/index.html export-ignore
 
 # Dojo sources used to rebuild the bundled dojo layer
 lib/dojo-src/ export-ignore
 
-# Translation sources, template and helper (runtime uses the compiled .mo files)
-*.po export-ignore
+# Translation template and helper (runtime uses the compiled .mo files)
 messages.pot export-ignore
 utils/rebase-translations.sh export-ignore
 
 # Theme and type sources (themes are served as compiled CSS)
 *.less export-ignore
 *.ts export-ignore
-
-# Dojo/Dijit keep their trimmed package.json as runtime metadata
-lib/dojo/package.json -export-ignore
-lib/dijit/package.json -export-ignore
-
-# Feedly theme build tooling and repository screenshots (dist/ is what ships)
-themes/feedly/dist.sh export-ignore
-themes/feedly/scripts/ export-ignore
-themes/feedly/screenshots/ export-ignore
-
-# Docs, demos and build tooling bundled with third-party packages
-# (licence and notice files stay; LICENSE.md is re-included below)
-vendor/**/docs/ export-ignore
-vendor/**/*.md export-ignore
-vendor/**/*.markdown export-ignore
-vendor/**/LICENSE.md -export-ignore
-vendor/**/*.neon export-ignore
-vendor/**/*.neon.dist export-ignore
-vendor/j4mie/idiorm/demo.php export-ignore
-vendor/soundasleep/html2text/convert.php export-ignore
-vendor/mervick/material-design-icons/.npmignore export-ignore
-vendor/mervick/material-design-icons/Gruntfile.js export-ignore
-vendor/mervick/material-design-icons/scripts/ export-ignore
-vendor/mervick/material-design-icons/scss/ export-ignore
-vendor/mervick/material-design-icons/yarn.lock export-ignore
