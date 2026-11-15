@@ -405,20 +405,13 @@ const Headlines = {
 
 		container.classList.add(App.isCombinedMode() ? 'cdm' : 'normal');
 		container.setAttribute("data-enable-grid", App.getInitParam("cdm_enable_grid") ? "true" : "false");
-		// Ensure data-enable-grid has a valid value even if init param is missing
-		if (!container.hasAttribute("data-enable-grid")) {
-			container.setAttribute("data-enable-grid", "false");
-		}
 		container.setAttribute("data-headlines-count", parseInt(headlines_count));
 		container.setAttribute("data-is-cdm", App.isCombinedMode() ? "true" : "false");
-		container.setAttribute("data-is-cdm-expanded", App.getInitParam("cdm_expanded"));
-		// Ensure data-is-cdm-expanded has a valid boolean value
-		if (container.hasAttribute("data-is-cdm-expanded")) {
-			const val = container.getAttribute("data-is-cdm-expanded");
-			container.setAttribute("data-is-cdm-expanded", val ? "true" : "false");
-		} else {
-			container.setAttribute("data-is-cdm-expanded", "false");
-		}
+		// The grid CSS only matches the literal "true", so normalize to a real boolean:
+		// getAttribute() hands back the string "false", which is truthy and would otherwise
+		// turn the grid on for "expand selected article only".
+		container.setAttribute("data-is-cdm-expanded",
+			App.getInitParam("cdm_expanded") ? "true" : "false");
 
 		// for floating title because it's placed outside of headlines-frame
 		document.getElementById('main').classList.remove('expandable', 'expanded');
@@ -522,6 +515,9 @@ const Headlines = {
 			row_class += App.getInitParam("cdm_expanded") ? " expanded" : " expandable";
 
 			const comments = Article.formatComments(hl);
+			const imagePreview = hl.image_preview
+				? `<img class="cdm-image-preview" src="${App.escapeHtml(hl.image_preview)}" alt="" loading="lazy" onclick="Headlines.click(event, ${hl.id})">`
+				: '';
 
 			row = `<div class="cdm ${row_class} ${Article.getScoreClass(hl.score)}"
 						id="RROW-${hl.id}"
@@ -565,6 +561,8 @@ const Headlines = {
 							</div>
 
 						</div>
+
+						${imagePreview}
 
 						<div class="content" onclick="return Headlines.click(event, ${hl.id}, true);">
 							${Article.renderNote(hl.id, hl.note)}
