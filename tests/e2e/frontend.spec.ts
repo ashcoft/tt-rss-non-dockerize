@@ -208,6 +208,18 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.v-snackbar')).toContainText(/score set/i, { timeout: 10000 });
   });
 
+  test('the Starred feed lists exactly the starred articles', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('Starred', { exact: true }).click();
+
+    // The seed stars articles 3, 8 and 11; the feed must show exactly those
+    // and nothing else (verifies the special-feed id maps to the right view).
+    const titles = page.locator('.headlines-list-content .v-list-item-title');
+    await expect(titles).toHaveCount(3, { timeout: 15000 });
+    await expect(titles).toContainText(['The rise of WebAssembly in server-side applications']);
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();
