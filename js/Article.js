@@ -86,11 +86,25 @@ const Article = {
 			this.cdmMoveToId(id);
 		}
 	},
+	//
+	// A combined-view row shows a thumbnail between its header and body. The body
+	// already carries that image (or, for a video, the player whose poster it is),
+	// so the thumbnail belongs to collapsed rows only. Core themes hide it with
+	// CSS, but a theme installed under themes.local ships no such rules, so the
+	// state is driven here and does not depend on the stylesheet.
+	//
+	syncImagePreview: function (row) {
+		const preview = row.querySelector('.cdm-image-preview');
+
+		if (preview)
+			preview.style.display = row.classList.contains('expandable') && !row.classList.contains('active') ? '' : 'none';
+	},
 	cdmUnsetActive: function (event) {
 		const row = document.getElementById(`RROW-${Article.getActive()}`);
 
 		if (row) {
 			row.classList.remove('active');
+			Article.syncImagePreview(row);
 
 			// Reconcile the Back-gesture history entry now that nothing is active.
 			App.reconcileOverlayHistory();
@@ -436,6 +450,8 @@ const Article = {
 
 				if (App.isCombinedMode() && !App.getInitParam("cdm_expanded"))
 					Article.pack(row);
+
+				Article.syncImagePreview(row);
 			});
 
 			const row = document.getElementById(`RROW-${id}`);
@@ -445,6 +461,8 @@ const Article = {
 
 				row.classList.remove('Unread');
 				row.classList.add('active');
+
+				Article.syncImagePreview(row);
 
 				PluginHost.run(PluginHost.HOOK_ARTICLE_SET_ACTIVE, parseInt(row.getAttribute('data-article-id')));
 			}
