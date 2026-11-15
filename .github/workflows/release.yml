@@ -61,7 +61,7 @@ jobs:
             exit 1
           fi
           for required in index.php config.php-dist vendor/autoload.php vendor/guzzlehttp/guzzle/src/Client.php lib/dojo/dojo.js locale/de_DE/LC_MESSAGES/messages.mo; do
-            [ -e "$required" ] || { echo "::error::Missing runtime file: $required"; exit 1; }
+            [ -f "$required" ] || { echo "::error::Missing runtime file: $required"; exit 1; }
           done
 
       - name: Create tt-rss.tar.gz

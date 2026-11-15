@@ -99,9 +99,13 @@ themes/feedly/scripts/ export-ignore
 themes/feedly/screenshots/ export-ignore
 
 # Docs, demos and build tooling bundled with third-party packages
+# (licence and notice files stay; LICENSE.md is re-included below)
 vendor/**/docs/ export-ignore
-vendor/**/AGENTS.md export-ignore
-vendor/**/CLAUDE.md export-ignore
+vendor/**/*.md export-ignore
+vendor/**/*.markdown export-ignore
+vendor/**/LICENSE.md -export-ignore
+vendor/**/*.neon export-ignore
+vendor/**/*.neon.dist export-ignore
 vendor/j4mie/idiorm/demo.php export-ignore
 vendor/soundasleep/html2text/convert.php export-ignore
 vendor/mervick/material-design-icons/.npmignore export-ignore
