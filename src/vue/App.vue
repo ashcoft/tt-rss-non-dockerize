@@ -70,6 +70,7 @@
           <ArticleView
             :article="headlinesStore.selectedArticle"
             @close="handleArticleClose"
+            @mark-relative="handleMarkRelative"
           />
         </aside>
       </main>
@@ -353,6 +354,17 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
 
 const handleArticleClose = () => {
   headlinesStore.clearSelection();
+};
+
+/** Mark the unread articles above/below one article as read. */
+const handleMarkRelative = async (articleId: number, above: boolean) => {
+  const ids = headlinesStore.unreadRelativeTo(articleId, above);
+  if (ids.length === 0) {
+    showMessage('No unread articles to mark', 'info');
+    return;
+  }
+  await headlinesStore.markAsRead(ids);
+  showMessage(`Marked ${ids.length} article(s) as read`, 'success');
 };
 
 /** Bulk actions from the headlines selection bar. */

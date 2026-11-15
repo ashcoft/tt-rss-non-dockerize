@@ -128,6 +128,9 @@ rather than the clickable item. There is no known blocker here.
 - **Digest settings were missing.** `RPC/sanityCheck` init-params now returns
   the four digest preferences (read with their real types, since the send time
   is a string), and the dialog lists them.
+- **"Mark above/below as read" was missing.** The article panel now offers both
+  actions, backed by a store helper that collects the unread ids on the chosen
+  side of the article.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.

@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  'mark-relative': [articleId: number, above: boolean];
 }>();
 
 const headlinesStore = useHeadlinesStore();
@@ -149,6 +150,14 @@ const sanitizedContent = computed(() => {
         <a :href="article.link" target="_blank" rel="noopener noreferrer">
           View Original
         </a>
+        <div class="relative-actions">
+          <v-btn size="x-small" variant="text" @click="emit('mark-relative', article.id, true)">
+            Mark above as read
+          </v-btn>
+          <v-btn size="x-small" variant="text" @click="emit('mark-relative', article.id, false)">
+            Mark below as read
+          </v-btn>
+        </div>
       </footer>
     </article>
   </div>
@@ -206,6 +215,12 @@ const sanitizedContent = computed(() => {
 .article-footer {
   padding: 1rem;
   border-top: 1px solid #eee;
+}
+
+.relative-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .article-footer a {

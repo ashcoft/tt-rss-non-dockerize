@@ -143,6 +143,17 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     cursorId.value = articleId;
   }
 
+  /**
+   * Ids of the unread headlines strictly above (`above = true`) or below the
+   * given article, mirroring the legacy "Mark above/below as read" action.
+   */
+  function unreadRelativeTo(articleId: number, above: boolean): number[] {
+    const index = headlines.value.findIndex(h => h.id === articleId);
+    if (index === -1) return [];
+    const slice = above ? headlines.value.slice(0, index) : headlines.value.slice(index + 1);
+    return slice.filter(h => !h.is_read).map(h => h.id);
+  }
+
   // Actions
   async function loadHeadlines(feedId: number | string, isCat: boolean = false) {
     loading.value = true;
@@ -598,6 +609,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     cursorHeadline,
     moveCursor,
     setCursor,
+    unreadRelativeTo,
     
     // Actions
     loadHeadlines,
