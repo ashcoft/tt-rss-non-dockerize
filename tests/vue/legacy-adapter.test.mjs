@@ -1149,3 +1149,21 @@ test('changePassword reads an alert-danger block as a failure', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.message, 'Entered passwords do not match.');
 });
+
+test('catchupFeed sends the feed, is_cat flag and time window', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: JSON.stringify({ counters: [] }) }, { text: JSON.stringify({ counters: [] }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.catchupFeed(backend, 7, false, '2week');
+  await endpoints.catchupFeed(backend, 3, true);
+
+  assert.ok(calls[0].body.includes('method=catchupFeed'));
+  assert.ok(calls[0].body.includes('feed_id=7'));
+  assert.ok(calls[0].body.includes('is_cat=0'));
+  assert.ok(calls[0].body.includes('mode=2week'));
+  // Default mode is "all".
+  assert.ok(calls[1].body.includes('is_cat=1'));
+  assert.ok(calls[1].body.includes('mode=all'));
+});

@@ -261,10 +261,17 @@ export const useFeedsStore = defineStore('feeds', () => {
 
   /**
    * Mark everything in a feed/category as read.
+   *
+   * `mode` mirrors the legacy "Mark as read" dropdown: 'all' (default) or a
+   * time window ('1day'/'1week'/'2week') that only marks older articles.
    */
-  async function catchupFeed(feedId: number | string, isCat: boolean = false): Promise<boolean> {
+  async function catchupFeed(
+    feedId: number | string,
+    isCat: boolean = false,
+    mode: string = 'all'
+  ): Promise<boolean> {
     try {
-      const response = await api.catchupFeed(feedId, isCat);
+      const response = await api.catchupFeed(feedId, isCat, mode);
       if (response.status === 0) {
         // Optimistically clear unread counters
         if (isCat) {
