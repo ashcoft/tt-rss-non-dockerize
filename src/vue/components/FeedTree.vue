@@ -213,10 +213,16 @@ interface Props {
   feeds: Feed[];
   categories: Category[];
   labels?: Label[];
+  /** Hide feeds with no unread articles (HIDE_READ_FEEDS). */
+  hideRead?: boolean;
+  /** Currently selected feed, kept visible while hiding read feeds. */
+  activeFeedId?: number | string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  labels: () => []
+  labels: () => [],
+  hideRead: false,
+  activeFeedId: null
 });
 
 const emit = defineEmits<{
@@ -253,11 +259,21 @@ const filteredLabels = computed(() => {
 });
 
 /**
+ * Whether a feed should appear given HIDE_READ_FEEDS. A feed with unread
+ * articles always shows; the active feed stays visible so hiding read feeds
+ * does not deselect what the user is reading.
+ */
+const visible = (feed: Feed): boolean => {
+  if (!props.hideRead) return true;
+  return (feed.unread ?? 0) > 0 || feed.id === props.activeFeedId;
+};
+
+/**
  * Computes the list of uncategorized feeds filtered by the current search query.
  * @returns The filtered array of uncategorized feeds.
  */
 const filteredUncategorizedFeeds = computed(() => {
-  const feeds = props.feeds.filter(f => !f.cat_id);
+  const feeds = props.feeds.filter(f => !f.cat_id && visible(f));
   if (!searchQuery.value) return feeds;
   const query = searchQuery.value.toLowerCase();
   return feeds.filter(feed => feed.title.toLowerCase().includes(query));
@@ -269,7 +285,7 @@ const filteredUncategorizedFeeds = computed(() => {
  * @returns The filtered array of feeds belonging to the specified category.
  */
 const getFeedsByCategory = (categoryId: number) => {
-  const feeds = props.feeds.filter(f => f.cat_id === categoryId);
+  const feeds = props.feeds.filter(f => f.cat_id === categoryId && visible(f));
   if (!searchQuery.value) return feeds;
   const query = searchQuery.value.toLowerCase();
   return feeds.filter(feed => feed.title.toLowerCase().includes(query));
