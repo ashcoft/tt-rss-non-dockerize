@@ -62,6 +62,7 @@
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
+            @bulk-action="handleBulkAction"
                     />
         </section>
 
@@ -352,6 +353,20 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
 
 const handleArticleClose = () => {
   headlinesStore.clearSelection();
+};
+
+/** Bulk actions from the headlines selection bar. */
+const handleBulkAction = async (action: string, ids: number[]) => {
+  if (ids.length === 0) return;
+  if (action === 'mark_read') {
+    await headlinesStore.markAsRead(ids);
+    showMessage(`${ids.length} article(s) marked as read`, 'success');
+  } else if (action === 'delete') {
+    await headlinesStore.deleteArticles(ids);
+    showMessage(`${ids.length} article(s) deleted`, 'success');
+  } else {
+    showMessage(`Unknown bulk action: ${action}`, 'warning');
+  }
 };
 
 const handleLoadMore = async () => {

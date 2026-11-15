@@ -372,6 +372,34 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     }
   }
 
+  /** Permanently delete several articles in one request. */
+  async function deleteArticles(articleIds: number[]): Promise<void> {
+    if (articleIds.length === 0) return;
+    try {
+      await api.deleteArticles(articleIds);
+
+      const feedsStore = useFeedsStore();
+      const ids = new Set(articleIds);
+
+      // Adjust feed unread counts for the unread articles being removed.
+      const deltas = new Map<number, number>();
+      for (const headline of headlines.value) {
+        if (!ids.has(headline.id) || headline.is_read) continue;
+        deltas.set(headline.feed_id, (deltas.get(headline.feed_id) ?? 0) - 1);
+      }
+      deltas.forEach((delta, feedId) => feedsStore.updateFeedUnread(feedId, delta));
+
+      headlines.value = headlines.value.filter(h => !ids.has(h.id));
+
+      if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
+        selectedArticle.value = null;
+      }
+    } catch (err) {
+      console.error('Failed to delete articles:', err);
+      throw err;
+    }
+  }
+
   async function updateNote(articleId: number, note: string) {
     try {
       await api.updateArticleNote(articleId, note);
@@ -523,6 +551,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     toggleStar,
     togglePublish,
     deleteArticle,
+    deleteArticles,
     updateNote,
     updateTags,
     suggestTags,

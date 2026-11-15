@@ -112,6 +112,10 @@ rather than the clickable item. There is no known blocker here.
 - **Feed icons were missing.** The tree showed a generic RSS glyph for every
   feed. It now renders each feed's icon from `public.php?op=feed_icon` (base
   URL from `icons_url` in init-params), falling back to the glyph on error.
+- **Bulk article selection was missing.** The headline list only acted on one
+  article at a time. Added per-article selection checkboxes, a select-all
+  control and a bar to mark the selection read or delete it, backed by a new
+  `deleteArticles` store action (single `RPC/delete` for the whole selection).
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
