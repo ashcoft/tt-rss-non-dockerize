@@ -1,0 +1,18 @@
+version: 2.1
+
+jobs:
+  php-lint:
+    docker:
+      - image: cimg/php:8.2
+    steps:
+      - checkout
+      - run:
+          name: PHP syntax check
+          command: |
+            find . -name '*.php' -not -path './vendor/*' -not -path './lib/dojo/*' -print0 |
+            xargs -0 -n1 -P4 php -l
+
+workflows:
+  php-lint-workflow:
+    jobs:
+      - php-lint
