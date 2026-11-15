@@ -10,6 +10,7 @@
         <v-tabs v-model="tab" color="primary">
           <v-tab value="general">General</v-tab>
           <v-tab value="filters">Filters</v-tab>
+          <v-tab value="password">Password</v-tab>
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
@@ -83,6 +84,42 @@
               </v-list-item>
             </v-list>
           </v-window-item>
+
+          <v-window-item value="password">
+            <v-text-field
+              v-model="oldPassword"
+              label="Current password"
+              type="password"
+              autocomplete="current-password"
+              density="compact"
+            />
+            <v-text-field
+              v-model="newPassword"
+              label="New password"
+              type="password"
+              autocomplete="new-password"
+              density="compact"
+            />
+            <v-text-field
+              v-model="confirmPassword"
+              label="Confirm new password"
+              type="password"
+              autocomplete="new-password"
+              density="compact"
+            />
+            <v-btn
+              color="primary"
+              :loading="busy"
+              :disabled="!canChangePassword"
+              @click="runDetached(changePassword(), 'change password')"
+            >
+              Change password
+            </v-btn>
+            <p class="text-caption text-grey mt-2">
+              Password rules are enforced by the backend and the active
+              authentication module.
+            </p>
+          </v-window-item>
         </v-window>
 
         <v-alert v-if="message" :type="messageType" variant="tonal" density="compact" class="mt-4">
@@ -104,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 import FilterEditorDialog from './FilterEditorDialog.vue';
@@ -121,6 +158,18 @@ const messageType = ref<'success' | 'error'>('success');
 // Filter editor dialog state
 const filterEditorOpen = ref(false);
 const editingFilterId = ref<number | null>(null);
+
+// Change-password form state
+const oldPassword = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+const busy = ref(false);
+const canChangePassword = computed(
+  () =>
+    oldPassword.value !== '' &&
+    newPassword.value !== '' &&
+    newPassword.value === confirmPassword.value
+);
 
 interface EditablePref {
   name: string;
@@ -228,6 +277,28 @@ function openFilterEditor(id: number | null): void {
 function onFilterSaved(): void {
   notify('Filter saved');
   runDetached(loadFilters(), 'reload filters');
+}
+
+async function changePassword(): Promise<void> {
+  busy.value = true;
+  try {
+    const response = await api.changePassword(
+      oldPassword.value,
+      newPassword.value,
+      confirmPassword.value
+    );
+    const result = response.content;
+    if (response.status === 0 && result.ok) {
+      notify(result.message || 'Password changed');
+      oldPassword.value = '';
+      newPassword.value = '';
+      confirmPassword.value = '';
+    } else {
+      notify(result.message || response.error || 'Failed to change password', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function deleteFilter(filter: Record<string, unknown>) {

@@ -403,6 +403,22 @@ class ApiClient {
   }
 
   // ============================================
+  // Account
+  // ============================================
+
+  /** Change the current user's password; resolves to the backend's message. */
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<ApiResponse<endpoints.PrefsActionResult>> {
+    return this.wrap(
+      () => endpoints.changePassword(legacyBackend, oldPassword, newPassword, confirmPassword),
+      { ok: false, message: '' }
+    );
+  }
+
+  // ============================================
   // Internal
   // ============================================
 

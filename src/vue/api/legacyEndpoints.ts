@@ -1093,3 +1093,44 @@ export async function saveFeedOrder(
   const payload = JSON.stringify(buildFeedOrderPayload(categories, feeds));
   await backend.call('Pref_Feeds', 'savefeedorder', { payload });
 }
+
+export interface PrefsActionResult {
+  /** False when the handler returned a `format_error()` block. */
+  ok: boolean;
+  /** The handler's message with its HTML wrapper stripped. */
+  message: string;
+}
+
+/**
+ * Interpret a preferences handler that answers with an HTML fragment.
+ *
+ * Handlers such as `Pref_Prefs/changepassword` print `format_notice()` on
+ * success and `format_error()` on failure, both as `<div class="alert ...">`
+ * blocks. The class is the only machine-readable signal, so success is "no
+ * `alert-danger`" and the message is the tag-stripped body.
+ */
+function parsePrefsResult(raw: string): PrefsActionResult {
+  const message = raw.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return { ok: raw.trim() !== '' && !raw.includes('alert-danger'), message };
+}
+
+/**
+ * Change the current user's password.
+ *
+ * `Pref_Prefs/changepassword` validates the inputs server-side (blank, equal,
+ * mismatched, disallowed characters) and delegates to the authentication
+ * module. It answers with an HTML fragment, parsed by `parsePrefsResult`.
+ */
+export async function changePassword(
+  backend: LegacyBackend,
+  oldPassword: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<PrefsActionResult> {
+  const response = await backend.call('Pref_Prefs', 'changepassword', {
+    old_password: oldPassword,
+    new_password: newPassword,
+    confirm_password: confirmPassword,
+  });
+  return parsePrefsResult(response.raw);
+}
