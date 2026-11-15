@@ -208,6 +208,23 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.v-snackbar')).toContainText(/score set/i, { timeout: 10000 });
   });
 
+  test('creates a content filter from the preferences dialog', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.getByRole('tab', { name: 'Filters' }).click();
+    await page.getByRole('button', { name: 'New filter' }).click();
+
+    const editor = page.getByRole('dialog').last();
+    await editor.getByLabel('Title').fill('E2E Filter');
+    await editor.getByRole('button', { name: 'Add rule' }).click();
+    await editor.getByLabel('Regular expression').first().fill('test');
+    await editor.getByRole('button', { name: 'Save' }).click();
+
+    // The editor reports success; the filter is now in the list.
+    await expect(editor.locator('.v-alert')).toContainText(/filter saved/i, { timeout: 10000 });
+    await expect(page.getByText('E2E Filter')).toBeVisible({ timeout: 10000 });
+  });
+
   test('toggles a boolean preference and persists it', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();

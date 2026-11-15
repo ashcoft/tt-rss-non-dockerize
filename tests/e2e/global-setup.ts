@@ -38,5 +38,18 @@ export default function globalSetup(): void {
     console.log('[e2e] re-seeded the test database');
   } catch (err) {
     console.warn('[e2e] could not re-seed the database; continuing with current state:', (err as Error).message);
+    return;
+  }
+
+  // The seed does not cover ttrss_filters2; drop any filters earlier E2E runs
+  // created so they do not accumulate.
+  try {
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_filters2 WHERE title LIKE 'E2E %'"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
+  } catch (err) {
+    console.warn('[e2e] could not clear leftover E2E filters:', (err as Error).message);
   }
 }
