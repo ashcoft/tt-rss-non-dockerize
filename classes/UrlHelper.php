@@ -302,7 +302,7 @@ class UrlHelper {
 	 *   target on port 80/443 is still a probe of the reader's local network.
 	 * @return bool true if the URL should be rejected, false otherwise
 	 */
-	static function has_disallowed_ip(string|array $url_or_tokens, bool $validate_resolved_ip = false,
+	public static function has_disallowed_ip(string|array $url_or_tokens, bool $validate_resolved_ip = false,
 			bool $allow_private_on_standard_ports = true): bool {
 		$tokens = is_array($url_or_tokens) ? $url_or_tokens : parse_url($url_or_tokens);
 

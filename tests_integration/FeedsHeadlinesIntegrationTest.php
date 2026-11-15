@@ -565,7 +565,6 @@ final class FeedsHeadlinesIntegrationTest extends DbTestCase {
         [$override_order, $skip_first_id_check] = Feeds::_order_to_override_query('date_reverse');
 
         $method = new ReflectionMethod('Feeds', '_format_headlines_list');
-        $method->setAccessible(true);
 
         $ret = $method->invoke(new Feeds(['feed' => 1]), 1, '', 'all_articles', 30, false,
             0, $override_order, true, null, $skip_first_id_check, 'date_reverse');
