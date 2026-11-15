@@ -228,10 +228,19 @@ const handleFeedAction = async (action: string, feedId: number) => {
       // feeds, so use the global mark-all-read handler.
       await headlinesStore.catchupAll();
       showMessage('All headlines marked as read', 'success');
-    } else if (feedId === -1 || feedId === -2) {
-      // Starred/published special views use the normal mark-read path
+    } else if (feedId < 0) {
+      // Other special views (Starred/Published) use the normal mark-read path.
       const ids = headlinesStore.headlines.map(h => h.id);
       await headlinesStore.markAsRead(ids);
+      showMessage('Headlines marked as read', 'success');
+    } else {
+      // A regular feed or category: the backend catchup clears its counters.
+      const ok = await feedsStore.catchupFeed(feedId, false);
+      showMessage(
+        ok ? 'Feed marked as read' : feedsStore.error ?? 'Failed to mark feed as read',
+        ok ? 'success' : 'error'
+      );
+      if (ok) await headlinesStore.loadHeadlines(feedId, false);
     }
   } else if (action === 'edit') {
     feedsDialogOpen.value = true;

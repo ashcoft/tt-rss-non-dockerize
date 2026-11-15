@@ -53,6 +53,8 @@ async function expandCategory(page: Page, title: string): Promise<void> {
     .locator('.feed-list .v-list-group__header')
     .filter({ hasText: title })
     .first();
+  // The tree loads its feeds just after login, so wait for the group first.
+  await header.waitFor({ state: 'visible', timeout: 15000 });
   await header.click();
 }
 
@@ -148,6 +150,19 @@ test.describe('Vue front-end', () => {
     await expect(page.getByText(/selected/)).toBeVisible();
     await page.getByRole('button', { name: 'Mark read' }).click();
     // The action reports success through the app snackbar.
+    await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
+  });
+
+  test('marks a feed as read from its row action', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Technology');
+
+    // The per-feed action buttons sit in the row; "Mark feed as read" calls the
+    // backend catchup and reports through the snackbar.
+    const row = page.locator('.feed-list .v-list-item').filter({ hasText: 'The Register' }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.getByRole('button', { name: 'Mark feed as read' }).click();
+
     await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
   });
 
