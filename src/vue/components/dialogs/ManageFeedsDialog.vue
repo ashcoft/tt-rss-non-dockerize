@@ -113,6 +113,22 @@
                 item-title="title"
                 item-value="value"
               />
+
+              <v-expansion-panels variant="accordion" class="mb-3">
+                <v-expansion-panel title="Advanced">
+                  <v-expansion-panel-text>
+                    <v-text-field v-model="editDetails.auth_login" label="HTTP username" density="compact" />
+                    <v-text-field v-model="editDetails.auth_pass" label="HTTP password" type="password" density="compact" />
+                    <v-checkbox v-model="editDetails.private" label="Private" hide-details density="compact" />
+                    <v-checkbox v-model="editDetails.cache_images" label="Cache images" hide-details density="compact" />
+                    <v-checkbox v-model="editDetails.hide_images" label="Hide images" hide-details density="compact" />
+                    <v-checkbox v-model="editDetails.mark_unread_on_update" label="Mark unread on update" hide-details density="compact" />
+                    <v-checkbox v-model="editDetails.include_in_digest" label="Include in digest" hide-details density="compact" />
+                    <v-checkbox v-model="editDetails.always_display_enclosures" label="Always display enclosures" hide-details density="compact" />
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
+
               <v-btn color="primary" :loading="busy" @click="saveFeedChanges">Save</v-btn>
             </template>
             <p v-else class="text-caption text-grey mt-2">Select a feed to edit.</p>
@@ -374,6 +390,8 @@ const saveFeedChanges = async () => {
   if (!editDetails.value) return;
   const details = editDetails.value;
   busy.value = true;
+  // saveFeed re-reads the record and merges, so passing only the edited fields
+  // (including the advanced ones) preserves everything else.
   const ok = await feedStore.saveFeed(details.id, {
     title: details.title,
     feed_url: details.feed_url,
@@ -381,6 +399,14 @@ const saveFeedChanges = async () => {
     cat_id: details.cat_id,
     update_interval: details.update_interval,
     purge_interval: details.purge_interval,
+    auth_login: details.auth_login,
+    auth_pass: details.auth_pass,
+    private: details.private,
+    cache_images: details.cache_images,
+    hide_images: details.hide_images,
+    mark_unread_on_update: details.mark_unread_on_update,
+    include_in_digest: details.include_in_digest,
+    always_display_enclosures: details.always_display_enclosures,
   });
   busy.value = false;
   notify(ok ? 'Feed saved' : feedStore.error ?? 'Failed to save feed', ok ? 'success' : 'error');
