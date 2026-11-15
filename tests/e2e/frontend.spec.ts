@@ -267,6 +267,21 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('searches articles by term', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    const searchBox = page.getByPlaceholder('Search articles...');
+    await searchBox.fill('kubernetes');
+    await searchBox.press('Enter');
+
+    // The seeded "Kubernetes" article is the only match.
+    const titles = page.locator('.headlines-list-content .v-list-item-title');
+    await expect(titles).toHaveCount(1, { timeout: 15000 });
+    await expect(titles).toContainText(['How Kubernetes evolved']);
+  });
+
   test('toggles the light/dark theme', async ({ page }) => {
     await login(page);
     const app = page.locator('.v-application');
