@@ -267,6 +267,15 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('toggles the light/dark theme', async ({ page }) => {
+    await login(page);
+    const app = page.locator('.v-application');
+    await expect(app).toHaveClass(/v-theme--light/);
+
+    await page.getByRole('button', { name: 'Toggle light/dark theme' }).click();
+    await expect(app).toHaveClass(/v-theme--dark/);
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();
