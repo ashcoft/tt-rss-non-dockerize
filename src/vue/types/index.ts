@@ -83,6 +83,8 @@ export interface Article {
     width: number;
     height: number;
   }>;
+  /** Thumbnail URL shown as a preview in combined mode, if any. */
+  image_preview?: string;
 }
 
 export interface FeedTreeNode {
