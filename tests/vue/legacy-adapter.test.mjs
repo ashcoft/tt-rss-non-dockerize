@@ -473,6 +473,23 @@ test('getHeadlines maps the article image preview', async () => {
   assert.equal(page.headlines[0].image_preview, 'https://example.com/thumb.jpg');
 });
 
+test('getHeadlines maps the feed background colour', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 1,
+      content: [{ id: 1, title: 'Tinted', unread: true, feed_bg_color: 'rgba(28,215,215,0.3)' }],
+    },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.equal(page.headlines[0].feed_bg_color, 'rgba(28,215,215,0.3)');
+});
+
 test('getHeadlines surfaces the toolbar feed error', async () => {
   installGlobals();
   const payload = {

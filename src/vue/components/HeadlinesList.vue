@@ -107,6 +107,15 @@
 
         <!-- Combined mode: the article body is shown inline in the list. -->
         <div v-if="combined" class="headline-content">
+          <a
+            class="headline-feed-label"
+            :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+            :href="headline.link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ headline.feed_title }}
+          </a>
           <img
             v-if="headline.image_preview"
             class="headline-image-preview"
@@ -332,6 +341,16 @@ const sanitize = (html: string): string =>
   max-height: 200px;
   object-fit: contain;
   margin-bottom: 0.5rem;
+}
+
+.headline-feed-label {
+  display: inline-block;
+  padding: 0 0.4rem;
+  margin-bottom: 0.35rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Grid view: tile the inline articles on wide screens (combined mode only).
