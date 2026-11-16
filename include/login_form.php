@@ -41,7 +41,7 @@
                         <?php } ?>
 
                         <fieldset>
-                                <label><?= __("Login:") ?></label>
+                                <label for="login"><?= __("Login:") ?></label>
                                 <input name="login" id="login" type="text"
                                         autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
                                         <?= Config::get(Config::DISABLE_LOGIN_FORM) ? 'disabled="disabled"' : '' ?>
@@ -49,9 +49,9 @@
                         </fieldset>
 
                         <fieldset>
-                                <label><?= __("Password:") ?></label>
+                                <label for="password"><?= __("Password:") ?></label>
 
-                                <input type="password" name="password" required="1"
+                                <input type="password" id="password" name="password" required="1"
                                         autocomplete="current-password"
                                         class="input input-text"
                                         <?= Config::get(Config::DISABLE_LOGIN_FORM) ? 'disabled="disabled"' : '' ?>
@@ -67,16 +67,16 @@
                                 <fieldset class="narrow">
                                         <label> </label>
 
-                                        <label>
-                                                <?= \Controls\checkbox_tag("bw_limit") ?>
+                                        <label for="bw_limit">
+                                                <?= \Controls\checkbox_tag("bw_limit", false, "", [], "bw_limit") ?>
                                                 <?= __("Use less traffic") ?></label>
                                 </fieldset>
 
                                 <fieldset class="narrow">
                                         <label> </label>
 
-                                        <label>
-                                                <?= \Controls\checkbox_tag("safe_mode") ?>
+                                        <label for="safe_mode">
+                                                <?= \Controls\checkbox_tag("safe_mode", false, "", [], "safe_mode") ?>
                                                 <?= __("Safe mode") ?>
                                         </label>
                                 </fieldset>
@@ -84,8 +84,8 @@
                                 <?php if (Config::get(Config::SESSION_COOKIE_LIFETIME) > 0) { ?>
                                         <fieldset class="narrow">
                                                 <label> </label>
-                                                <label>
-                                                        <?= \Controls\checkbox_tag("remember_me") ?>
+                                                <label for="remember_me">
+                                                        <?= \Controls\checkbox_tag("remember_me", false, "", [], "remember_me") ?>
                                                         <?= __("Remember me") ?>
                                                 </label>
                                         </fieldset>

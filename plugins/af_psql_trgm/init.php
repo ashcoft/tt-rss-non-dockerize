@@ -87,7 +87,7 @@ class Af_Psql_Trgm extends Plugin {
 				<?= format_notice("Enable for specific feeds in the feed editor.") ?>
 
 				<fieldset>
-					<label><?= __("Minimum similarity:") ?></label>
+					<label for="psql_trgm_similarity"><?= __("Minimum similarity:") ?></label>
 					<input
 						placeholder="<?= $this->default_similarity ?>"
 						id='psql_trgm_similarity'
@@ -100,10 +100,11 @@ class Af_Psql_Trgm extends Plugin {
 				</fieldset>
 
 				<fieldset>
-					<label><?= __("Minimum title length:") ?></label>
+					<label for="psql_trgm_min_title_length"><?= __("Minimum title length:") ?></label>
 					<input
 						placeholder="<?= $this->default_min_length ?>"
 						required="1"
+						id="psql_trgm_min_title_length"
 						name="min_title_length" value="<?= htmlspecialchars($min_title_length) ?>">
 				</fieldset>
 

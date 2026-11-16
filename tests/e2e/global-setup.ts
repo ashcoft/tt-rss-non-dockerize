@@ -1,6 +1,34 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
+
+/** Fixed, non-writable directories a psql binary is installed into. */
+const PSQL_SEARCH_PATHS = [
+  '/usr/bin',
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+  '/opt/local/bin',
+];
+
+/**
+ * Resolve a command to an absolute path before running it.
+ *
+ * Only fixed, non-writable directories are searched so the helper cannot be
+ * steered to an unintended binary by a writable PATH entry (and `execFileSync`
+ * never performs its own PATH lookup). `TTRSS_PSQL_BIN` overrides the search
+ * for non-standard installs.
+ */
+function resolveExecutable(name: string, override?: string): string | null {
+  if (override) {
+    if (!isAbsolute(override)) return null;
+    return existsSync(override) ? override : null;
+  }
+  for (const dir of PSQL_SEARCH_PATHS) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 /**
  * Playwright global setup: re-seed the tt-rss database so the E2E run starts
@@ -29,9 +57,15 @@ export default function globalSetup(): void {
     return;
   }
 
+  const psql = resolveExecutable('psql', process.env.TTRSS_PSQL_BIN);
+  if (!psql) {
+    console.warn('[e2e] psql not found; skipping re-seed and preference reset');
+    return;
+  }
+
   try {
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-v', 'ON_ERROR_STOP=1', '-f', seed],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
@@ -45,7 +79,7 @@ export default function globalSetup(): void {
   // created so they do not accumulate.
   try {
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_filters2 WHERE title LIKE 'E2E %'"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
@@ -56,7 +90,7 @@ export default function globalSetup(): void {
   // Likewise drop any tags an E2E run added.
   try {
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_tags WHERE tag_name LIKE 'e2e%'"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
@@ -69,26 +103,26 @@ export default function globalSetup(): void {
   // assume the three-pane layout, so set it off (and grid off) explicitly.
   try {
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
         "DELETE FROM ttrss_user_prefs2 WHERE pref_name IN ('CDM_ENABLE_GRID', 'COMBINED_DISPLAY_MODE')"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
         "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL)"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
     // Enable the `note` plugin so the plugin article-button surface is testable.
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
         "DELETE FROM ttrss_user_prefs2 WHERE pref_name = '_ENABLED_PLUGINS'"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
     execFileSync(
-      'psql',
+      psql,
       ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
         "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, '_ENABLED_PLUGINS', 'note', NULL)"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }

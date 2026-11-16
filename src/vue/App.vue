@@ -230,34 +230,37 @@ const onLogout = async () => {
 };
 
 /**
- * Feed tree context actions (Phase 3).
+ * Mark a feed, category or special view as read.
  * Special feed ids mirror Feeds::FEED_* in classes/Feeds.php:
  * -1 starred, -2 published, -3 fresh, -4 all, -6 recently read, 0 archived.
  */
+const markFeedRead = async (feedId: number) => {
+  if (feedId === -4 || feedId === -3) {
+    // "All articles" / "Fresh": there is no per-feed catchup for virtual
+    // feeds, so use the global mark-all-read handler.
+    await headlinesStore.catchupAll();
+    showMessage('All headlines marked as read', 'success');
+  } else if (feedId < 0) {
+    // Other special views (Starred/Published) use the normal mark-read path.
+    const ids = headlinesStore.headlines.map(h => h.id);
+    await headlinesStore.markAsRead(ids);
+    showMessage('Headlines marked as read', 'success');
+  } else {
+    // A regular feed or category: the backend catchup clears its counters.
+    const ok = await feedsStore.catchupFeed(feedId, false);
+    showMessage(
+      ok ? 'Feed marked as read' : feedsStore.error ?? 'Failed to mark feed as read',
+      ok ? 'success' : 'error'
+    );
+    if (ok) await headlinesStore.loadHeadlines(feedId, false);
+  }
+};
+
+/** Feed tree context actions (Phase 3). */
 const handleFeedAction = async (action: string, feedId: number) => {
   if (action === 'mark_read') {
-    if (feedId === -4 || feedId === -3) {
-      // "All articles" / "Fresh": there is no per-feed catchup for virtual
-      // feeds, so use the global mark-all-read handler.
-      await headlinesStore.catchupAll();
-      showMessage('All headlines marked as read', 'success');
-    } else if (feedId < 0) {
-      // Other special views (Starred/Published) use the normal mark-read path.
-      const ids = headlinesStore.headlines.map(h => h.id);
-      await headlinesStore.markAsRead(ids);
-      showMessage('Headlines marked as read', 'success');
-    } else {
-      // A regular feed or category: the backend catchup clears its counters.
-      const ok = await feedsStore.catchupFeed(feedId, false);
-      showMessage(
-        ok ? 'Feed marked as read' : feedsStore.error ?? 'Failed to mark feed as read',
-        ok ? 'success' : 'error'
-      );
-      if (ok) await headlinesStore.loadHeadlines(feedId, false);
-    }
-  } else if (action === 'edit') {
-    feedsDialogOpen.value = true;
-  } else if (action === 'delete') {
+    await markFeedRead(feedId);
+  } else if (action === 'edit' || action === 'delete') {
     feedsDialogOpen.value = true;
   }
 };

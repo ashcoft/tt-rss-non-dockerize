@@ -350,7 +350,6 @@ final class RPCTest extends DbTestCase {
 
         $rpc = new RPC([]);
         $ref = new ReflectionMethod('RPC', '_make_init_params');
-        $ref->setAccessible(true);
         $params = $ref->invoke($rpc);
 
         foreach (['purge_old_days', 'purge_unread_articles',
