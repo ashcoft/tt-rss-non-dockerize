@@ -151,7 +151,12 @@ rather than the clickable item. There is no known blocker here.
 - **Combined display mode was not implemented.** `COMBINED_DISPLAY_MODE` was
   only a preference toggle; the app always used the three-pane layout. It now
   renders each article's body inline in the headlines list (DOMPurify-sanitized)
-  and hides the reading panel, toggled from the toolbar action menu.
+  and hides the reading panel, toggled from the toolbar action menu. The grid
+  view (`CDM_ENABLE_GRID`) tiles the inline articles on wide screens.
+- **Display preferences were ignored on an existing session.** The
+  already-authenticated path (`onMounted`) loaded feeds but not the display
+  preferences, so hide-read, combined mode and grid were silently dropped. It
+  now loads them, matching the login path. Found with the E2E suite.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -162,8 +167,7 @@ modes and all four sort orders return correctly ordered results.
   covers the common user preferences, digest, password, plugin management and
   per-feed options, but not the full filter-rule editor.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
-- **The grid view** (wider-screen tile layout) and the article toolbar's plugin
-  buttons. Combined display mode is implemented.
+- **The article toolbar's plugin buttons.**
 - **Deleting the Dojo libraries themselves** (blocked on the above).
 
 ### End-to-end verification
