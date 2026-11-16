@@ -414,6 +414,23 @@ test.describe('Vue front-end', () => {
     await expect(app).toHaveClass(/v-theme--dark/);
   });
 
+  test('lists plugins and saves the enabled set', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.getByRole('tab', { name: 'Plugins' }).click();
+
+    // The bundled plugins are listed (auth_internal is system-enabled).
+    const rows = page.locator('.plugin-list .v-list-item');
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
+    expect(await rows.count()).toBeGreaterThan(0);
+
+    // Saving the current selection round-trips to the backend.
+    await page.getByRole('button', { name: 'Enable selected' }).click();
+    await expect(page.getByRole('dialog').locator('.v-alert')).toContainText(/plugins updated/i, {
+      timeout: 10000,
+    });
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();
