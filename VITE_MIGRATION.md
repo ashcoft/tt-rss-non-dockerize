@@ -185,12 +185,16 @@ button HTML is parsed into `{plugin, method, icon, title}`, rendered in the
 reading pane, and dispatched through `PluginHandler` with the returned fragment
 shown in a sanitized dialog (see `ArticleView.runPluginButton`).
 
+The preferences dialog now renders the **full backend preference set** (an
+Advanced tab covers the ones without a curated label), so the legacy
+`Pref_Prefs` screen is no longer needed.
+
 What this does not yet cover, and which the legacy shell used to provide:
 
 - **Other plugin UI surfaces** (`HOOK_TOOLBAR_BUTTON`, `HOOK_MAIN_TOOLBAR_BUTTON`,
   `HOOK_PREFS_TAB_SECTION`) have no Vue host yet.
-- **The filter-rule editor** covers create/edit; feed preferences and plugin
-  settings are only partly represented in the Vue dialog.
+- **Some `Pref_*` screens** (feed-level preferences, users, system) are not yet
+  fully represented in the Vue dialog.
 
 ### End-to-end verification
 
