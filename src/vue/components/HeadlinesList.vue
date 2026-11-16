@@ -101,6 +101,13 @@
           </span>
         </v-list-item-subtitle>
 
+        <!-- Combined mode: the article body is shown inline in the list. -->
+        <div
+          v-if="combined"
+          class="headline-content"
+          v-html="sanitize(headline.content)"
+        ></div>
+
         <template #append>
           <div class="headline-actions">
             <v-btn
@@ -156,6 +163,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import DOMPurify from 'dompurify';
 import type { Headline } from '@/types';
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
 
@@ -166,6 +174,8 @@ const props = defineProps<{
   hasMore?: boolean;
   /** Id of the headline under the keyboard cursor, highlighted in the list. */
   activeId?: number | null;
+  /** Combined mode: render each article's content inline instead of a panel. */
+  combined?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -235,6 +245,14 @@ const toggleRead = (headline: Headline) => {
 // Feeds/view returns pre-localised date strings ("14:05", "Mar 03, 9:12",
 // "Never"), not Unix timestamps, so they are rendered as-is.
 const formatDate = (updated: string): string => updated;
+
+// Combined mode renders article HTML inline; sanitize it client-side, matching
+// ArticleView (content is also sanitized server-side).
+const sanitize = (html: string): string =>
+  DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'b', 'i', 'em', 'strong', 'a', 'img', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+  });
 </script>
 
 <style scoped>
@@ -283,6 +301,18 @@ const formatDate = (updated: string): string => updated;
 .headline-actions {
   display: flex;
   gap: 0.25rem;
+}
+
+/* Combined mode: the article body rendered inline under the headline. */
+.headline-content {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.headline-content :deep(img) {
+  max-width: 100%;
 }
 
 .bulk-bar {

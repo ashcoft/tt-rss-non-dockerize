@@ -37,6 +37,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const hideReadFeeds = ref(false);
   /** HIDE_READ_SHOWS_SPECIAL: keep special feeds visible while hiding read. */
   const hideReadShowsSpecial = ref(true);
+  /** COMBINED_DISPLAY_MODE: show article content inline instead of a panel. */
+  const combinedMode = ref(false);
   /** Base URL of public.php, from init-params; used for feed icons. */
   const iconsUrl = ref('/public.php');
 
@@ -342,6 +344,7 @@ export const useFeedsStore = defineStore('feeds', () => {
       const params = response.content;
       hideReadFeeds.value = Number(params.hide_read_feeds) === 1;
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
+      combinedMode.value = Number(params.combined_display_mode) === 1;
       // public.php streams a feed's icon; the backend tells us the base URL so
       // the app works behind a sub-path install.
       if (typeof params.icons_url === 'string' && params.icons_url !== '') {
@@ -349,6 +352,23 @@ export const useFeedsStore = defineStore('feeds', () => {
       }
     } catch (err) {
       console.error('Failed to load display preferences:', err);
+    }
+  }
+
+  /** Toggle COMBINED_DISPLAY_MODE (inline article content) and persist it. */
+  async function toggleCombinedMode(): Promise<boolean> {
+    const next = !combinedMode.value;
+    try {
+      const response = await api.setPref('COMBINED_DISPLAY_MODE', next ? '1' : '0');
+      if (response.status === 0) {
+        combinedMode.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
     }
   }
 
@@ -399,6 +419,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     currentIsCat,
     hideReadFeeds,
     hideReadShowsSpecial,
+    combinedMode,
     iconsUrl,
     
     // Getters
@@ -424,6 +445,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     moveFeed,
     moveCategory,
     toggleHideRead,
+    toggleCombinedMode,
     loadDisplayPrefs,
     reset,
   };
