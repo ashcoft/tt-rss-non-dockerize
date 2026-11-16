@@ -58,6 +58,15 @@
 
     <div class="toolbar-center">
       <span class="feed-title" v-if="feedInfo">{{ feedInfo.title }}</span>
+      <!-- Feed update error, mirroring the legacy toolbar's error icon. -->
+      <v-icon
+        v-if="feedError"
+        icon="mdi-alert-circle"
+        color="error"
+        size="18"
+        class="ml-2"
+        :title="feedError"
+      />
     </div>
 
     <div class="toolbar-right">
@@ -120,6 +129,8 @@ import type { Feed } from '../types';
 
 interface Props {
   feedInfo: Feed | null;
+  /** The current feed's last update error, shown as an icon when set. */
+  feedError?: string | null;
   searchLanguages?: string[];
   modelSearchLanguage?: string;
   modelViewMode?: string;
@@ -127,6 +138,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  feedError: null,
   searchLanguages: () => [],
   modelSearchLanguage: 'english',
   modelViewMode: 'adaptive',

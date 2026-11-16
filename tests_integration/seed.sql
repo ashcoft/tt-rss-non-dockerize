@@ -55,6 +55,9 @@ INSERT INTO ttrss_feeds (id, owner_uid, title, cat_id, feed_url, update_interval
 
 SELECT setval(pg_get_serial_sequence('ttrss_feeds', 'id'), (SELECT MAX(id) FROM ttrss_feeds));
 
+-- 3b. A feed with an update error, so the toolbar error indicator is testable.
+UPDATE ttrss_feeds SET last_error = 'HTTP 404 Not Found' WHERE id = 1;
+
 -- 4. Articles (ttrss_entries)
 INSERT INTO ttrss_entries (id, title, guid, link, updated, content, content_hash, date_entered, date_updated) VALUES
 -- Hacker News articles

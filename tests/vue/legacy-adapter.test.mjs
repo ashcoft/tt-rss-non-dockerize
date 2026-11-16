@@ -449,6 +449,38 @@ test('getHeadlines maps enclosure entries', async () => {
   ]);
 });
 
+test('getHeadlines surfaces the toolbar feed error', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 0,
+      content: [],
+      toolbar: { title: 'Broken Feed', error: 'HTTP 404 Not Found', plugin_menu_items: '' },
+    },
+    'headlines-info': { count: 0 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.equal(page.feedError, 'HTTP 404 Not Found');
+});
+
+test('getHeadlines reports no feed error when the toolbar error is empty', async () => {
+  installGlobals();
+  const payload = {
+    headlines: { first_id: 0, content: [], toolbar: { title: 'Fine', error: '' } },
+    'headlines-info': { count: 0 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.equal(page.feedError, null);
+});
+
 test('getHeadlines searches via `query`, not `search`', async () => {
   installGlobals();
   const calls = stubFetch([
