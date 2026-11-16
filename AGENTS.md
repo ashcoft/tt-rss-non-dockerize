@@ -82,7 +82,7 @@ about the `"@semantic-release/npm>npm": "-"` override and blocks a postinstall
 
 ## Migration status
 
-`VITE_MIGRATION.md` is the source of truth for what has moved to Vue and what
-is still on Dojo. Update its "Still on Dojo" list when you complete an item.
-The Dojo libraries (`lib/dojo`, `lib/dijit`, `js/*.js`) must stay until every
-item on that list is ported.
+`VITE_MIGRATION.md` is the source of truth for the migration. The Dojo
+libraries (`lib/dojo`, `lib/dijit`, `lib/dojox`, `js/*.js` AMD modules) have
+been **deleted**: `index.php` and `prefs.php` serve the Vue shell only, and a
+production build (`pnpm run build`) is required.

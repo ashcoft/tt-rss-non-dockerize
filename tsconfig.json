@@ -18,13 +18,9 @@
       "@/*": ["src/vue/*"],
       "@/types": ["src/vue/types"],
       "@/components/*": ["src/vue/components/*"],
-      "@/composables/*": ["src/vue/composables/*"],
-      "dojo/*": ["lib/dojo/*"],
-      "dijit/*": ["lib/dijit/*"],
-      "dojox/*": ["lib/dojox/*"],
-      "fox/*": ["js/*"]
+      "@/composables/*": ["src/vue/composables/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue"],
-  "exclude": ["node_modules", "dist", "lib/dojo", "lib/dijit", "lib/dojox", "js"]
+  "exclude": ["node_modules", "dist"]
 }

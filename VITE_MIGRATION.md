@@ -172,14 +172,21 @@ rather than the clickable item. There is no known blocker here.
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
 
-### Still on Dojo
+### Dojo removed
 
-- **Preferences screens.** `prefs.php` renders Dojo tabs; the Vue dialog
-  covers the common user preferences, digest, password, plugin management and
-  per-feed options, but not the full filter-rule editor.
-- **Plugin UI surfaces** (the `HOOK_*` render hooks).
-- **The article toolbar's plugin buttons.**
-- **Deleting the Dojo libraries themselves** (blocked on the above).
+The Dojo stack is **gone**: `lib/dojo`, `lib/dijit`, `lib/dojox`, `lib/dojo-src`
+and the `js/*.js` AMD modules (plus `js/form/`, `lib/CheckBox*.js` and the
+`src/shim/`) are deleted, and every `dojoType`/`dijit.*` reference is removed
+from the PHP. `index.php` and `prefs.php` serve the Vue shell only, so a
+production build (`pnpm run build`) is required.
+
+What this does not yet cover, and which the legacy shell used to provide:
+
+- **Plugin UI surfaces.** `HOOK_ARTICLE_BUTTON` and friends still emit raw
+  HTML with inline `Plugins.*` handlers; there is no Dojo runtime for them, so
+  the bundled plugins that render buttons (`note`, `share`) show nothing.
+- **The filter-rule editor** covers create/edit; feed preferences and plugin
+  settings are only partly represented in the Vue dialog.
 
 ### End-to-end verification
 

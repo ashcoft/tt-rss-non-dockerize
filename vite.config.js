@@ -78,14 +78,6 @@ export default defineConfig({
   // Resolve configuration for module aliases
   resolve: {
     alias: {
-      // Dojo module aliases - point to the existing Dojo AMD modules
-      'dojo': path.resolve(__dirname, 'lib/dojo'),
-      'dijit': path.resolve(__dirname, 'lib/dijit'),
-      'fox': path.resolve(__dirname, 'js'),
-      
-      // Legacy module paths
-      'lib': path.resolve(__dirname, 'lib'),
-      
       // Vue 3 aliases
       '@': path.resolve(__dirname, 'src/vue'),
       '@/components': path.resolve(__dirname, 'src/vue/components'),
@@ -192,7 +184,6 @@ export default defineConfig({
           path.resolve(__dirname, 'themes'),
           path.resolve(__dirname, 'themes/light'),
           path.resolve(__dirname, 'themes/night'),
-          path.resolve(__dirname, 'lib/dijit/themes'),
         ],
       },
     },

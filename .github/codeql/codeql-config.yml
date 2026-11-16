@@ -16,8 +16,3 @@ paths-ignore:
   - node_modules/**
   - cache/**
   - lock/**
-  # Vendored Dojo Toolkit; the layer is rebuilt from lib/dojo-src when needed
-  - lib/dojo/**
-  - lib/dijit/**
-  - lib/dojox/**
-  - lib/dojo-src/**

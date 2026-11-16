@@ -103,28 +103,28 @@ class Pref_System extends Handler_Administrative {
 		}
 
 		?>
-		<div dojoType='dijit.layout.BorderContainer' gutters='false'>
-			<div region='top' dojoType='fox.Toolbar'>
+		<div gutters='false'>
+			<div region='top'>
 
-				<button dojoType='dijit.form.Button' onclick='Helpers.EventLog.refresh()'>
+				<button onclick='Helpers.EventLog.refresh()'>
 					<?= __('Refresh') ?>
 				</button>
 
-				<button dojoType='dijit.form.Button' <?= ($page <= 0 ? "disabled" : "") ?>
+				<button <?= ($page <= 0 ? "disabled" : "") ?>
 					onclick='Helpers.EventLog.prevPage()'>
 					<?= __('&lt;&lt;') ?>
 				</button>
 
-				<button dojoType='dijit.form.Button' disabled>
+				<button disabled>
 					<?= T_sprintf('Page %d of %d', $page+1, $total_pages+1) ?>
 				</button>
 
-				<button dojoType='dijit.form.Button' <?= ($page >= $total_pages ? "disabled" : "") ?>
+				<button <?= ($page >= $total_pages ? "disabled" : "") ?>
 					onclick='Helpers.EventLog.nextPage()'>
 					<?= __('&gt;&gt;') ?>
 				</button>
 
-				<button dojoType='dijit.form.Button'
+				<button
 					onclick='Helpers.EventLog.clear()'>
 					<?= __('Clear') ?>
 				</button>
@@ -141,7 +141,7 @@ class Pref_System extends Handler_Administrative {
 				</div>
 			</div>
 
-			<div style="padding : 0px" dojoType="dijit.layout.ContentPane" region="center">
+			<div style="padding : 0px" region="center">
 
 				<table width='100%' class='event-log'>
 
@@ -187,83 +187,4 @@ class Pref_System extends Handler_Administrative {
 		<?php
 	}
 
-	function index(): void {
-
-		$severity = (int) ($_REQUEST["severity"] ?? E_USER_WARNING);
-		$page = (int) ($_REQUEST["page"] ?? 0);
-		?>
-		<div dojoType='dijit.layout.AccordionContainer' region='center'>
-			<?php if (Config::get(Config::LOG_DESTINATION) == Logger::LOG_DEST_SQL) { ?>
-				<div dojoType='dijit.layout.AccordionPane' style='padding : 0' title='<i class="material-icons">report</i> <?= __('Event log') ?>'>
-					<?php
-						$this->_log_viewer($page, $severity);
-					?>
-				</div>
-			<?php } ?>
-			<div dojoType='dijit.layout.AccordionPane' style='padding : 0' title='<i class="material-icons">mail</i> <?= __('Email configuration') ?>'>
-				<div dojoType="dijit.layout.ContentPane">
-
-					<form dojoType="dijit.form.Form">
-						<script type="dojo/method" event="onSubmit" args="evt">
-							evt.preventDefault();
-							if (this.validate()) {
-								xhr.json("backend.php", this.getValues(), (reply) => {
-									const msg = document.getElementById("mail-test-result");
-
-									if (reply.rc) {
-										msg.innerHTML = <?= json_encode(__('Email sent.')) ?>;
-										msg.className = 'alert alert-success';
-									} else {
-										msg.innerHTML = reply.error;
-										msg.className = 'alert alert-danger';
-									}
-
-									msg.show();
-								})
-							}
-						</script>
-
-						<?= \Controls\hidden_tag("op", "Pref_System") ?>
-						<?= \Controls\hidden_tag("method", "sendTestEmail") ?>
-
-						<?php
-							$user = ORM::for_table('ttrss_users')->find_one($_SESSION["uid"]);
-						?>
-
-						<fieldset>
-							<label><?= __("To:") ?></label>
-							<?= \Controls\input_tag("mail_address",$user->email, "text", ['required' => 1]) ?>
-							<?= \Controls\submit_tag(__("Send test email")) ?>
-							<span style="display: none; margin-left : 10px" class="alert alert-error" id="mail-test-result">...</span>
-						</fieldset>
-					</form>
-				</div>
-			</div>
-			<div dojoType='dijit.layout.AccordionPane' title='<i class="material-icons">alarm</i> <?= __('Scheduled tasks') ?>'>
-					<script type='dojo/method' event='onSelected' args='evt'>
-						if (this.domNode.querySelector('.loading'))
-							window.setTimeout(() => {
-								xhr.post("backend.php", {op: 'Pref_System', method: 'getscheduledtasks'}, (reply) => {
-									this.attr('content', `<div class='phpinfo'>${reply}</div>`);
-								});
-							}, 200);
-					</script>
-					<span class='loading'><?= __("Loading, please wait...") ?></span>
-			</div>
-			<div dojoType='dijit.layout.AccordionPane' title='<i class="material-icons">info</i> <?= __('PHP Information') ?>'>
-					<script type='dojo/method' event='onSelected' args='evt'>
-						if (this.domNode.querySelector('.loading'))
-							window.setTimeout(() => {
-								xhr.post("backend.php", {op: 'Pref_System', method: 'getphpinfo'}, (reply) => {
-									this.attr('content', `<div class='phpinfo'>${reply}</div>`);
-								});
-							}, 200);
-					</script>
-					<span class='loading'><?= __("Loading, please wait...") ?></span>
-			</div>
-
-			<?php PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB, "prefSystem") ?>
-		</div>
-		<?php
-	}
 }

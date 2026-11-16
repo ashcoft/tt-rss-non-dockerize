@@ -11,9 +11,6 @@ export default [
       '.github/**',
       'node_modules/**',
       'dist/**',
-      'lib/dojo/**',
-      'lib/dijit/**',
-      'lib/dojox/**',
       'vendor/**'
     ]
   },
