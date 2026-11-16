@@ -37,17 +37,14 @@
 	 * @param array<string, mixed> $attributes
 	 */
    function button_tag(string $value, string $type, array $attributes = []): string {
-      return "<button dojoType=\"dijit.form.Button\" ".attributes_to_string($attributes)." type=\"$type\">$value</button>";
+      return "<button ".attributes_to_string($attributes)." type=\"$type\">$value</button>";
    }
 
 	/**
 	 * @param array<string, mixed> $attributes
 	 */
    function input_tag(string $name, string $value, string $type = "text", array $attributes = [], string $id = ""): string {
-      $attributes_str = attributes_to_string($attributes);
-      $dojo_type = str_contains($attributes_str, "dojoType") ? "" : "dojoType='dijit.form.TextBox'";
-
-      return "<input name=\"".htmlspecialchars($name)."\" $dojo_type ".attributes_to_string($attributes)." id=\"".htmlspecialchars($id)."\"
+      return "<input name=\"".htmlspecialchars($name)."\" ".attributes_to_string($attributes)." id=\"".htmlspecialchars($id)."\"
          type=\"$type\" value=\"".htmlspecialchars($value)."\">";
    }
 
@@ -55,7 +52,7 @@
 	 * @param array<string, mixed> $attributes
 	 */
    function number_spinner_tag(string $name, string $value, array $attributes = [], string $id = ""): string {
-      return input_tag($name, $value, 'text', ['dojoType' => 'dijit.form.NumberSpinner', ...$attributes], $id);
+      return input_tag($name, $value, 'text', $attributes, $id);
    }
 
 	/**
@@ -85,10 +82,9 @@
 	 */
    function select_tag(string $name, mixed $value, array $values, array $attributes = [], string $id = ""): string {
       $attributes_str = attributes_to_string($attributes);
-      $dojo_type = str_contains($attributes_str, "dojoType") ? "" : "dojoType='fox.form.Select'";
 
-      $rv = "<select $dojo_type name=\"".htmlspecialchars($name)."\"
-         id=\"".htmlspecialchars($id)."\" name=\"".htmlspecialchars($name)."\" $attributes_str>";
+      $rv = "<select name=\"".htmlspecialchars($name)."\"
+         id=\"".htmlspecialchars($id)."\" $attributes_str>";
 
       foreach ($values as $v) {
          $is_sel = ($v == $value) ? "selected=\"selected\"" : "";
@@ -114,10 +110,9 @@
 	 */
    function select_hash(string $name, $value, array $values, array $attributes = [], string $id = ""): string {
       $attributes_str = attributes_to_string($attributes);
-      $dojo_type = str_contains($attributes_str, "dojoType") ? "" : "dojoType='fox.form.Select'";
 
-      $rv = "<select $dojo_type name=\"".htmlspecialchars($name)."\"
-         id=\"".htmlspecialchars($id)."\" name=\"".htmlspecialchars($name)."\" $attributes_str>";
+      $rv = "<select name=\"".htmlspecialchars($name)."\"
+         id=\"".htmlspecialchars($id)."\" $attributes_str>";
 
       foreach ($values as $k => $v) {
          $is_sel = ($k == $value) ? "selected=\"selected\"" : "";
@@ -134,7 +129,7 @@
 	 * @param array<string, mixed> $attributes
 	 */
    function hidden_tag(string $name, string $value, array $attributes = []): string {
-      return "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"
+      return "<input type=\"hidden\"
                ".attributes_to_string($attributes)." name=\"".htmlspecialchars($name)."\"
                value=\"".htmlspecialchars($value)."\">";
    }
@@ -146,7 +141,7 @@
       $is_checked = $checked ? "checked" : "";
       $value_str = $value ? "value=\"".htmlspecialchars($value)."\"" : "";
 
-      return "<input dojoType='dijit.form.CheckBox' name=\"".htmlspecialchars($name)."\"
+      return "<input type=\"checkbox\" name=\"".htmlspecialchars($name)."\"
                   $value_str $is_checked ".attributes_to_string($attributes)." id=\"".htmlspecialchars($id)."\">";
    }
 
@@ -162,7 +157,7 @@
          $ret .= "<select name=\"".htmlspecialchars($name)."\"
                         id=\"".htmlspecialchars($id)."\"
                         default=\"".((string)$default_id)."\"
-                        dojoType=\"fox.form.Select\" ".attributes_to_string($attributes).">";
+                        ".attributes_to_string($attributes).">";
       }
 
       $pdo = \Db::pdo();
