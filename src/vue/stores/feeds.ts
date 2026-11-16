@@ -39,6 +39,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const hideReadShowsSpecial = ref(true);
   /** COMBINED_DISPLAY_MODE: show article content inline instead of a panel. */
   const combinedMode = ref(false);
+  /** CDM_ENABLE_GRID: tile the inline articles in a grid on wide screens. */
+  const gridEnabled = ref(false);
   /** Base URL of public.php, from init-params; used for feed icons. */
   const iconsUrl = ref('/public.php');
 
@@ -345,6 +347,7 @@ export const useFeedsStore = defineStore('feeds', () => {
       hideReadFeeds.value = Number(params.hide_read_feeds) === 1;
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
       combinedMode.value = Number(params.combined_display_mode) === 1;
+      gridEnabled.value = Number(params.cdm_enable_grid) === 1;
       // public.php streams a feed's icon; the backend tells us the base URL so
       // the app works behind a sub-path install.
       if (typeof params.icons_url === 'string' && params.icons_url !== '') {
@@ -420,6 +423,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     hideReadFeeds,
     hideReadShowsSpecial,
     combinedMode,
+    gridEnabled,
     iconsUrl,
     
     // Getters

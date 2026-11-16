@@ -59,7 +59,11 @@
         </template>
       </div>
 
-      <v-list class="headlines-list-content" lines="three">
+      <v-list
+        class="headlines-list-content"
+        :class="{ 'headlines-grid': combined && grid }"
+        lines="three"
+      >
         <v-list-item
           v-for="headline in headlines"
           :key="headline.id"
@@ -176,6 +180,8 @@ const props = defineProps<{
   activeId?: number | null;
   /** Combined mode: render each article's content inline instead of a panel. */
   combined?: boolean;
+  /** Grid: tile the inline articles on wide screens (only meaningful with combined). */
+  grid?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -313,6 +319,15 @@ const sanitize = (html: string): string =>
 
 .headline-content :deep(img) {
   max-width: 100%;
+}
+
+/* Grid view: tile the inline articles on wide screens (combined mode only).
+   Mirrors the legacy #headlines-frame[data-enable-grid] rule. */
+.headlines-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+  gap: 8px;
+  padding: 8px;
 }
 
 .bulk-bar {

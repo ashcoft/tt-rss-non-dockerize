@@ -60,6 +60,7 @@
             :has-more="headlinesStore.hasMore"
             :active-id="headlinesStore.cursorId"
             :combined="feedsStore.combinedMode"
+            :grid="feedsStore.gridEnabled"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
@@ -552,7 +553,12 @@ onMounted(async () => {
   const authenticated = await api.checkSession();
   if (authenticated) {
     authStore.setLoggedIn(true);
-    await Promise.all([feedsStore.loadFeeds(), labelsStore.loadLabels(), loadSearchLanguages()]);
+    await Promise.all([
+      feedsStore.loadFeeds(),
+      feedsStore.loadDisplayPrefs(),
+      labelsStore.loadLabels(),
+      loadSearchLanguages(),
+    ]);
     startPolling();
   }
 });
