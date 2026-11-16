@@ -80,6 +80,19 @@ export default function globalSetup(): void {
         "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL)"],
       { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
     );
+    // Enable the `note` plugin so the plugin article-button surface is testable.
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
+        "DELETE FROM ttrss_user_prefs2 WHERE pref_name = '_ENABLED_PLUGINS'"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
+        "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, '_ENABLED_PLUGINS', 'note', NULL)"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
   } catch (err) {
     console.warn('[e2e] could not reset display preferences:', (err as Error).message);
   }

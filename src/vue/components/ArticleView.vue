@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
+import api from '@/api/client';
 
 const props = defineProps<{
   article: Article;
@@ -14,6 +15,44 @@ const emit = defineEmits<{
 }>();
 
 const headlinesStore = useHeadlinesStore();
+
+// Plugin article buttons run their handler through PluginHandler and render the
+// returned HTML fragment in a dialog. Material-icons names are mapped to their
+// MDI equivalents (the Vue app uses @mdi/font).
+const PLUGIN_ICONS: Record<string, string> = {
+  note: 'mdi-note-edit-outline',
+  link: 'mdi-link-variant',
+  bookmark_outline: 'mdi-bookmark-outline',
+};
+
+const pluginIcon = (icon: string): string => PLUGIN_ICONS[icon] ?? 'mdi-extension';
+
+const pluginDialog = ref<{ title: string; html: string } | null>(null);
+const pluginBusy = ref(false);
+
+/** Sanitize the plugin's dialog body before rendering it. */
+const sanitizedPluginHtml = computed(() =>
+  pluginDialog.value ? DOMPurify.sanitize(pluginDialog.value.html) : ''
+);
+
+async function runPluginButton(button: { plugin: string; method: string; title: string }): Promise<void> {
+  pluginBusy.value = true;
+  try {
+    const response = await api.invokePluginHandler(button.plugin, button.method, {
+      id: props.article.id,
+    });
+    if (response.status === 0) {
+      pluginDialog.value = { title: button.title, html: response.content };
+    } else {
+      pluginDialog.value = {
+        title: button.title,
+        html: `<p>${response.error ?? 'Plugin handler failed.'}</p>`,
+      };
+    }
+  } finally {
+    pluginBusy.value = false;
+  }
+}
 const noteDraft = ref(props.article.note ?? '');
 const tagDraft = ref<string[]>([...(props.article.tags ?? [])]);
 const tagSuggestions = ref<string[]>([]);
@@ -93,6 +132,19 @@ const sanitizedContent = computed(() => {
         <div class="article-header-inner">
           <v-btn icon="mdi-close" variant="text" @click="closeArticle" class="mr-2" />
           <h1>{{ article.title }}</h1>
+          <!-- Plugin article buttons (HOOK_ARTICLE_BUTTON), dispatched through
+               the Vue plugin registry. -->
+          <v-btn
+            v-for="button in article.pluginButtons ?? []"
+            :key="`${button.plugin}.${button.method}`"
+            icon
+            variant="text"
+            size="small"
+            :title="button.title"
+            @click="runPluginButton(button)"
+          >
+            <v-icon>{{ pluginIcon(button.icon) }}</v-icon>
+          </v-btn>
         </div>
         <div class="article-meta">
           <span class="feed">{{ article.feed_title }}</span>
@@ -186,6 +238,24 @@ const sanitizedContent = computed(() => {
         </div>
       </footer>
     </article>
+
+    <!-- Plugin handler output (a dialog body from the backend). -->
+    <v-dialog
+      :model-value="pluginDialog !== null"
+      max-width="640"
+      @update:model-value="pluginDialog = null"
+    >
+      <v-card>
+        <v-card-title>{{ pluginDialog?.title || 'Plugin' }}</v-card-title>
+        <v-card-text>
+          <div class="plugin-dialog-body" v-html="sanitizedPluginHtml"></div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="pluginDialog = null">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 

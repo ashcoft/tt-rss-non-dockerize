@@ -497,6 +497,27 @@ test.describe('Vue front-end', () => {
     await expect(dialog.getByRole('tab', { name: 'Plugins' })).toBeVisible();
   });
 
+  test('runs a plugin article button and shows its dialog', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+    await expect(page.locator('.headlines-list-content .v-list-item-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    await page.locator('.headlines-list-content .v-list-item-title').first().click();
+
+    // The `note` plugin's HOOK_ARTICLE_BUTTON renders an "Edit article note"
+    // button; clicking it invokes PluginHandler and shows the returned form.
+    const noteButton = page.getByRole('button', { name: 'Edit article note' });
+    await expect(noteButton).toBeVisible({ timeout: 15000 });
+    await noteButton.click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.plugin-dialog-body textarea')).toBeVisible();
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();

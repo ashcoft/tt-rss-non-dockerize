@@ -11,13 +11,6 @@ class Note extends Plugin {
 		$host->add_hook($host::HOOK_ARTICLE_BUTTON, $this);
 	}
 
-	function get_js() {
-		return file_get_contents(__DIR__ . "/note.js");
-	}
-
-	function get_css() {
-		return file_get_contents(__DIR__ . "/note.css");
-	}
 
 	function hook_article_button($line) {
 		return "<i class='material-icons' onclick=\"Plugins.Note.edit(".$line["id"].")\"

@@ -449,6 +449,44 @@ test('getHeadlines maps enclosure entries', async () => {
   ]);
 });
 
+test('getHeadlines parses plugin article buttons from the HTML', async () => {
+  installGlobals();
+  const buttons = [
+    '<i class="material-icons" onclick="Plugins.Note.edit(7)" style="cursor : pointer" title="Edit article note" data-plugin-name="Note">note</i>',
+    '<i class="material-icons icon-share" onclick="Plugins.Share.shareArticle(260)" title="Share by URL" data-plugin-name="Share">link</i>',
+  ].join('');
+  const payload = {
+    headlines: { first_id: 1, content: [{ id: 1, title: 'T', unread: true, buttons }] },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.deepEqual(page.headlines[0].pluginButtons, [
+    { plugin: 'Note', method: 'edit', icon: 'note', title: 'Edit article note' },
+    { plugin: 'Share', method: 'shareArticle', icon: 'link', title: 'Share by URL' },
+  ]);
+});
+
+test('getHeadlines ignores plugin buttons without a Plugins.* handler', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 1,
+      content: [{ id: 1, title: 'T', unread: true, buttons: '<i class="material-icons">plain</i>' }],
+    },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.deepEqual(page.headlines[0].pluginButtons, []);
+});
+
 test('getHeadlines maps the article image preview', async () => {
   installGlobals();
   const payload = {

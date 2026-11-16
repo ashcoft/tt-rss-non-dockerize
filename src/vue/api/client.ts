@@ -409,6 +409,22 @@ class ApiClient {
     return endpoints.opmlExportUrl(includeSettings);
   }
 
+  // ============================================
+  // Plugins
+  // ============================================
+
+  /** Run a plugin's article-button handler; resolves to its HTML fragment. */
+  async invokePluginHandler(
+    plugin: string,
+    method: string,
+    params: Record<string, string | number> = {}
+  ): Promise<ApiResponse<string>> {
+    return this.wrap(
+      () => endpoints.invokePluginHandler(legacyBackend, plugin, method, params),
+      ''
+    );
+  }
+
   /** Keyboard-shortcuts help as an HTML fragment (sanitize before display). */
   async getHotkeyHelp(): Promise<ApiResponse<string>> {
     return this.wrap(() => endpoints.getHotkeyHelp(legacyBackend), '');
