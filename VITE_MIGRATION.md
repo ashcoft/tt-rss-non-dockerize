@@ -148,6 +148,10 @@ rather than the clickable item. There is no known blocker here.
 - **The article comments link was missing.** The adapter mapped the comment
   count and URL but nothing rendered them; the article header now shows the
   comments link.
+- **Combined display mode was not implemented.** `COMBINED_DISPLAY_MODE` was
+  only a preference toggle; the app always used the three-pane layout. It now
+  renders each article's body inline in the headlines list (DOMPurify-sanitized)
+  and hides the reading panel, toggled from the toolbar action menu.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
@@ -158,7 +162,8 @@ modes and all four sort orders return correctly ordered results.
   covers the common user preferences, digest, password, plugin management and
   per-feed options, but not the full filter-rule editor.
 - **Plugin UI surfaces** (the `HOOK_*` render hooks).
-- **Combined-display / grid modes** and the article toolbar's plugin buttons.
+- **The grid view** (wider-screen tile layout) and the article toolbar's plugin
+  buttons. Combined display mode is implemented.
 - **Deleting the Dojo libraries themselves** (blocked on the above).
 
 ### End-to-end verification
