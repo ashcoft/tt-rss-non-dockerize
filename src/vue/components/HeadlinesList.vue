@@ -94,6 +94,12 @@
 
         <v-list-item-title class="headline-title">
           {{ headline.title }}
+          <!-- Excerpt, as in the legacy row's title preview (an HTML fragment). -->
+          <span
+            v-if="headline.excerpt"
+            class="headline-preview"
+            v-html="sanitize(headline.excerpt)"
+          ></span>
         </v-list-item-title>
 
         <v-list-item-subtitle class="headline-meta">
@@ -103,6 +109,14 @@
           <span v-if="headline.updated" class="headline-date">
             {{ formatDate(headline.updated) }}
           </span>
+          <!-- Score indicator, matching the legacy icon-score. -->
+          <v-icon
+            v-if="headline.score !== 0"
+            :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
+            :color="headline.score > 0 ? 'green' : 'red'"
+            size="14"
+            :title="`Score: ${headline.score}`"
+          />
         </v-list-item-subtitle>
 
         <!-- Combined mode: the article body is shown inline in the list. -->
@@ -309,6 +323,13 @@ const sanitize = (html: string): string =>
   font-weight: 500;
   white-space: normal;
   line-height: 1.3;
+}
+
+.headline-preview {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: grey;
 }
 
 .headline-meta {
