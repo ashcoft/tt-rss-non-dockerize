@@ -157,6 +157,9 @@ rather than the clickable item. There is no known blocker here.
   already-authenticated path (`onMounted`) loaded feeds but not the display
   preferences, so hide-read, combined mode and grid were silently dropped. It
   now loads them, matching the login path. Found with the E2E suite.
+- **Feed update errors were invisible.** `Feeds/view` reports the feed's last
+  update error in its toolbar payload; the adapter dropped it. It now shows an
+  alert icon next to the feed title with the message as its tooltip.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
