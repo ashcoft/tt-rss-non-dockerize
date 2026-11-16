@@ -149,7 +149,7 @@ test.describe('Vue front-end', () => {
 
     // The Select menu offers All/Unread/Invert/None; pick "All".
     await page.getByRole('button', { name: 'Select' }).click();
-    await page.getByRole('listitem').filter({ hasText: 'All' }).first().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'All' }).first().click();
 
     await expect(page.getByText(/selected/)).toBeVisible();
     await page.getByRole('button', { name: 'Mark read' }).click();
@@ -200,7 +200,7 @@ test.describe('Vue front-end', () => {
     ).toBeVisible({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'Select' }).click();
-    await page.getByRole('listitem').filter({ hasText: 'All' }).first().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'All' }).first().click();
     await expect(page.getByText(/selected/)).toBeVisible();
 
     // The score prompt is a native dialog; answer it, then expect success.
@@ -404,6 +404,17 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.article-view .v-chip').filter({ hasText: 'e2etag' })).toBeVisible({
       timeout: 15000,
     });
+  });
+
+  test('shows the headline excerpt in the list', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    // Each row renders its content preview, with the HTML entity decoded.
+    const preview = page.locator('.headline-preview').first();
+    await expect(preview).toBeVisible({ timeout: 15000 });
+    await expect(preview).toContainText('—');
   });
 
   test('searches articles by term', async ({ page }) => {
