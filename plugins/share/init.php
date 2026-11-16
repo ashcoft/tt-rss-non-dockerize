@@ -20,28 +20,7 @@ class Share extends Plugin {
 		return $method == "get";
 	}
 
-	function get_js() {
-		return file_get_contents(__DIR__ . "/share.js");
-	}
 
-	function get_css() {
-		return file_get_contents(__DIR__ . "/share.css");
-	}
-
-	function get_prefs_js() {
-		return file_get_contents(__DIR__ . "/share_prefs.js");
-	}
-
-	/** @return void */
-	function unshare() {
-		$id = $_REQUEST['id'];
-
-		$sth = $this->pdo->prepare("UPDATE ttrss_user_entries SET uuid = '' WHERE int_id = ?
-			AND owner_uid = ?");
-		$sth->execute([$id, $_SESSION['uid']]);
-
-		print __("Article unshared");
-	}
 
 	/**
 	 * @param string $id

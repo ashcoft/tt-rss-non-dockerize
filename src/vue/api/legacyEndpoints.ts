@@ -89,6 +89,21 @@ export interface AdaptedHeadline {
   image_preview: string;
   /** The feed's background colour, used to tint its label in combined mode. */
   feed_bg_color: string;
+  /** Plugin-provided article buttons (parsed from the backend's HTML). */
+  pluginButtons: AdaptedPluginButton[];
+}
+
+/**
+ * A plugin article button. The backend emits raw HTML with an inline
+ * `onclick="Plugins.<Class>.<method>(<id>)"`; the plugin name and method are
+ * extracted so the Vue side can invoke the same handler through its own
+ * registry instead of relying on a Dojo global.
+ */
+export interface AdaptedPluginButton {
+  plugin: string;
+  method: string;
+  icon: string;
+  title: string;
 }
 
 export interface AdaptedLabel {
@@ -301,6 +316,34 @@ export interface HeadlinesPage {
   feedError: string | null;
 }
 
+/**
+ * Parse the backend's plugin-button HTML fragment.
+ *
+ * Each button is `<i ... onclick="Plugins.<Class>.<method>(<id>)" title="...">icon</i>`.
+ * Only the handler name and presentation are extracted; the id comes from the
+ * headline, so a button is not tied to a single article. Buttons whose onclick
+ * does not match the `Plugins.*` contract are skipped (a plugin may emit
+ * arbitrary markup the Vue side cannot dispatch).
+ */
+function adaptPluginButtons(html: string): AdaptedPluginButton[] {
+  if (!html) return [];
+
+  const buttons: AdaptedPluginButton[] = [];
+  for (const match of html.matchAll(/<i\b[^>]*>([^<]*)<\/i>/g)) {
+    const tag = match[0];
+    const handler = /onclick="Plugins\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\(/.exec(tag);
+    if (!handler) continue;
+    const title = /title="([^"]*)"/.exec(tag);
+    buttons.push({
+      plugin: handler[1],
+      method: handler[2],
+      icon: match[1] || 'extension',
+      title: title ? title[1] : '',
+    });
+  }
+  return buttons;
+}
+
 function adaptHeadline(raw: unknown): AdaptedHeadline {
   const line = expectObject(raw, 'Feeds/view.headline');
   const unread = asBoolean(line.unread);
@@ -350,6 +393,7 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
     }),
     image_preview: asString(line.image_preview),
     feed_bg_color: asString(line.feed_bg_color),
+    pluginButtons: adaptPluginButtons(asString(line.buttons)),
   };
 }
 
@@ -965,6 +1009,29 @@ export async function saveFeed(
 /** The value `checkbox_to_sql_bool()` recognises as checked. */
 function checkboxValue(checked: boolean): string {
   return checked ? 'on' : '';
+}
+
+/**
+ * Invoke a plugin's article-button handler through `PluginHandler`.
+ *
+ * The backend dispatches `op=PluginHandler&plugin=<Class>&pmethod=<method>`;
+ * the handler answers with an HTML fragment (a dialog body) that the caller
+ * renders. Returns the raw body.
+ */
+export async function invokePluginHandler(
+  backend: LegacyBackend,
+  plugin: string,
+  method: string,
+  params: LegacyParams = {}
+): Promise<string> {
+  // PluginHandler::catchall($method) dispatches on the standard `method`
+  // field and reads `plugin`; it validates the CSRF token itself (the transport
+  // supplies it), so no `pmethod` is involved here.
+  const response = await backend.call('PluginHandler', method, {
+    plugin: plugin.toLowerCase(),
+    ...params,
+  });
+  return response.raw;
 }
 
 /** Article tags are stored comma-separated; `tags_str` is what the handler reads. */
