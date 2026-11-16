@@ -413,6 +413,17 @@ class RPC extends Handler_Protected {
 		$params["icon_blank"] = $this->image_to_base64("images/blank_icon.gif");
 		$params["labels"] = Labels::get_all($_SESSION["uid"]);
 
+		// Every user preference with its type, so the Vue preferences dialog can
+		// render the full set (the legacy Pref_Prefs page grouped them by hand).
+		$prefs = [];
+		foreach (Prefs::get_all($_SESSION['uid'], $profile) as $pref) {
+			$prefs[$pref['pref_name']] = [
+				'value' => $pref['value'],
+				'type' => $pref['type_hint'],
+			];
+		}
+		$params["prefs"] = $prefs;
+
 		return $params;
 	}
 
