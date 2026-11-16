@@ -58,28 +58,6 @@ async function expandCategory(page: Page, title: string): Promise<void> {
   await header.click();
 }
 
-/**
- * Switch the "Show" view mode. The default (adaptive) hides read articles, so
- * tests that need a specific article must select "All Articles" to include it
- * regardless of what earlier tests marked read.
- */
-async function setViewMode(page: Page, name: string): Promise<void> {
-  const show = page.getByRole('combobox', { name: 'Show' });
-  const option = page.getByRole('option', { name });
-
-  // Opening the Vuetify select can race its transition; retry until the option
-  // is on screen, then pick it.
-  await expect(async () => {
-    if (!(await option.isVisible())) {
-      await show.focus();
-      await page.keyboard.press('ArrowDown');
-    }
-    await expect(option).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 15000 });
-
-  await option.click();
-}
-
 test.describe('Vue front-end', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!(await backendReachable(page)), 'no tt-rss backend reachable at baseURL');
@@ -144,11 +122,11 @@ test.describe('Vue front-end', () => {
 
   test('opens an article in the reading pane', async ({ page }) => {
     await login(page);
-    // "All Articles" includes read items, so this test does not depend on
-    // running before the ones that mark articles read.
-    await expandCategory(page, 'Special');
-    await page.getByText('All Articles', { exact: true }).click();
-    await setViewMode(page, 'All Articles');
+    // Search finds the article regardless of read state, unlike the default
+    // (adaptive) list which hides articles earlier tests marked read.
+    const searchBox = page.getByPlaceholder('Search articles...');
+    await searchBox.fill('PostgreSQL');
+    await searchBox.press('Enter');
 
     const headline = page.getByText('PostgreSQL 18 released with major performance improvements');
     await expect(headline).toBeVisible({ timeout: 15000 });
@@ -412,6 +390,35 @@ test.describe('Vue front-end', () => {
 
     await page.getByRole('button', { name: 'Toggle light/dark theme' }).click();
     await expect(app).toHaveClass(/v-theme--dark/);
+  });
+
+  test('applies the grid view in combined mode', async ({ page }) => {
+    await login(page);
+
+    // Enable combined mode and the grid preference via the preferences dialog,
+    // then reload: display preferences are read from init-params on load.
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/Combined mode/).first().check();
+    await dialog.getByLabel(/Grid view/).first().check();
+    await dialog.getByRole('button', { name: 'Close' }).click();
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible({ timeout: 15000 });
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    // The list is now a CSS grid with inline article content.
+    const list = page.locator('.headlines-list-content');
+    await expect(list).toHaveClass(/headlines-grid/, { timeout: 15000 });
+    expect(await list.evaluate((el) => getComputedStyle(el).display)).toBe('grid');
+    await expect(page.locator('.headline-content').first()).toBeVisible();
+
+    // Reset both preferences so later tests see the default layout.
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await dialog.getByLabel(/Combined mode/).first().uncheck();
+    await dialog.getByLabel(/Grid view/).first().uncheck();
+    await dialog.getByRole('button', { name: 'Close' }).click();
   });
 
   test('lists plugins and saves the enabled set', async ({ page }) => {

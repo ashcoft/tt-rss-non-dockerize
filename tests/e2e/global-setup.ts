@@ -63,4 +63,24 @@ export default function globalSetup(): void {
   } catch (err) {
     console.warn('[e2e] could not clear leftover E2E tags:', (err as Error).message);
   }
+
+  // Pin the display preferences the E2E tests depend on so a run starts from a
+  // known layout. COMBINED_DISPLAY_MODE defaults to *on* in tt-rss; the tests
+  // assume the three-pane layout, so set it off (and grid off) explicitly.
+  try {
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
+        "DELETE FROM ttrss_user_prefs2 WHERE pref_name IN ('CDM_ENABLE_GRID', 'COMBINED_DISPLAY_MODE')"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
+    execFileSync(
+      'psql',
+      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
+        "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL)"],
+      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
+    );
+  } catch (err) {
+    console.warn('[e2e] could not reset display preferences:', (err as Error).message);
+  }
 }
