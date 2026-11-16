@@ -259,6 +259,20 @@ test.describe('Vue front-end', () => {
     ).toHaveCount(0, { timeout: 15000 });
   });
 
+  test('selecting a category shows its feeds\' articles', async ({ page }) => {
+    await login(page);
+    // The "Technology" category holds Hacker News, The Register and Ars Technica.
+    const header = page.locator('.feed-list .v-list-group__header').filter({ hasText: 'Technology' }).first();
+    await header.waitFor({ state: 'visible', timeout: 15000 });
+    await header.click();
+
+    // Articles from all three member feeds are present.
+    const titles = page.locator('.headlines-list-content .v-list-item-title');
+    await expect(titles.filter({ hasText: 'Show HN' })).toHaveCount(1, { timeout: 15000 });
+    await expect(titles.filter({ hasText: 'AI startup' })).toHaveCount(1);
+    await expect(titles.filter({ hasText: 'Apple announces' })).toHaveCount(1);
+  });
+
   test('the Starred feed lists exactly the starred articles', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');
