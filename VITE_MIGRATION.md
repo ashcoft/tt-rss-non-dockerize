@@ -180,11 +180,15 @@ and the `js/*.js` AMD modules (plus `js/form/`, `lib/CheckBox*.js` and the
 from the PHP. `index.php` and `prefs.php` serve the Vue shell only, so a
 production build (`pnpm run build`) is required.
 
+**Plugin article buttons** (`HOOK_ARTICLE_BUTTON`) are supported: the backend's
+button HTML is parsed into `{plugin, method, icon, title}`, rendered in the
+reading pane, and dispatched through `PluginHandler` with the returned fragment
+shown in a sanitized dialog (see `ArticleView.runPluginButton`).
+
 What this does not yet cover, and which the legacy shell used to provide:
 
-- **Plugin UI surfaces.** `HOOK_ARTICLE_BUTTON` and friends still emit raw
-  HTML with inline `Plugins.*` handlers; there is no Dojo runtime for them, so
-  the bundled plugins that render buttons (`note`, `share`) show nothing.
+- **Other plugin UI surfaces** (`HOOK_TOOLBAR_BUTTON`, `HOOK_MAIN_TOOLBAR_BUTTON`,
+  `HOOK_PREFS_TAB_SECTION`) have no Vue host yet.
 - **The filter-rule editor** covers create/edit; feed preferences and plugin
   settings are only partly represented in the Vue dialog.
 
