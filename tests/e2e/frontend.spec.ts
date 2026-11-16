@@ -304,6 +304,33 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('toggles combined display mode', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+    await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // No inline content in the default (three-pane) layout.
+    await expect(page.locator('.headline-content')).toHaveCount(0);
+
+    // Toggle combined mode from the toolbar's action menu.
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle combined mode' }).first().click();
+
+    // Every loaded headline now renders its body inline.
+    await expect(page.locator('.headline-content').first()).toBeVisible({ timeout: 10000 });
+    const count = await page.locator('.headlines-list-content .v-list-item').count();
+    await expect(page.locator('.headline-content')).toHaveCount(count);
+
+    // Turn it back off: it is a persisted preference, so leaving it on would
+    // change the layout for later tests.
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle combined mode' }).first().click();
+    await expect(page.locator('.headline-content')).toHaveCount(0, { timeout: 10000 });
+  });
+
   test('marks the articles below one as read', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');

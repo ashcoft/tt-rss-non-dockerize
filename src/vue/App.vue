@@ -59,6 +59,7 @@
             :loading-more="headlinesStore.loadingMore"
             :has-more="headlinesStore.hasMore"
             :active-id="headlinesStore.cursorId"
+            :combined="feedsStore.combinedMode"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
@@ -66,7 +67,11 @@
                     />
         </section>
 
-        <aside class="article-panel" v-if="headlinesStore.selectedArticle">
+        <!-- In combined mode the content is inline in the list, so no panel. -->
+        <aside
+          class="article-panel"
+          v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
+        >
           <ArticleView
             :article="headlinesStore.selectedArticle"
             @close="handleArticleClose"
@@ -487,6 +492,13 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       await feedsStore.toggleHideRead();
       showMessage(
         feedsStore.hideReadFeeds ? 'Hiding read feeds' : 'Showing read feeds',
+        'info'
+      );
+      break;
+    case 'toggleCombinedMode':
+      await feedsStore.toggleCombinedMode();
+      showMessage(
+        feedsStore.combinedMode ? 'Combined mode on' : 'Combined mode off',
         'info'
       );
       break;
