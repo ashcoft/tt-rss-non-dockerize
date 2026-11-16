@@ -293,6 +293,8 @@ export interface HeadlinesPage {
   first_id: number;
   /** Set when the backend refused to render a list (e.g. "Feed not found."). */
   message: string | null;
+  /** Feed update error reported by the toolbar payload, or null. */
+  feedError: string | null;
 }
 
 function adaptHeadline(raw: unknown): AdaptedHeadline {
@@ -394,9 +396,16 @@ export async function getHeadlines(
   const count = asNumber(info.count);
   const firstId = asNumber(headlines.first_id);
 
+  // The toolbar payload carries the feed's last update error (shown as an
+  // icon next to the title in the legacy UI); `error` is "" when there is none.
+  const toolbar = typeof headlines.toolbar === 'object' && headlines.toolbar !== null
+    ? (headlines.toolbar as Record<string, unknown>)
+    : {};
+  const feedError = asString(toolbar.error).trim() || null;
+
   if (typeof content === 'string') {
     // A string body is the legacy empty/error marker.
-    return { headlines: [], count, first_id: firstId, message: stripTags(content) };
+    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError };
   }
 
   const rows = expectArray(content, 'Feeds/view.headlines.content');
@@ -405,6 +414,7 @@ export async function getHeadlines(
     count,
     first_id: firstId,
     message: null,
+    feedError,
   };
 }
 

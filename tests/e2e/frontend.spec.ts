@@ -282,6 +282,18 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('shows a feed update error in the toolbar', async ({ page }) => {
+    await login(page);
+    // The seed marks Hacker News (feed 1) with a last_error; opening it shows
+    // the error icon next to the feed title.
+    await expandCategory(page, 'Technology');
+    await page.getByText('Hacker News', { exact: true }).click();
+
+    const errorIcon = page.locator('.toolbar-center .v-icon.mdi-alert-circle');
+    await expect(errorIcon).toBeVisible({ timeout: 15000 });
+    await expect(errorIcon).toHaveAttribute('title', /error|not found/i);
+  });
+
   test('toggles combined display mode', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');

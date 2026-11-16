@@ -34,6 +34,7 @@
         <section class="content">
           <Toolbar
             :feed-info="feedsStore.currentFeed"
+            :feed-error="headlinesStore.feedError"
             :search-languages="searchLanguages"
             :model-search-language="headlinesStore.searchLanguage"
             :model-view-mode="headlinesStore.viewMode"

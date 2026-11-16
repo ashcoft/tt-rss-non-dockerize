@@ -230,6 +230,7 @@ class ApiClient {
       count: 0,
       first_id: 0,
       message: null,
+      feedError: null,
     });
   }
 
