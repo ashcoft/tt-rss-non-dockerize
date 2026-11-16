@@ -163,6 +163,9 @@ rather than the clickable item. There is no known blocker here.
 - **Article image previews were missing.** The adapter dropped `image_preview`
   (the first image enclosure), so combined mode showed no thumbnail. It now
   renders above the inline content.
+- **Minor header parity.** The reading pane now shows the long date
+  (`updated_long`), matching the legacy header, and combined mode tints the
+  feed label with the feed's `bg_color`.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
