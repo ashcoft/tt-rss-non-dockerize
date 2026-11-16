@@ -160,6 +160,9 @@ rather than the clickable item. There is no known blocker here.
 - **Feed update errors were invisible.** `Feeds/view` reports the feed's last
   update error in its toolbar payload; the adapter dropped it. It now shows an
   alert icon next to the feed title with the message as its tooltip.
+- **Article image previews were missing.** The adapter dropped `image_preview`
+  (the first image enclosure), so combined mode showed no thumbnail. It now
+  renders above the inline content.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
