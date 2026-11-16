@@ -87,6 +87,8 @@ export interface AdaptedHeadline {
   enclosures: AdaptedEnclosure[];
   /** Thumbnail URL for the article (from its first image enclosure), or ''. */
   image_preview: string;
+  /** The feed's background colour, used to tint its label in combined mode. */
+  feed_bg_color: string;
 }
 
 export interface AdaptedLabel {
@@ -347,6 +349,7 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
       };
     }),
     image_preview: asString(line.image_preview),
+    feed_bg_color: asString(line.feed_bg_color),
   };
 }
 

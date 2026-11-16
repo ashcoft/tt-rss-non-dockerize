@@ -85,6 +85,8 @@ export interface Article {
   }>;
   /** Thumbnail URL shown as a preview in combined mode, if any. */
   image_preview?: string;
+  /** The feed's background colour, used to tint its label in combined mode. */
+  feed_bg_color?: string;
 }
 
 export interface FeedTreeNode {

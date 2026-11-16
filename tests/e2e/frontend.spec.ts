@@ -309,10 +309,11 @@ test.describe('Vue front-end', () => {
     await page.locator('.toolbar-right button').last().click();
     await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle combined mode' }).first().click();
 
-    // Every loaded headline now renders its body inline.
+    // Every loaded headline now renders its body inline, with its feed label.
     await expect(page.locator('.headline-content').first()).toBeVisible({ timeout: 10000 });
     const count = await page.locator('.headlines-list-content .v-list-item').count();
     await expect(page.locator('.headline-content')).toHaveCount(count);
+    await expect(page.locator('.headline-feed-label').first()).toBeVisible();
 
     // Turn it back off: it is a persisted preference, so leaving it on would
     // change the layout for later tests.

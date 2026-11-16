@@ -97,7 +97,8 @@ const sanitizedContent = computed(() => {
         <div class="article-meta">
           <span class="feed">{{ article.feed_title }}</span>
           <span v-if="article.author" class="author">by {{ article.author }}</span>
-          <time :datetime="article.updated">{{ article.updated }}</time>
+          <!-- The legacy header shows the long date here, not the short one. -->
+          <time :datetime="article.updated">{{ article.updated_long || article.updated }}</time>
           <!-- Comments link, mirroring the legacy article header. -->
           <a
             v-if="article.comments_count > 0 || article.comments_link"
