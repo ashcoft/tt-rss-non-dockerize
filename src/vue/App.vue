@@ -142,7 +142,12 @@ const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
 const sidebarOpen = ref(false);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
-const prefsOpen = ref(false);
+// prefs.php serves this shell with __open_preferences=true so the dialog opens
+// on mount.
+const prefsOpen = ref(
+  typeof window !== 'undefined' &&
+    (window as unknown as { __open_preferences?: boolean }).__open_preferences === true
+);
 const hotkeyHelpOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);

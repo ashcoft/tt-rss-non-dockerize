@@ -63,7 +63,7 @@ class VueAssets {
          * session's CSRF token and stylesheets, so it must not be stored by a
          * shared cache but should stay eligible for the back/forward cache.
          */
-        public static function serve_vue_shell(): void {
+        public static function serve_vue_shell(bool $openPreferences = false): void {
                 header('Content-Type: text/html; charset=utf-8');
                 header('Cache-Control: private, no-cache');
 
@@ -72,6 +72,11 @@ class VueAssets {
                 // The Vue client reads this from the global, and the adapter also
                 // falls back to parsing the page when the global is missing.
                 $csrf_token = $_SESSION['csrf_token'] ?? '';
+
+                // Tells the app to open the preferences dialog on mount. Used by
+                // prefs.php, which now serves this same shell instead of the
+                // legacy Dojo preferences page.
+                $open_preferences = $openPreferences;
 
                 ob_start();
                 require_once __DIR__ . '/vue_shell.php';
