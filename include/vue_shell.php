@@ -58,6 +58,9 @@ if ($authenticated === true) {
 
 		const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
 		const __default_dark_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_DARK_THEME), 'themes/night.css') ?>";
+		// prefs.php serves this shell and asks the app to open the preferences
+		// dialog on mount.
+		window.__open_preferences = <?= !empty($open_preferences) ? 'true' : 'false' ?>;
 	</script>
 
 	<?php

@@ -487,6 +487,16 @@ test.describe('Vue front-end', () => {
     });
   });
 
+  test('prefs.php serves the Vue app with the preferences dialog open', async ({ page }) => {
+    await page.goto('/prefs.php');
+    await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible({ timeout: 15000 });
+
+    // The legacy Dojo preferences page is gone; the dialog opens on mount.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('tab', { name: 'Plugins' })).toBeVisible();
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();

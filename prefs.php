@@ -5,12 +5,22 @@
 
 	require_once __DIR__ . '/include/autoload.php';
 	require_once __DIR__ . '/include/sessions.php';
+	require_once __DIR__ . '/include/vue_assets.php';
 
 	Config::sanity_check();
 
 	if (!init_plugins()) return;
 
 	UserHelper::login_sequence();
+
+        // Preferences now serve the Vue shell: the app opens its preferences
+        // dialog on mount (see __open_preferences in include/vue_shell.php).
+        // The legacy Dojo markup below stays reachable only when there is no
+        // production build, so a source checkout still has working prefs.
+        if (VueAssets::is_built() === true) {
+                VueAssets::serve_vue_shell(true);
+                return;
+        }
 
 	header('Content-Type: text/html; charset=utf-8');
 
