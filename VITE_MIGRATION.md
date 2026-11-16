@@ -10,15 +10,8 @@ feed/category reordering, labels and label colours), content-filter management
 entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
 legacy adapter.
 
-The Dojo stack is **not yet deleted**. What remains:
-
-- `prefs.php` still renders Dojo markup. The preference screens are generated
-  server-side by `Pref_*.php` (~4,700 lines emitting 225 `dojoType` widgets)
-  and driven by ~2,000 lines of Dojo JS, so porting them is its own workstream.
-- `lib/dojo`, `lib/dijit` (~12.7 MB) and the `js/*.js` AMD modules are still
-  shipped; the legacy shell is reachable with `VUE_LEGACY_SHELL=1` for
-  comparison.
-- Plugin UI hooks (`HOOK_*`) still emit Dojo markup into the old shell.
+The Dojo stack has since been **deleted** (see "Dojo removed" below); this
+section records the state at the time of that migration.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
 instance):
@@ -256,10 +249,9 @@ These were confirmed by calling the running backend, not by reading code:
 
 ### How index.php serves Vue
 
-`index.php` renders `include/vue_shell.php` whenever a production build exists
-(`dist/.vite/manifest.json`), which `VueAssets::tags()` uses to emit the hashed
-entry script and stylesheet. Set `VUE_LEGACY_SHELL=1` to fall back to the Dojo
-shell. Two details are easy to get wrong:
+`index.php` and `prefs.php` render `include/vue_shell.php`; a production build
+(`dist/.vite/manifest.json`) is required, which `VueAssets::tags()` uses to emit
+the hashed entry script and stylesheet. Two details are easy to get wrong:
 
 - The shell is served with an ETag. After login the cached copy still holds the
   pre-login (empty) CSRF token, so `fetchCsrfToken()` forces revalidation;

@@ -55,9 +55,9 @@ about the `"@semantic-release/npm>npm": "-"` override and blocks a postinstall
 
 ## Frontend architecture
 
-- `src/vue/` is the Vue app. `index.php` serves it via `include/vue_shell.php`
-  when `dist/.vite/manifest.json` exists; set `VUE_LEGACY_SHELL=1` for the Dojo
-  shell.
+- `src/vue/` is the Vue app. `index.php` and `prefs.php` serve it via
+  `include/vue_shell.php`; a production build (`dist/.vite/manifest.json`) is
+  required.
 - `src/vue/api/legacy.ts` is the transport (POST-only, CSRF in the body).
   `legacyEndpoints.ts` maps each legacy handler's response onto the shapes the
   Pinia stores expect. `client.ts` wraps both in a `{status, content}` envelope
