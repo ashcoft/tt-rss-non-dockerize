@@ -69,8 +69,8 @@ class Bookmarklets extends Plugin {
 					<?= \Controls\hidden_tag("csrf_token", $_SESSION["csrf_token"]) ?>
 
 					<fieldset>
-						<label>Feed or site URL:</label>
-						<input style="width: 300px" required="1" name="feed_url" value="<?= htmlspecialchars($feed_url) ?>">
+						<label for="feed_url">Feed or site URL:</label>
+						<input id="feed_url" style="width: 300px" required="1" name="feed_url" value="<?= htmlspecialchars($feed_url) ?>">
 					</fieldset>
 
 					<button class="alt-primary" type="submit">
@@ -113,8 +113,8 @@ class Bookmarklets extends Plugin {
 						<?= \Controls\hidden_tag("csrf_token", $_SESSION["csrf_token"]) ?>
 
 						<fieldset>
-							<label style='display : inline'><?= __("Multiple feed URLs found:") ?></label>
-							<select name='feed_url'>
+							<label for='feed_url_select' style='display : inline'><?= __("Multiple feed URLs found:") ?></label>
+							<select name='feed_url' id='feed_url_select'>
 							<?php foreach ($feed_urls as $url => $name) { ?>
 								<option value="<?= htmlspecialchars($url) ?>"><?= htmlspecialchars($name) ?></option>
 							<?php } ?>
@@ -221,22 +221,22 @@ class Bookmarklets extends Plugin {
 						<?= \Controls\hidden_tag("action", "share") ?>
 
 						<fieldset>
-							<label><?= __("Title:") ?></label>
-							<input style='width : 270px' name='title' value="<?= $title ?>">
+							<label for="share_title"><?= __("Title:") ?></label>
+							<input id="share_title" style='width : 270px' name='title' value="<?= $title ?>">
 						</fieldset>
 
 						<fieldset>
-							<label><?= __("URL:") ?></label>
-							<input style='width : 270px' name='url' value="<?= $url ?>">
+							<label for="share_url"><?= __("URL:") ?></label>
+							<input id="share_url" style='width : 270px' name='url' value="<?= $url ?>">
 						</fieldset>
 
 						<fieldset>
-							<label><?= __("Content:") ?></label>
-							<input style='width : 270px' name='content' value="">
+							<label for="share_content"><?= __("Content:") ?></label>
+							<input id="share_content" style='width : 270px' name='content' value="">
 						</fieldset>
 
 						<fieldset>
-							<label><?= __("Labels:") ?></label>
+							<label for="labels_value"><?= __("Labels:") ?></label>
 							<input style='width : 270px' name='labels' id="labels_value"
 								placeholder='Alpha, Beta, Gamma' value="">
 							<!-- <div class="autocomplete" id="labels_choices"
@@ -267,16 +267,16 @@ class Bookmarklets extends Plugin {
 				<input type="hidden" name="op" value="login">
 
 				<fieldset>
-					<label><?= __("Login:") ?></label>
+					<label for="login"><?= __("Login:") ?></label>
 					<input name="login" id="login" type="text"
 							onchange="fetchProfiles()" onfocus="fetchProfiles()" onblur="fetchProfiles()"
 							required="1" value="<?= $_SESSION["fake_login"] ?>" />
 				</fieldset>
 
 				<fieldset>
-					<label><?= __("Password:") ?></label>
+					<label for="password"><?= __("Password:") ?></label>
 
-					<input type="password" name="password" required="1"
+					<input type="password" id="password" name="password" required="1"
 							class="input input-text"
 							value="<?= $_SESSION["fake_password"] ?>"/>
 				</fieldset>

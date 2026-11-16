@@ -1,19 +1,5 @@
 <?php
 class Pref_Prefs extends Handler_Protected {
-	/** @var array<Prefs::*, array<int, string>> */
-	private array $pref_help = [];
-
-	/** @var array<string, array<int, string>> pref items are Prefs::*|Pref_Prefs::BLOCK_SEPARATOR (PHPStan was complaining) */
-	private array $pref_item_map = [];
-
-	/** @var array<string, string> */
-	private array $pref_help_bottom = [];
-
-	/** @var array<int, string> */
-	private array $pref_blacklist = [];
-
-	private const BLOCK_SEPARATOR = 'BLOCK_SEPARATOR';
-
 	const PI_RES_ALREADY_INSTALLED = "PI_RES_ALREADY_INSTALLED";
 	const PI_RES_SUCCESS = "PI_RES_SUCCESS";
 	const PI_ERR_NO_CLASS = "PI_ERR_NO_CLASS";
@@ -27,116 +13,6 @@ class Pref_Prefs extends Handler_Protected {
 
 	function csrf_ignore(string $method) : bool {
 		return in_array($method, ['index', 'updateself', 'otpqrcode']);
-	}
-
-	function __construct($args) {
-		parent::__construct($args);
-
-		$this->pref_item_map = [
-			__('General') => [
-				Prefs::USER_LANGUAGE,
-				Prefs::USER_TIMEZONE,
-				self::BLOCK_SEPARATOR,
-				Prefs::USER_CSS_THEME,
-				self::BLOCK_SEPARATOR,
-				Prefs::ENABLE_API_ACCESS,
-				Prefs::ENABLE_API_ACCESS_BROWSER,
-			],
-			__('Feeds') => [
-				Prefs::DEFAULT_UPDATE_INTERVAL,
-				Prefs::FRESH_ARTICLE_MAX_AGE,
-				Prefs::RECENTLY_READ_MAX_AGE,
-				Prefs::DEFAULT_SEARCH_LANGUAGE,
-				self::BLOCK_SEPARATOR,
-				Prefs::ENABLE_FEED_CATS,
-				self::BLOCK_SEPARATOR,
-				Prefs::CONFIRM_FEED_CATCHUP,
-				Prefs::ON_CATCHUP_SHOW_NEXT_FEED,
-				self::BLOCK_SEPARATOR,
-				Prefs::HIDE_READ_FEEDS,
-				Prefs::HIDE_READ_SHOWS_SPECIAL,
-			],
-			__('Articles') => [
-				Prefs::PURGE_OLD_DAYS,
-				Prefs::PURGE_UNREAD_ARTICLES,
-				self::BLOCK_SEPARATOR,
-				Prefs::COMBINED_DISPLAY_MODE,
-				Prefs::CDM_EXPANDED,
-				Prefs::CDM_ENABLE_GRID,
-				self::BLOCK_SEPARATOR,
-				Prefs::CDM_AUTO_CATCHUP,
-				Prefs::VFEED_GROUP_BY_FEED,
-				self::BLOCK_SEPARATOR,
-				Prefs::SHOW_CONTENT_PREVIEW,
-				Prefs::STRIP_IMAGES,
-			],
-			__('Digest') => [
-				Prefs::DIGEST_ENABLE,
-				Prefs::DIGEST_CATCHUP,
-				Prefs::DIGEST_PREFERRED_TIME,
-				Prefs::DIGEST_MIN_SCORE,
-			],
-			__('Advanced') => [
-				Prefs::BLACKLISTED_TAGS,
-				self::BLOCK_SEPARATOR,
-				Prefs::LONG_DATE_FORMAT,
-				Prefs::SHORT_DATE_FORMAT,
-				self::BLOCK_SEPARATOR,
-				Prefs::SSL_CERT_SERIAL,
-				self::BLOCK_SEPARATOR,
-				Prefs::DISABLE_CONDITIONAL_COUNTERS,
-				Prefs::HEADLINES_NO_DISTINCT,
-			],
-			__('Debugging') => [
-				Prefs::DEBUG_HEADLINE_IDS,
-			],
-		];
-
-		$this->pref_help_bottom = [
-			Prefs::BLACKLISTED_TAGS => __("Never apply these tags automatically (comma-separated list)."),
-		];
-
-		$this->pref_help = [
-			Prefs::BLACKLISTED_TAGS => [__("Blacklisted tags"), ""],
-			Prefs::DEFAULT_SEARCH_LANGUAGE => [__("Default language"), __("Used for full-text search")],
-			Prefs::CDM_AUTO_CATCHUP => [__("Mark read on scroll"), __("Mark articles as read as you scroll past them")],
-			Prefs::CDM_EXPANDED => [__("Always expand articles")],
-			Prefs::COMBINED_DISPLAY_MODE => [__("Combined mode"), __("Show flat list of articles instead of separate panels")],
-			Prefs::CONFIRM_FEED_CATCHUP => [__("Confirm marking feeds as read")],
-			Prefs::DEFAULT_UPDATE_INTERVAL => [__("Default update interval")],
-			Prefs::DIGEST_CATCHUP => [__("Mark sent articles as read")],
-			Prefs::DIGEST_ENABLE => [__("Enable digest"), __("Send daily digest of new (and unread) headlines to your email address")],
-			Prefs::DIGEST_PREFERRED_TIME => [__("Try to send around this time"), __("Time in UTC")],
-			Prefs::ENABLE_API_ACCESS => [__("Enable API"), __("Allows accessing this account through the API")],
-			Prefs::ENABLE_API_ACCESS_BROWSER => [__('Enable browser-based API access'), __("Allows accessing the API from browsers ('Enable API' must also be enabled)")],
-			Prefs::ENABLE_FEED_CATS => [__("Enable categories")],
-			Prefs::FRESH_ARTICLE_MAX_AGE => [__("Maximum age of fresh articles"), "<strong>" . __("hours") . "</strong>"],
-			Prefs::RECENTLY_READ_MAX_AGE => [__('Maximum age of recently read articles'), '<strong>' . __('hours') . '</strong>'],
-			Prefs::HIDE_READ_FEEDS => [__("Hide read feeds")],
-			Prefs::HIDE_READ_SHOWS_SPECIAL => [__("Always show special feeds"), __("While hiding read feeds")],
-			Prefs::LONG_DATE_FORMAT => [__("Long date format"), __("Syntax is identical to PHP <a href='https://www.php.net/manual/function.date.php'>date()</a> function.")],
-			Prefs::ON_CATCHUP_SHOW_NEXT_FEED => [__("Automatically show next feed"), __("After marking one as read")],
-			Prefs::PURGE_OLD_DAYS => [__("Purge articles older than"), __("<strong>days</strong> (0 disables)")],
-			Prefs::PURGE_UNREAD_ARTICLES => [__("Purge unread articles")],
-			Prefs::SHORT_DATE_FORMAT => [__("Short date format")],
-			Prefs::SHOW_CONTENT_PREVIEW => [__("Show content preview in headlines")],
-			Prefs::SSL_CERT_SERIAL => [__("SSL client certificate")],
-			Prefs::STRIP_IMAGES => [__("Do not embed media")],
-			Prefs::USER_TIMEZONE => [__("Time zone")],
-			Prefs::VFEED_GROUP_BY_FEED => [__("Group by feed"), __("Group multiple-feed output by originating feed")],
-			Prefs::USER_LANGUAGE => [__("Language")],
-			Prefs::USER_CSS_THEME => [__("Theme")],
-			Prefs::HEADLINES_NO_DISTINCT => [__("Don't enforce DISTINCT headlines"), __("May produce duplicate entries")],
-			Prefs::DEBUG_HEADLINE_IDS => [__("Show article and feed IDs"), __("In the headlines buffer")],
-			Prefs::DISABLE_CONDITIONAL_COUNTERS => [__("Disable conditional counter updates"), __("May increase server load")],
-			Prefs::CDM_ENABLE_GRID => [__("Grid view"), __("On wider screens, if always expanded")],
-			Prefs::DIGEST_MIN_SCORE => [__("Required score"), __("Include articles with this or above score")],
-		];
-
-		// hidden in the main prefs UI (use to hide things that have description set above)
-		$this->pref_blacklist = [
-			//
-		];
 	}
 
 	function changepassword(): void {
@@ -906,22 +782,14 @@ class Pref_Prefs extends Handler_Protected {
 		print json_encode($rv);
 	}
 
-	private function _get_short_desc(string $pref_name): string {
-		return $this->pref_help[$pref_name][0] ?? "";
-	}
-
-	private function _get_help_text(string $pref_name): string {
-		return $this->pref_help[$pref_name][1] ?? "";
-	}
-
 	private function appPasswordList(): void {
 		?>
 		<div>
 			<div>
 				<span><?= __('Select') ?></span>
 				<div style='display: none'>
-					<div onclick="Tables.select('app-password-list', true)"><?= __('All') ?></div>
-					<div onclick="Tables.select('app-password-list', false)"><?= __('None') ?></div>
+					<button type="button" onclick="Tables.select('app-password-list', true)"><?= __('All') ?></button>
+					<button type="button" onclick="Tables.select('app-password-list', false)"><?= __('None') ?></button>
 				</div>
 			</div>
 		</div>
@@ -944,7 +812,7 @@ class Pref_Prefs extends Handler_Protected {
 				foreach ($passwords as $pass) { ?>
 					<tr data-row-id='<?= $pass['id'] ?>'>
 						<td class="checkbox">
-							<input onclick='Tables.onRowChecked(this)' type='checkbox'>
+							<input onclick='Tables.onRowChecked(this)' type='checkbox' aria-label="<?= __('Select') ?>">
 						</td>
 						<td>
 							<?= htmlspecialchars($pass["title"]) ?>
@@ -1010,9 +878,5 @@ class Pref_Prefs extends Handler_Protected {
 				$_SERVER["SSL_CLIENT_S_DN"]);
 		}
 		return "";
-	}
-
-	private function format_otp_secret(string $secret): string {
-		return implode(" ", str_split($secret, 4));
 	}
 }
