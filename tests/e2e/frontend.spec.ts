@@ -304,6 +304,24 @@ test.describe('Vue front-end', () => {
     await expect(titles).toContainText(['Show HN: I built a distributed task queue in Rust']);
   });
 
+  test('marks the articles below one as read', async ({ page }) => {
+    await login(page);
+    await expandCategory(page, 'Special');
+    await page.getByText('All Articles', { exact: true }).click();
+
+    // Open the first article and mark everything below it read. The exact count
+    // depends on what earlier tests read, so assert the action reports a result
+    // rather than a fixed number.
+    const rows = page.locator('.headlines-list-content .v-list-item');
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
+    await rows.first().locator('.headline-title').click();
+
+    await page.getByRole('button', { name: 'Mark below as read' }).click();
+    await expect(page.locator('.v-snackbar')).toContainText(/as read|No unread/i, {
+      timeout: 10000,
+    });
+  });
+
   test('shows the comments link for an article with comments', async ({ page }) => {
     await login(page);
     // Search finds the article regardless of read state, unlike the default
