@@ -518,6 +518,23 @@ test.describe('Vue front-end', () => {
     await expect(dialog.locator('.plugin-dialog-body textarea')).toBeVisible();
   });
 
+  test('the preferences dialog surfaces the full backend preference set', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    const dialog = page.getByRole('dialog');
+
+    // The General tab lists the curated preferences.
+    await expect(dialog.locator('.v-window-item').nth(0).locator('.v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // The Advanced tab lists the rest of the backend's preferences.
+    await dialog.getByRole('tab', { name: 'Advanced' }).click();
+    const advanced = dialog.locator('.v-window-item').nth(1);
+    await expect(advanced.locator('.v-list-item').first()).toBeVisible();
+    expect(await advanced.locator('.v-list-item').count()).toBeGreaterThan(0);
+  });
+
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
     await page.getByRole('button', { name: 'Preferences' }).click();

@@ -9,6 +9,7 @@
       <v-card-text>
         <v-tabs v-model="tab" color="primary">
           <v-tab value="general">General</v-tab>
+          <v-tab value="advanced">Advanced</v-tab>
           <v-tab value="filters">Filters</v-tab>
           <v-tab value="password">Password</v-tab>
           <v-tab value="plugins">Plugins</v-tab>
@@ -41,6 +42,31 @@
             <p class="text-caption text-grey mt-4">
               Changes are saved immediately to the backend.
             </p>
+          </v-window-item>
+
+          <v-window-item value="advanced">
+            <div v-if="loadingPrefs" class="text-center py-6">
+              <v-progress-circular indeterminate color="primary" />
+            </div>
+            <v-list v-else lines="one">
+              <v-list-item v-for="pref in advancedPrefs" :key="pref.name">
+                <v-checkbox
+                  v-if="pref.type === 'bool'"
+                  :model-value="pref.value === '1' || pref.value === 'true'"
+                  :label="prefText(pref.name)"
+                  hide-details
+                  @update:model-value="(checked: boolean) => savePref(pref.name, checked ? '1' : '0')"
+                />
+                <v-text-field
+                  v-else
+                  :model-value="pref.value"
+                  :label="prefText(pref.name)"
+                  density="compact"
+                  hide-details
+                  @update:model-value="(value: string) => savePref(pref.name, value)"
+                />
+              </v-list-item>
+            </v-list>
           </v-window-item>
 
           <v-window-item value="filters">
@@ -212,6 +238,9 @@ const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: 
 const prefConstant = (name: string) => name.toUpperCase();
 
 const editablePrefs = ref<EditablePref[]>([]);
+// Preferences the backend exposes that have no curated label; shown on the
+// Advanced tab so the whole set is editable.
+const advancedPrefs = ref<EditablePref[]>([]);
 const filters = ref<Array<Record<string, unknown>>>([]);
 
 watch(
@@ -235,14 +264,33 @@ async function loadPrefs() {
   loadingPrefs.value = true;
   try {
     // Preference values are only readable through the RPC/sanityCheck
-    // init-params payload; there is no per-preference read endpoint.
+    // init-params payload; there is no per-preference read endpoint. The
+    // payload's `prefs` map carries every user preference with its type.
     const response = await api.getInitParams();
     const params = response.status === 0 ? response.content : {};
+    const backendPrefs = (params.prefs ?? {}) as Record<string, { value: unknown; type: number }>;
+
+    const labelled = new Set(prefDefinitions.map(d => d.name));
     editablePrefs.value = prefDefinitions.map(def => ({
       name: def.name,
       type: def.type,
       value: params[def.name] === undefined ? '' : String(params[def.name]),
     }));
+
+    // Every remaining backend preference (types: 1 bool, 2 string, 3 int);
+    // skip internal bookkeeping names.
+    advancedPrefs.value = Object.entries(backendPrefs)
+      .filter(([name]) => !name.startsWith('_'))
+      .map(([name]) => name.toLowerCase())
+      .filter(name => !labelled.has(name))
+      .map(name => ({
+        name,
+        type: backendPrefs[name.toUpperCase()]?.type === 1 ? 'bool' : 'string',
+        value:
+          backendPrefs[name.toUpperCase()]?.value === undefined
+            ? ''
+            : String(backendPrefs[name.toUpperCase()].value),
+      }));
   } catch (err) {
     console.error('Failed to load preferences:', err);
     notify('Failed to load preferences', 'error');
