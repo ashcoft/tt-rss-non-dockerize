@@ -34,7 +34,7 @@ class Note extends Plugin {
 			?>
 			<textarea
 				style='font-size : 12px; width : 98%; height: 100px;'
-				name='note'><?= $note ?></textarea>
+				name='note' id='note' aria-label="<?= __('Note') ?>"><?= $note ?></textarea>
 			<?php
 		}
 		?>

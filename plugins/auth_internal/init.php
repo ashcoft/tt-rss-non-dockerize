@@ -72,7 +72,7 @@ class Auth_Internal extends Auth_Base implements IAuthModule2 {
 										<?= \Controls\hidden_tag("op", "login") ?>
 
 										<fieldset>
-											<label><?= __("Please enter verification code (OTP):") ?></label>
+											<label for="otp"><?= __("Please enter verification code (OTP):") ?></label>
 											<input id="otp" required="1" autocomplete="off" size="6" name="otp" value=""/>
 											<?= \Controls\submit_tag(__("Continue")) ?>
 										</fieldset>

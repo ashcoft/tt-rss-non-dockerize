@@ -176,7 +176,8 @@ SELECT setval(pg_get_serial_sequence('ttrss_enclosures', 'id'), (SELECT MAX(id) 
 -- article title and the HTML-stripped content (see Article::_set_content);
 -- the seed inserts rows directly, so populate it here or search matches nothing.
 UPDATE ttrss_entries
-SET tsvector_combined = to_tsvector('english', coalesce(title, '') || ' ' || regexp_replace(coalesce(content, ''), '<[^>]+>', ' ', 'g'));
+SET tsvector_combined = to_tsvector('english', coalesce(title, '') || ' ' || regexp_replace(coalesce(content, ''), '<[^>]+>', ' ', 'g'))
+WHERE tsvector_combined IS NULL;
 
 -- 5e. Give article 2 a comment thread so the article header's comments link
 -- is exercised.

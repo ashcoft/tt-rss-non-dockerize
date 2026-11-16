@@ -2,8 +2,6 @@
 
 class Pref_System extends Handler_Administrative {
 
-	private const LOG_PAGE_LIMIT = 15;
-
 	function csrf_ignore(string $method): bool {
 		return $method === 'index';
 	}
@@ -69,122 +67,6 @@ class Pref_System extends Handler_Administrative {
 		ob_end_clean();
 
 		print preg_replace( '%^.*<body>(.*)</body>.*$%ms','$1', (string)$info);
-	}
-
-	private function _log_viewer(int $page, int $severity): void {
-		$errno_values = match ($severity) {
-			E_USER_ERROR => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR],
-			E_USER_WARNING => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR, E_WARNING, E_USER_WARNING, E_DEPRECATED, E_USER_DEPRECATED],
-			default => [],
-		};
-
-		if (count($errno_values) > 0) {
-			$errno_qmarks = arr_qmarks($errno_values);
-			$errno_filter_qpart = "errno IN ($errno_qmarks)";
-		} else {
-			$errno_filter_qpart = "true";
-		}
-
-		$offset = self::LOG_PAGE_LIMIT * $page;
-
-		$sth = $this->pdo->prepare("SELECT
-				COUNT(id) AS total_pages
-			FROM
-				ttrss_error_log
-			WHERE
-				$errno_filter_qpart");
-
-		$sth->execute($errno_values);
-
-		if ($res = $sth->fetch()) {
-			$total_pages = (int)($res["total_pages"] / self::LOG_PAGE_LIMIT);
-		} else {
-			$total_pages = 0;
-		}
-
-		?>
-		<div gutters='false'>
-			<div region='top'>
-
-				<button onclick='Helpers.EventLog.refresh()'>
-					<?= __('Refresh') ?>
-				</button>
-
-				<button <?= ($page <= 0 ? "disabled" : "") ?>
-					onclick='Helpers.EventLog.prevPage()'>
-					<?= __('&lt;&lt;') ?>
-				</button>
-
-				<button disabled>
-					<?= T_sprintf('Page %d of %d', $page+1, $total_pages+1) ?>
-				</button>
-
-				<button <?= ($page >= $total_pages ? "disabled" : "") ?>
-					onclick='Helpers.EventLog.nextPage()'>
-					<?= __('&gt;&gt;') ?>
-				</button>
-
-				<button
-					onclick='Helpers.EventLog.clear()'>
-					<?= __('Clear') ?>
-				</button>
-
-				<div class='pull-right'>
-					<label><?= __("Severity:") ?></label>
-
-					<?= \Controls\select_hash("severity", $severity,
-						[
-							E_USER_ERROR => __("Errors"),
-							E_USER_WARNING => __("Warnings"),
-							E_USER_NOTICE => __("Everything")
-						], ["onchange"=> "Helpers.EventLog.refresh()"], "severity") ?>
-				</div>
-			</div>
-
-			<div style="padding : 0px" region="center">
-
-				<table width='100%' class='event-log'>
-
-					<tr>
-						<th width='5%'><?= __("Error") ?></th>
-						<th><?= __("Filename") ?></th>
-						<th><?= __("Message") ?></th>
-						<th width='5%'><?= __("User") ?></th>
-						<th width='5%'><?= __("Date") ?></th>
-					</tr>
-
-					<?php
-					$sth = $this->pdo->prepare("SELECT
-							errno, errstr, filename, lineno, created_at, login, context
-						FROM
-							ttrss_error_log LEFT JOIN ttrss_users ON (owner_uid = ttrss_users.id)
-						WHERE
-							$errno_filter_qpart
-						ORDER BY
-							ttrss_error_log.id DESC
-						LIMIT ". self::LOG_PAGE_LIMIT ." OFFSET $offset");
-
-					$sth->execute($errno_values);
-
-					while ($line = $sth->fetch()) {
-						foreach ($line as $k => $v) { $line[$k] = htmlspecialchars($v ?? ''); }
-						?>
-						<tr>
-							<td class='errno'>
-								<?= Logger::ERROR_NAMES[$line["errno"]] . " (" . $line["errno"] . ")" ?>
-							</td>
-							<td class='filename'><?= $line["filename"] . ":" . $line["lineno"] ?></td>
-							<td class='errstr'><?= $line["errstr"] . "\n" .  $line["context"] ?></td>
-							<td class='login'><?= $line["login"] ?></td>
-							<td class='timestamp'>
-								<?= TimeHelper::make_local_datetime($line['created_at']) ?>
-							</td>
-						</tr>
-					<?php } ?>
-				</table>
-			</div>
-		</div>
-		<?php
 	}
 
 }

@@ -17,4 +17,3 @@ class Toggle_Sidebar extends Plugin {
 	}
 
 }
-?>

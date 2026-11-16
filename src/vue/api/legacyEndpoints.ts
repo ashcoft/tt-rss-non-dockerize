@@ -331,7 +331,7 @@ function adaptPluginButtons(html: string): AdaptedPluginButton[] {
   const buttons: AdaptedPluginButton[] = [];
   for (const match of html.matchAll(/<i\b[^>]*>([^<]*)<\/i>/g)) {
     const tag = match[0];
-    const handler = /onclick="Plugins\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\(/.exec(tag);
+    const handler = /onclick="Plugins\.(\w+)\.(\w+)\(/.exec(tag);
     if (!handler) continue;
     const title = /title="([^"]*)"/.exec(tag);
     buttons.push({
@@ -1292,7 +1292,7 @@ export interface PrefsActionResult {
  * `alert-danger`" and the message is the tag-stripped body.
  */
 function parsePrefsResult(raw: string): PrefsActionResult {
-  const message = raw.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const message = stripTags(raw);
   return { ok: raw.trim() !== '' && !raw.includes('alert-danger'), message };
 }
 
