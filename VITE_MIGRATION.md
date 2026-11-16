@@ -166,6 +166,8 @@ rather than the clickable item. There is no known blocker here.
 - **Minor header parity.** The reading pane now shows the long date
   (`updated_long`), matching the legacy header, and combined mode tints the
   feed label with the feed's `bg_color`.
+- **Headline rows were missing the excerpt and score.** The legacy row shows a
+  content preview and a score icon; both are now rendered in the list.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
