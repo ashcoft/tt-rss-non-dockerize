@@ -30,6 +30,24 @@ function resolveExecutable(name: string, override?: string): string | null {
   return null;
 }
 
+/** Connection details for the tt-rss test database. */
+interface DbConfig {
+  host: string;
+  port: string;
+  name: string;
+  user: string;
+  pass: string;
+}
+
+/** Run a SQL statement with psql, inheriting PGPASSWORD via the environment. */
+function runSql(psql: string, db: DbConfig, args: string[]): void {
+  execFileSync(
+    psql,
+    ['-h', db.host, '-p', db.port, '-U', db.user, '-d', db.name, '-q', ...args],
+    { env: { ...process.env, PGPASSWORD: db.pass }, stdio: ['ignore', 'ignore', 'pipe'] }
+  );
+}
+
 /**
  * Playwright global setup: re-seed the tt-rss database so the E2E run starts
  * from a known state.
@@ -63,70 +81,39 @@ export default function globalSetup(): void {
     return;
   }
 
+  const db: DbConfig = { host, port: port ?? '5432', name, user, pass: pass ?? '' };
+
   try {
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-v', 'ON_ERROR_STOP=1', '-f', seed],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
+    runSql(psql, db, ['-v', 'ON_ERROR_STOP=1', '-f', seed]);
     console.log('[e2e] re-seeded the test database');
   } catch (err) {
     console.warn('[e2e] could not re-seed the database; continuing with current state:', (err as Error).message);
     return;
   }
 
-  // The seed does not cover ttrss_filters2; drop any filters earlier E2E runs
-  // created so they do not accumulate.
+  // Drop state earlier E2E runs left behind that the seed does not cover, so it
+  // does not accumulate across runs.
   try {
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_filters2 WHERE title LIKE 'E2E %'"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
+    runSql(psql, db, ['-c', "DELETE FROM ttrss_filters2 WHERE title LIKE 'E2E %'"]);
   } catch (err) {
     console.warn('[e2e] could not clear leftover E2E filters:', (err as Error).message);
   }
 
-  // Likewise drop any tags an E2E run added.
   try {
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c', "DELETE FROM ttrss_tags WHERE tag_name LIKE 'e2e%'"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
+    runSql(psql, db, ['-c', "DELETE FROM ttrss_tags WHERE tag_name LIKE 'e2e%'"]);
   } catch (err) {
     console.warn('[e2e] could not clear leftover E2E tags:', (err as Error).message);
   }
 
   // Pin the display preferences the E2E tests depend on so a run starts from a
   // known layout. COMBINED_DISPLAY_MODE defaults to *on* in tt-rss; the tests
-  // assume the three-pane layout, so set it off (and grid off) explicitly.
+  // assume the three-pane layout, so set it off (and grid off) explicitly. The
+  // `note` plugin is enabled so the plugin article-button surface is testable.
   try {
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
-        "DELETE FROM ttrss_user_prefs2 WHERE pref_name IN ('CDM_ENABLE_GRID', 'COMBINED_DISPLAY_MODE')"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
-        "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL)"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
-    // Enable the `note` plugin so the plugin article-button surface is testable.
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
-        "DELETE FROM ttrss_user_prefs2 WHERE pref_name = '_ENABLED_PLUGINS'"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
-    execFileSync(
-      psql,
-      ['-h', host, '-p', port ?? '5432', '-U', user, '-d', name, '-q', '-c',
-        "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, '_ENABLED_PLUGINS', 'note', NULL)"],
-      { env: { ...process.env, PGPASSWORD: pass ?? '' }, stdio: ['ignore', 'ignore', 'pipe'] }
-    );
+    runSql(psql, db, ['-c',
+      "DELETE FROM ttrss_user_prefs2 WHERE pref_name IN ('CDM_ENABLE_GRID', 'COMBINED_DISPLAY_MODE', '_ENABLED_PLUGINS')"]);
+    runSql(psql, db, ['-c',
+      "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL), (1, '_ENABLED_PLUGINS', 'note', NULL)"]);
   } catch (err) {
     console.warn('[e2e] could not reset display preferences:', (err as Error).message);
   }
