@@ -321,6 +321,31 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.headline-content')).toHaveCount(0, { timeout: 10000 });
   });
 
+  test('shows the article image preview in combined mode', async ({ page }) => {
+    await login(page);
+
+    // Search finds the seeded article with an image enclosure regardless of
+    // read state.
+    const searchBox = page.getByPlaceholder('Search articles...');
+    await searchBox.fill('distributed task queue');
+    await searchBox.press('Enter');
+    await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle combined mode' }).first().click();
+
+    const preview = page.locator('.headline-image-preview');
+    await expect(preview.first()).toBeVisible({ timeout: 10000 });
+    await expect(preview.first()).toHaveAttribute('src', /hqdefault\.jpg/);
+
+    // Reset the preference.
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle combined mode' }).first().click();
+    await expect(page.locator('.headline-content')).toHaveCount(0, { timeout: 10000 });
+  });
+
   test('marks the articles below one as read', async ({ page }) => {
     await login(page);
     await expandCategory(page, 'Special');

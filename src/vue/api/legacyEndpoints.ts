@@ -85,6 +85,8 @@ export interface AdaptedHeadline {
   note: string;
   /** Attachments the backend reports as `enclosures.entries`. */
   enclosures: AdaptedEnclosure[];
+  /** Thumbnail URL for the article (from its first image enclosure), or ''. */
+  image_preview: string;
 }
 
 export interface AdaptedLabel {
@@ -344,6 +346,7 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
         height: asNumber(enc.height),
       };
     }),
+    image_preview: asString(line.image_preview),
   };
 }
 

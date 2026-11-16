@@ -449,6 +449,30 @@ test('getHeadlines maps enclosure entries', async () => {
   ]);
 });
 
+test('getHeadlines maps the article image preview', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 1,
+      content: [
+        {
+          id: 1,
+          title: 'With thumbnail',
+          unread: true,
+          image_preview: 'https://example.com/thumb.jpg',
+        },
+      ],
+    },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+  assert.equal(page.headlines[0].image_preview, 'https://example.com/thumb.jpg');
+});
+
 test('getHeadlines surfaces the toolbar feed error', async () => {
   installGlobals();
   const payload = {

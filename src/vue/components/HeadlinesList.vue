@@ -106,11 +106,16 @@
         </v-list-item-subtitle>
 
         <!-- Combined mode: the article body is shown inline in the list. -->
-        <div
-          v-if="combined"
-          class="headline-content"
-          v-html="sanitize(headline.content)"
-        ></div>
+        <div v-if="combined" class="headline-content">
+          <img
+            v-if="headline.image_preview"
+            class="headline-image-preview"
+            :src="headline.image_preview"
+            alt=""
+            loading="lazy"
+          />
+          <div v-html="sanitize(headline.content)"></div>
+        </div>
 
         <template #append>
           <div class="headline-actions">
@@ -319,6 +324,14 @@ const sanitize = (html: string): string =>
 
 .headline-content :deep(img) {
   max-width: 100%;
+}
+
+.headline-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
 }
 
 /* Grid view: tile the inline articles on wide screens (combined mode only).
