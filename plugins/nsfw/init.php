@@ -76,9 +76,9 @@ class NSFW extends Plugin {
 		$tags = $this->host->get($this, "tags");
 
 		?>
-		<div dojoType="dijit.layout.AccordionPane"
+		<div
 			title="<i class='material-icons'>extension</i> <?= __("NSFW Plugin") ?>">
-			<form dojoType="dijit.form.Form">
+			<form>
 
 				<?= \Controls\pluginhandler_tags($this, "save") ?>
 
@@ -95,7 +95,7 @@ class NSFW extends Plugin {
 				<header><?= __("Tags to consider NSFW (comma-separated):") ?></header>
 
 				<fieldset>
-					<textarea dojoType='dijit.form.SimpleTextarea' rows='4'
+					<textarea rows='4'
 							style='width: 500px; font-size : 12px;'
 							name='tags'><?= $tags ?></textarea>
 				</fieldset>

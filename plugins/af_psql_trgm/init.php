@@ -44,80 +44,6 @@ class Af_Psql_Trgm extends Plugin {
 		$host->add_hook($host::HOOK_ARTICLE_BUTTON, $this);
 	}
 
-	function get_js() {
-		return file_get_contents(__DIR__ . "/init.js");
-	}
-
-	/** @return void */
-	function showrelated() {
-		$id = (int) $_REQUEST['id'];
-		$owner_uid = $_SESSION["uid"];
-
-		$sth = $this->pdo->prepare("SELECT title FROM ttrss_entries, ttrss_user_entries
-			WHERE ref_id = id AND id = ? AND owner_uid = ?");
-		$sth->execute([$id, $owner_uid]);
-
-		if ($row = $sth->fetch()) {
-
-			$title = $row['title'];
-
-			print "<p>$title</p>";
-
-			$sth = $this->pdo->prepare("SELECT ttrss_entries.id AS id,
-				feed_id,
-				ttrss_entries.title AS title,
-				updated, link,
-				ttrss_feeds.title AS feed_title,
-				SIMILARITY(ttrss_entries.title, :title) AS sm
-			FROM
-				ttrss_entries, ttrss_user_entries LEFT JOIN ttrss_feeds ON (ttrss_feeds.id = feed_id)
-			WHERE
-				ttrss_entries.id = ref_id AND
-				ttrss_user_entries.owner_uid = :owner_uid AND
-				ttrss_entries.id != :id AND
-				date_entered >= NOW() - INTERVAL '2 weeks'
-			ORDER BY
-				sm DESC, date_entered DESC
-			LIMIT 10");
-
-			$sth->execute(['title' => $title, "owner_uid" => $owner_uid, "id" => $id]);
-
-			print "<ul class='panel panel-scrollable'>";
-
-			while ($line = $sth->fetch()) {
-				print "<li style='display : flex'>";
-				print "<i class='material-icons'>bookmark_outline</i>";
-
-				$sm = sprintf("%.2f", $line['sm']);
-				$article_link = htmlspecialchars($line["link"]);
-
-				print "<div style='flex-grow : 2'>";
-
-				print " <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"$article_link\">".
-					$line["title"]."</a>";
-
-				print " (<a href=\"#\" onclick=\"Feeds.open({feed:".$line["feed_id"]."})\">".
-					htmlspecialchars($line["feed_title"])."</a>)";
-
-				print " &mdash; $sm";
-
-				print "</div>";
-
-				print "<div style='text-align : right' class='text-muted'>" . TimeHelper::smart_date_time(strtotime($line["updated"] ?? '')) . "</div>";
-
-				print "</li>";
-			}
-
-			print "</ul>";
-
-		}
-
-		print "<footer class='text-center'>
-			<button dojoType='dijit.form.Button' type='submit' class='alt-primary'>".__('Close this window')."</button>
-		</footer>";
-
-
-	}
 
 	function hook_article_button($line) {
 		return "<i style=\"cursor : pointer\" class='material-icons'
@@ -134,7 +60,7 @@ class Af_Psql_Trgm extends Plugin {
 
 		?>
 
-		<div dojoType="dijit.layout.AccordionPane"
+		<div
 			title="<i class='material-icons'>extension</i> <?= __('Mark similar articles as read (af_psql_trgm)') ?>">
 
 			<?php
@@ -144,7 +70,7 @@ class Af_Psql_Trgm extends Plugin {
 				print_error("pg_trgm extension not found.");
 			} ?>
 
-			<form dojoType="dijit.form.Form">
+			<form>
 
 				<?= \Controls\pluginhandler_tags($this, "save") ?>
 
@@ -162,20 +88,20 @@ class Af_Psql_Trgm extends Plugin {
 
 				<fieldset>
 					<label><?= __("Minimum similarity:") ?></label>
-					<input dojoType="dijit.form.NumberSpinner"
+					<input
 						placeholder="<?= $this->default_similarity ?>"
 						id='psql_trgm_similarity'
 						required="1"
 						name="similarity" value="<?= htmlspecialchars($similarity) ?>">
 
-					<div dojoType='dijit.Tooltip' connectId='psql_trgm_similarity' position='below'>
+					<div connectId='psql_trgm_similarity' position='below'>
 						<?= __("PostgreSQL trigram extension returns string similarity as a floating point number (0-1). Setting it too low might produce false positives, zero disables checking.") ?>
 					</div>
 				</fieldset>
 
 				<fieldset>
 					<label><?= __("Minimum title length:") ?></label>
-					<input dojoType="dijit.form.NumberSpinner"
+					<input
 						placeholder="<?= $this->default_min_length ?>"
 						required="1"
 						name="min_title_length" value="<?= htmlspecialchars($min_title_length) ?>">

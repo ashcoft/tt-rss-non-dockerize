@@ -611,8 +611,8 @@ class Pref_Feeds extends Handler_Protected {
 		<?= \Controls\hidden_tag("op", "Pref_Feeds") ?>
 		<?= \Controls\hidden_tag("method", "batchEditSave") ?>
 
-		<div dojoType="dijit.layout.TabContainer" style="height : 450px">
-			<div dojoType="dijit.layout.ContentPane" title="<?= __('General') ?>">
+		<div style="height : 450px">
+			<div title="<?= __('General') ?>">
 				<section>
 				<?php if (Prefs::get(Prefs::ENABLE_FEED_CATS, $_SESSION['uid'], $_SESSION['profile'] ?? null)) { ?>
 					<fieldset>
@@ -647,23 +647,23 @@ class Pref_Feeds extends Handler_Protected {
 					<?php } ?>
 				</section>
 			</div>
-			<div dojoType="dijit.layout.ContentPane" title="<?= __('Authentication') ?>">
+			<div title="<?= __('Authentication') ?>">
 				<section>
 					<fieldset>
 						<label><?= __("Login:") ?></label>
-						<input dojoType='dijit.form.TextBox'
+						<input
 							disabled='1' autocomplete='new-password' name='auth_login' value=''>
 						<?= $this->_batch_toggle_checkbox("auth_login") ?>
 					</fieldset>
 					<fieldset>
 						<label><?= __("Password:") ?></label>
-						<input dojoType='dijit.form.TextBox' type='password' name='auth_pass'
+						<input type='password' name='auth_pass'
 							autocomplete='new-password' disabled='1' value=''>
 						<?= $this->_batch_toggle_checkbox("auth_pass") ?>
 					</fieldset>
 				</section>
 			</div>
-			<div dojoType="dijit.layout.ContentPane" title="<?= __('Options') ?>">
+			<div title="<?= __('Options') ?>">
 			<?php
 				foreach ($options as $name => $caption) {
 					?>
@@ -876,199 +876,9 @@ class Pref_Feeds extends Handler_Protected {
 		$opml->opml_import($_SESSION["uid"]);
 	}
 
-	private function index_feeds(): void {
-		$error_button = "<button dojoType='dijit.form.Button'
-				id='pref_feeds_errors_btn' style='display : none'
-				onclick='CommonDialogs.showFeedsWithErrors()'>".
-			__("Feeds with errors")."</button>";
 
-		$inactive_button = "<button dojoType='dijit.form.Button'
-				id='pref_feeds_inactive_btn'
-				style='display : none'
-				onclick=\"dijit.byId('feedTree').showInactiveFeeds()\">" .
-				__("Inactive feeds") . "</button>";
 
-		$feed_search = clean($_REQUEST["search"] ?? "");
 
-		if (array_key_exists("search", $_REQUEST)) {
-			$_SESSION["prefs_feed_search"] = $feed_search;
-		} else {
-			$feed_search = $_SESSION["prefs_feed_search"] ?? "";
-		}
-
-		?>
-
-		<div dojoType="dijit.layout.BorderContainer" gutters="false">
-			<div region='top' dojoType="fox.Toolbar">
-				<div style='float : right'>
-					<form dojoType="dijit.form.Form" onsubmit="dijit.byId('feedTree').reload(); return false;">
-						<input dojoType="dijit.form.TextBox" id="feed_search" size="20" type="search"
-							value="<?= htmlspecialchars($feed_search) ?>">
-						<button dojoType="dijit.form.Button" type="submit">
-							<?= __('Search') ?></button>
-					</form>
-				</div>
-
-				<div dojoType="fox.form.DropDownButton">
-					<span><?= __('Select') ?></span>
-					<div dojoType="dijit.Menu" style="display: none;">
-						<div onclick="dijit.byId('feedTree').model.setAllChecked(true)"
-							dojoType="dijit.MenuItem"><?= __('All') ?></div>
-						<div onclick="dijit.byId('feedTree').model.setAllChecked(false)"
-							dojoType="dijit.MenuItem"><?= __('None') ?></div>
-					</div>
-				</div>
-
-				<div dojoType="fox.form.DropDownButton">
-					<span><?= __('Feeds') ?></span>
-					<div dojoType="dijit.Menu" style="display: none">
-						<div onclick="CommonDialogs.subscribeToFeed()"
-							dojoType="dijit.MenuItem"><?= __('Subscribe to feed') ?></div>
-						<div onclick="dijit.byId('feedTree').editSelectedFeed()"
-							dojoType="dijit.MenuItem"><?= __('Edit selected feeds') ?></div>
-						<div onclick="dijit.byId('feedTree').resetFeedOrder()"
-							dojoType="dijit.MenuItem"><?= __('Reset sort order') ?></div>
-						<div onclick="dijit.byId('feedTree').batchSubscribe()"
-							dojoType="dijit.MenuItem"><?= __('Batch subscribe') ?></div>
-						<div dojoType="dijit.MenuItem" onclick="dijit.byId('feedTree').removeSelectedFeeds()">
-							<?= __('Unsubscribe') ?></div>
-					</div>
-				</div>
-
-				<?php if (Prefs::get(Prefs::ENABLE_FEED_CATS, $_SESSION['uid'], $_SESSION['profile'] ?? null)) { ?>
-					<div dojoType="fox.form.DropDownButton">
-						<span><?= __('Categories') ?></span>
-						<div dojoType="dijit.Menu" style="display: none">
-							<div onclick="dijit.byId('feedTree').createCategory()"
-								dojoType="dijit.MenuItem"><?= __('Add category') ?></div>
-							<div onclick="dijit.byId('feedTree').resetCatOrder()"
-								dojoType="dijit.MenuItem"><?= __('Reset sort order') ?></div>
-							<div onclick="dijit.byId('feedTree').removeSelectedCategories()"
-								dojoType="dijit.MenuItem"><?= __('Remove selected') ?></div>
-						</div>
-					</div>
-				<?php } ?>
-				<?= $error_button ?>
-				<?= $inactive_button ?>
-			</div>
-			<div style="padding : 0px" dojoType="dijit.layout.ContentPane" region="center">
-				<div dojoType="fox.PrefFeedStore" jsId="feedStore"
-					url="backend.php?op=Pref_Feeds&method=getfeedtree">
-				</div>
-
-				<div dojoType="lib.CheckBoxStoreModel" jsId="feedModel" store="feedStore"
-					query="{id:'root'}" rootId="root" rootLabel="Feeds" childrenAttrs="items"
-					checkboxStrict="false" checkboxAll="false">
-				</div>
-
-				<div dojoType="fox.PrefFeedTree" id="feedTree"
-					dndController="dijit.tree.dndSource"
-					betweenThreshold="5"
-					autoExpand="<?= (!empty($feed_search) ? "true" : "false") ?>"
-					persist="true"
-					model="feedModel"
-					openOnClick="false">
-				</div>
-			</div>
-		</div>
-	<?php
-
-	}
-
-	private function index_opml(): void {
-		?>
-
-		<form id='opml_import_form' method='post' enctype='multipart/form-data'>
-			<label class='dijitButton'><?= __("Choose file...") ?>
-				<input style='display : none' id='opml_file' name='opml_file' type='file'>
-			</label>
-			<input type='hidden' name='op' value='Pref_Feeds'>
-			<input type='hidden' name='csrf_token' value="<?= $_SESSION['csrf_token'] ?>">
-			<input type='hidden' name='method' value='importOpml'>
-			<button dojoType='dijit.form.Button' class='alt-primary' onclick="return Helpers.OPML.import()" type="submit">
-			<?= \Controls\icon("file_upload") ?>
-				<?= __('Import OPML') ?>
-			</button>
-		</form>
-
-		<hr/>
-
-		<?php print_notice("Only main settings profile can be migrated using OPML.") ?>
-
-		<form dojoType='dijit.form.Form' id='opmlExportForm' style='display : inline-block'>
-			<button dojoType='dijit.form.Button' onclick='Helpers.OPML.export()'>
-				<?= \Controls\icon("file_download") ?>
-				<?= __('Export OPML') ?>
-			</button>
-
-			<label class='checkbox'>
-				<?= \Controls\checkbox_tag("include_settings", true, "1") ?>
-				<?= __("Include tt-rss settings") ?>
-			</label>
-		</form>
-
-		<?php
-		PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION, "prefFeedsOPML");
-	}
-
-	private function index_shared(): void {
-		?>
-
-		<?= format_notice('Published articles can be subscribed by anyone who knows the following URL:') ?></h3>
-
-		<button dojoType='dijit.form.Button' class='alt-primary'
-			onclick="CommonDialogs.generatedFeed(<?= Feeds::FEED_PUBLISHED ?>, false)">
-			<?= \Controls\icon('share') ?>
-			<?= __('Display URL') ?>
-		</button>
-
-		<button class='alt-danger' dojoType='dijit.form.Button' onclick='return Helpers.Feeds.clearFeedAccessKeys()'>
-			<?= \Controls\icon('delete') ?>
-			<?= __('Clear all generated URLs') ?>
-		</button>
-
-		<?php
-		PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION, "prefFeedsPublishedGenerated");
-	}
-
-	function index(): void {
-		?>
-
-		<div dojoType='dijit.layout.TabContainer' tabPosition='left-h'>
-			<div style='padding : 0px' dojoType='dijit.layout.ContentPane'
-				title="<i class='material-icons'>rss_feed</i> <?= __('My feeds') ?>">
-				<?php $this->index_feeds() ?>
-			</div>
-
-			<div dojoType='dijit.layout.ContentPane'
-						title="<i class='material-icons'>import_export</i> <?= __('OPML') ?>">
-						<?php $this->index_opml() ?>
-					</div>
-
-			<div dojoType="dijit.layout.ContentPane"
-				title="<i class='material-icons'>share</i> <?= __('Sharing') ?>">
-				<?php $this->index_shared() ?>
-			</div>
-
-			<?php
-				ob_start();
-				PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB, "prefFeeds");
-				$plugin_data = trim((string)ob_get_contents());
-				ob_end_clean();
-			?>
-
-			<?php if ($plugin_data) { ?>
-				<div dojoType='dijit.layout.ContentPane'
-					title="<i class='material-icons'>extension</i> <?= __('Plugins') ?>">
-
-					<div dojoType='dijit.layout.AccordionContainer' region='center'>
-						<?= $plugin_data ?>
-					</div>
-				</div>
-			<?php } ?>
-		</div>
-		<?php
-	}
 
 	/**
 	 * @return array<string, mixed>

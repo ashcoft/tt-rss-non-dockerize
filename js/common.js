@@ -122,22 +122,22 @@ const xhr = {
 			if (typeof __csrf_token !== "undefined")
 				params = {...params, ...{csrf_token: __csrf_token}};
 
-			dojo.xhrPost({url: url,
-				postData: dojo.objectToQuery(params),
-				handleAs: "text",
-				error: function(error) {
-					if (failed !== undefined)
-						failed(error);
+			fetch(url, {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams(params).toString(),
+			}).then((response) => response.text()).then((data) => {
+				if (typeof complete === 'function')
+					complete(data, null);
 
-					reject(error);
-				},
-				load: function(data, ioargs) {
-					if (typeof complete === 'function')
-						complete(data, ioargs.xhr);
+				resolve(data);
+			}).catch((error) => {
+				if (failed !== undefined)
+					failed(error);
 
-					resolve(data)
-				}}
-			);
+				reject(error);
+			});
 		});
 	},
 	json: function(url, params = {}, complete = undefined, failed = undefined) {
@@ -182,18 +182,19 @@ function xhrPost(url, params = {}, complete = undefined) {
 		if (typeof __csrf_token !== "undefined")
 			params = {...params, ...{csrf_token: __csrf_token}};
 
-		dojo.xhrPost({url: url,
-			postData: dojo.objectToQuery(params),
-			handleAs: "text",
-			error: function(error) {
-				reject(error);
-			},
-			load: function(data, ioargs) {
-				if (complete !== undefined)
-					complete(ioargs.xhr);
+		fetch(url, {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams(params).toString(),
+		}).then((response) => {
+			if (complete !== undefined)
+				complete(response);
 
-				resolve(ioargs.xhr)
-			}});
+			resolve(response);
+		}).catch((error) => {
+			reject(error);
+		});
 	});
 }
 
@@ -207,9 +208,7 @@ function xhrJson(url, params = {}, complete = undefined) {
 /* exported Lists */
 const Lists = {
 	onRowChecked: function(elem) {
-		// account for dojo checkboxes
-		const checked = elem.domNode ? elem.attr('checked') : elem.checked;
-		elem = elem.domNode || elem;
+		const checked = elem.checked;
 		elem.closest('li')?.classList.toggle('Selected', checked);
 	},
 	select: function(elem, selected) {
@@ -217,17 +216,11 @@ const Lists = {
 			elem = document.getElementById(elem);
 
 		elem.querySelectorAll("li").forEach((row) => {
-			const checkNode = row.querySelector(".dijitCheckBox,input[type=checkbox]");
+			const checkNode = row.querySelector("input[type=checkbox]");
 			if (checkNode) {
-				const widget = dijit.getEnclosingWidget(checkNode);
+				checkNode.checked = selected;
 
-				if (widget) {
-					widget.attr("checked", selected);
-				} else {
-					checkNode.checked = selected;
-				}
-
-				this.onRowChecked(widget);
+				this.onRowChecked(checkNode);
 			}
 		});
 	},
@@ -260,9 +253,7 @@ const Lists = {
 /* exported Tables */
 const Tables = {
 	onRowChecked: function(elem) {
-		// account for dojo checkboxes
-		const checked = elem.domNode ? elem.attr('checked') : elem.checked;
-		elem = elem.domNode || elem;
+		const checked = elem.checked;
 		elem.closest('tr')?.classList.toggle('Selected', checked);
 	},
 	select: function(elem, selected) {
@@ -270,17 +261,11 @@ const Tables = {
 			elem = document.getElementById(elem);
 
 		elem.querySelectorAll("tr").forEach((row) => {
-			const checkNode = row.querySelector(".dijitCheckBox,input[type=checkbox]");
+			const checkNode = row.querySelector("input[type=checkbox]");
 			if (checkNode) {
-				const widget = dijit.getEnclosingWidget(checkNode);
+				checkNode.checked = selected;
 
-				if (widget) {
-					widget.attr("checked", selected);
-				} else {
-					checkNode.checked = selected;
-				}
-
-				this.onRowChecked(widget);
+				this.onRowChecked(checkNode);
 			}
 		});
 	},

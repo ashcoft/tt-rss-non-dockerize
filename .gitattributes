@@ -71,8 +71,6 @@ tests_integration/ export-ignore
 src/ export-ignore
 js/index.html export-ignore
 
-# Dojo sources used to rebuild the bundled dojo layer
-lib/dojo-src/ export-ignore
 
 # Translation template and helper (runtime uses the compiled .mo files)
 messages.pot export-ignore

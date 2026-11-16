@@ -39,7 +39,7 @@ class Note extends Plugin {
 			print \Controls\pluginhandler_tags($this, "setnote");
 
 			?>
-			<textarea dojoType='dijit.form.SimpleTextarea'
+			<textarea
 				style='font-size : 12px; width : 98%; height: 100px;'
 				name='note'><?= $note ?></textarea>
 			<?php

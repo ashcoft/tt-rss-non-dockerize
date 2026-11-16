@@ -23,5 +23,5 @@ jobs:
     - name: Run ShellCheck
       run: |
         # Project utility scripts (use of bash or compatible assumed)
-        find lib/dojo-src utils -type f -name '*.sh' -exec \
+        find utils -type f -name '*.sh' -exec \
           docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable --severity=warning --shell=bash {} +
