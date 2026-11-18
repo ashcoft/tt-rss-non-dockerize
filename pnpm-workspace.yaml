@@ -1,6 +1,9 @@
 packages:
   - '.'
 allowBuilds:
+  # postinstall only warns about stale generated model types and is a no-op in
+  # published packages (no src/); nothing to build, so deny it.
+  '@openrouter/sdk': false
   '@parcel/watcher': true
   esbuild: true
 overrides:
