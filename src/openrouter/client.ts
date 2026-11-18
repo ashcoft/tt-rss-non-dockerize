@@ -143,8 +143,9 @@ function toRequestError(err: unknown): OpenRouterRequestError {
   const detail = messageFromBody(rawBody);
 
   if (statusCode !== undefined) {
+    const suffix = detail ? `: ${detail}` : '';
     return new OpenRouterRequestError(
-      `OpenRouter request failed with HTTP ${statusCode}${detail ? `: ${detail}` : ''}`,
+      `OpenRouter request failed with HTTP ${statusCode}${suffix}`,
       { statusCode, body: typeof rawBody === 'string' ? rawBody : undefined, cause: err }
     );
   }
