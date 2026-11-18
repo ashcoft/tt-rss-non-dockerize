@@ -80,6 +80,30 @@ about the `"@semantic-release/npm>npm": "-"` override and blocks a postinstall
 - `OPML/export` is a GET that sets `Content-Disposition: attachment` and is in
   `csrf_ignore()`; navigate to it rather than fetching it.
 
+## OpenRouter integration
+
+`src/openrouter/` is server-side/CLI-only TypeScript that calls the OpenRouter
+API through the official `@openrouter/sdk` package. It must never be imported
+from `src/vue/`, which would ship `OPENROUTER_API_KEY` to the browser.
+
+```bash
+corepack pnpm run ask "What is tt-rss?"      # reads .env if present
+corepack pnpm run ask "hi" --model nvidia/nemotron-3-ultra-550b-a55b:free --json
+```
+
+Configuration comes from the environment: `OPENROUTER_API_KEY` (required),
+`OPENROUTER_MODEL` (defaults to the free Nemotron slug in `client.ts`) and
+`OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1`; set it to
+`https://eu.openrouter.ai/api/v1` for EU in-region routing). `.env` is
+gitignored — keep the key there, never in `config.php` or a committed file.
+
+Two behaviours of the SDK are easy to get wrong:
+
+- It retries connection errors by default for up to an hour. `client.ts` passes
+  its own bounded `DEFAULT_RETRY`; keep it bounded so callers fail fast.
+- Node runs these files directly, so relative imports need the explicit `.ts`
+  extension (`allowImportingTsExtensions` is on for that reason).
+
 ## Migration status
 
 `VITE_MIGRATION.md` is the source of truth for the migration. The Dojo
