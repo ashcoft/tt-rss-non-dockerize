@@ -18,7 +18,7 @@ import {
   askModel,
 } from '../../src/openrouter/client.ts';
 
-/** Start a stub OpenRouter endpoint. `handler` returns [status, body]. */
+/** Start a stub OpenRouter endpoint. `handler` returns [status, body] (or a promise of it). */
 function startStubServer(handler) {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
@@ -26,8 +26,8 @@ function startStubServer(handler) {
       req.on('data', (chunk) => {
         raw += chunk;
       });
-      req.on('end', () => {
-        const [status, body] = handler({ method: req.method, url: req.url, headers: req.headers, raw });
+      req.on('end', async () => {
+        const [status, body] = await handler({ method: req.method, url: req.url, headers: req.headers, raw });
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(typeof body === 'string' ? body : JSON.stringify(body));
       });
@@ -209,6 +209,68 @@ test('askModel rejects a response with no content', async () => {
       }
     );
   } finally {
+    await closeServer(server);
+  }
+});
+
+test('askModel applies the timeout even when a cancellation signal is passed', async () => {
+  // A review flagged that supplying a signal might disable the timeout. The
+  // pinned SDK restores it (hooks/signal-hooks.js, issue #1123), so both the
+  // timeout and the caller's signal must stay effective. Guard that here.
+  const { server, baseUrl } = await startStubServer(() => {
+    return new Promise((resolve) => setTimeout(() => resolve([200, COMPLETION]), 500));
+  });
+
+  try {
+    const started = Date.now();
+    await assert.rejects(
+      () =>
+        askModel('hi', {
+          apiKey: 'test-key',
+          baseUrl,
+          signal: new AbortController().signal,
+          timeoutMs: 100,
+          retries: { strategy: 'none' },
+        }),
+      (err) => {
+        assert.ok(err instanceof OpenRouterRequestError, `expected a request error, got ${err?.name}`);
+        assert.match(err.message, /timed out|timeout/i);
+        return true;
+      }
+    );
+    assert.ok(Date.now() - started < 500, 'the timeout must fire before the stub responds');
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test('askModel aborts promptly when the caller cancels', async () => {
+  const { server, baseUrl } = await startStubServer(() => {
+    return new Promise((resolve) => setTimeout(() => resolve([200, COMPLETION]), 2000));
+  });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 50);
+
+  try {
+    const started = Date.now();
+    await assert.rejects(
+      () =>
+        askModel('hi', {
+          apiKey: 'test-key',
+          baseUrl,
+          signal: controller.signal,
+          timeoutMs: 10_000,
+          retries: { strategy: 'none' },
+        }),
+      (err) => {
+        assert.ok(err instanceof OpenRouterRequestError, `expected a request error, got ${err?.name}`);
+        return true;
+      }
+    );
+    assert.ok(Date.now() - started < 1500, 'cancellation must abort before the stub responds');
+  } finally {
+    clearTimeout(timer);
     await closeServer(server);
   }
 });
