@@ -1,0 +1,14 @@
+inputSet:
+  name: Build_ashcoft_tt_rss_non_dockerize_1795136216781-pr-trigger-input-set
+  identifier: Build_ashcoft_tt_rss_non_dockerize_1795136216781prtriggerinputset
+  orgIdentifier: default
+  projectIdentifier: default_project
+  pipeline:
+    identifier: Build_ashcoft_tt_rss_non_dockerize_1795136216781
+    properties:
+      ci:
+        codebase:
+          build:
+            type: PR
+            spec:
+              number: <+trigger.prNumber>
