@@ -390,7 +390,9 @@ function colorPalette(string $imageFile, int $numColors, int $granularity = 5): 
 				$hsl = rgb2hsl(_color_unpack("#$p"));
 
 				if ($hsl[1] > 0.25 && $hsl[2] > 0.25 &&
-					!($hsl[0] >= 0 && $hsl[0] < 0.01 && $hsl[1] < 0.01) &&
+					// A saturation check ($hsl[1] < 0.01) used to guard this branch, but it can
+					// never be true once $hsl[1] > 0.25 has passed, so it is dropped here;
+					// behaviour is unchanged (PHPStan booleanAnd.alwaysFalse / smaller.alwaysFalse).
 					!($hsl[0] >= 0 && $hsl[0] < 0.01 && $hsl[2] > 0.99)) {
 
 					return _color_pack(hsl2rgb($hsl));
