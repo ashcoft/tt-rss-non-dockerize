@@ -20,60 +20,26 @@ pipeline:
           execution:
             steps:
               - step:
-                  identifier: prerequisite
-                  name: prerequisite
-                  spec:
-                    command: "export GOBIN=/home/harness/go/bin\n\t\tgo install github.com/jstemmer/go-junit-report/v2@latest\n\t\tmkdir /home/harness/go/src\n\t\t\n\t\techo cd to gopath\n\t\tcd /home/harness/go\n\t\tls\n\t\t\n\t\texport PATH=/home/harness/go/bin:$PATH\n\t\techo $PATH\n\t\t\n\t\t\n\t\t# GLIDE_VERSION=\"v0.13.3\"\n\t\tGLIDE_URL=\"https://github.com/Masterminds/glide/releases/download/v0.13.3/glide-v0.13.3-linux-386.zip\"\n\t\tTMP_DIR=\"/tmp/glide_tmp\"\n\t\t\n\t\t# Create a temporary directory\n\t\tmkdir -p \"$TMP_DIR\"\n\t\t\n\t\t# Download Glide binary\n\t\twget \"$GLIDE_URL\" -O \"$TMP_DIR/glide.zip\"\n\t\t\n\t\t# Extract the downloaded ZIP file\n\t\tunzip \"$TMP_DIR/glide.zip\" -d \"$TMP_DIR\"\n\t\t\n\t\t# Find Glide binary in extracted folder\n\t\t# GLIDE_BINARY=$(find \"$TMP_DIR\" -name \"glide*\" -type f -executable)\n\t\t# echo $GLIDE_BINARY\n\t\tGLIDE_BINARY=$TMP_DIR/linux-386/glide\n\t\t# Move Glide binary to go/bin directory\n\t\tif [ -n \"$GLIDE_BINARY\" ]; then\n\t\t\tmv \"$GLIDE_BINARY\" \"/home/harness/go/bin/\"\n\t\t\techo \"Glide binary moved to /home/harness/go/bin/\"\n\t\telse\n\t\t\techo \"Glide binary not found.\"\n\t\tfi\n\t\t\n\t\t# Clean up temporary directory\n\t\trm -rf \"$TMP_DIR\"\n\t\t\n\t\t\n\t\techo installed\n\t\t\n\t\t\n\t\tcd /harness\n\t\t\n\t\texport GO111MODULE=off\n\t\t\n\t\techo glide install\n\t\tglide install\n\t\t\n\t\texport GO111MODULE=off\n\t\tgo get\n\t\techo done go get\n\t\tgo build"
-                  timeout: ""
-                  type: Run
-              - step:
-                  identifier: gobuild
-                  name: go_build
-                  spec:
-                    command: "export GO111MODULE=off\t\t\n\t\tgo build\n\t\t"
-                  timeout: ""
-                  type: Run
-              - step:
-                  identifier: gotestcoverage
-                  name: go_test_coverage
-                  spec:
-                    command: "export GO111MODULE=off\n\t\tgo test -coverprofile=coverage.out ./..."
-                  timeout: ""
-                  type: Run
-              - step:
-                  identifier: gotestreport
-                  name: go_test_report
-                  spec:
-                    command: "export GOBIN=/home/harness/go/bin\n\t\texport PATH=/home/harness/go/bin:$PATH\n\t\tgo install github.com/jstemmer/go-junit-report/v2@latest\n\t\t\n\t\texport GO111MODULE=off\n\t\tgo test -v 2>&1 ./... | go-junit-report -set-exit-code > report.xml"
-                    reports:
-                      spec:
-                        paths:
-                          - /harness/report.xml
-                      type: JUnit
-                  timeout: ""
-                  type: Run
-              - step:
                   identifier: installdependencies
                   name: install dependencies
                   spec:
-                    command: npm install
-                  timeout: ""
-                  type: Run
+                    command: |-
+                      # pnpm is the package manager this repo locks with (pnpm-lock.yaml).
+                      command -v pnpm >/dev/null 2>&1 || npm install -g pnpm@9
+                      pnpm install --ignore-scripts
+                    timeout: ""
+                    type: Run
               - step:
                   identifier: build
                   name: build
                   spec:
-                    command: npm run build
-                  timeout: ""
-                  type: Run
-              - step:
-                  identifier: composerinstall
-                  name: composer_install
-                  spec:
-                    command: composer install
-                    runAsUser: "1000"
-                  timeout: ""
-                  type: Run
+                    # Builds the Vue bundle in dist/ with Vite.
+                    # PHP dependencies are vendored in the repo and validated by
+                    # the GitHub Actions php-code-quality workflow, so there is
+                    # no composer step here.
+                    command: pnpm run build
+                    timeout: ""
+                    type: Run
           platform:
             arch: Amd64
             os: Linux
