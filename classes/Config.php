@@ -389,15 +389,25 @@ class Config {
 	static function get_version_html() : string {
 		$version = self::get_version(false);
 
-		return sprintf("<span title=\"%s\n%s\n%s\">%s</span>",
-			date("Y-m-d H:i:s", ($version['timestamp'] ?? 0)),
-				$version['commit'] ?? '',
-				$version['branch'] ?? '',
-				$version['version']);
+		if (is_string($version))
+			return htmlspecialchars($version);
+
+		$title = array_filter([
+			empty($version['timestamp']) ? '' : date("Y-m-d H:i:s", (int) $version['timestamp']),
+			(string) ($version['commit'] ?? ''),
+			(string) ($version['branch'] ?? ''),
+		]);
+
+		if ($title)
+			return sprintf('<span title="%s">%s</span>',
+				htmlspecialchars(implode("\n", $title)),
+				htmlspecialchars((string) $version['version']));
+
+		return htmlspecialchars((string) $version['version']);
 	}
 
 	/**
-	 * @return array{branch: string, timestamp: int, version: string, commit: string, status: int}|array{version: string}|string
+	 * @return array{branch: string, timestamp: int, version: string, commit: string, status: int}|array{version: string, status: int}|string
 	 */
 	private function _get_version(bool $as_string = true): array|string {
 		$root_dir = self::get_self_dir();
@@ -411,28 +421,39 @@ class Config {
 					'status' => 0,
 				];
 				$this->version['version'] = sprintf('%s-%s', date('y.m', $this->version['timestamp']), getenv('CI_COMMIT_SHORT_SHA'));
-			} else if (PHP_OS === 'Darwin') {
-				$this->version = ['version' => 'UNKNOWN (Unsupported, Darwin)', 'status' => -1];
-			} else if (file_exists("$root_dir/version_static.txt")) {
-				$this->version = ['version' => trim(file_get_contents("$root_dir/version_static.txt")) . ' (Unsupported)', 'status' => -1];
-			} else if (ini_get("open_basedir")) {
-				$this->version = ['version' => 'UNKNOWN (Unsupported, open_basedir)', 'status' => -1];
 			} else if (is_dir("$root_dir/.git")) {
-				$this->version = self::get_version_from_git($root_dir);
+				$version = self::get_version_from_git($root_dir);
 
-				if ($this->version['status'] != 0) {
-					user_error('Unable to determine version: ' . $this->version['version'], E_USER_WARNING);
+				if ($version['status'] == 0) {
+					$this->version = $version;
+				} else {
+					user_error('Unable to determine version: ' . $version['version'], E_USER_WARNING);
 
-					$this->version = ['version' => 'UNKNOWN (Unsupported, Git error)', 'status' => -1];
-				} else if (!getenv('SCRIPT_ROOT') || !file_exists('/.dockerenv')) {
-					$this->version['version'] .= ' (Unsupported)';
+					$this->version = self::get_version_static($root_dir) ?? ['version' => 'UNKNOWN (Git error)', 'status' => -1];
 				}
 			} else {
-				$this->version = ['version' => 'UNKNOWN (Unsupported)', 'status' => -1];
+				$this->version = self::get_version_static($root_dir) ?? ['version' => 'UNKNOWN', 'status' => -1];
 			}
 		}
 
 		return $as_string ? $this->version['version'] : $this->version;
+	}
+
+	/**
+	 * Release tag written by the packaging step. Release tarballs ship without
+	 * .git, so this file is the only version source there.
+	 *
+	 * @return array{version: string, status: int}|null
+	 */
+	private static function get_version_static(string $dir): ?array {
+		$file = "$dir/version_static.txt";
+
+		if (!is_readable($file))
+			return null;
+
+		$version = trim((string) file_get_contents($file));
+
+		return $version !== '' ? ['version' => $version, 'status' => 0] : null;
 	}
 
 	/**
@@ -452,6 +473,8 @@ class Config {
 			"timestamp" => "0",
 		];
 
+		$tag = self::get_git_tag($dir);
+
 		$proc = proc_open('git --no-pager log --pretty="version-%ct-%h" --abbrev=8 -n1 HEAD',
 						$descriptorspec, $pipes, $dir);
 
@@ -466,7 +489,7 @@ class Config {
 
 			if ($check == "version") {
 
-				$rv["version"] = sprintf("%s-%s", date("y.m", (int)$timestamp), $commit);
+				$rv["version"] = $tag ?? sprintf("%s-%s", date("y.m", (int)$timestamp), $commit);
 				$rv["commit"] = $commit;
 				$rv["timestamp"] = $timestamp;
 
@@ -482,6 +505,21 @@ class Config {
 		}
 
 		return $rv;
+	}
+
+	/** Tag pointing exactly at HEAD, or null when HEAD is not a tagged release. */
+	private static function get_git_tag(string $dir): ?string {
+		$proc = proc_open('git --no-pager describe --tags --exact-match HEAD',
+			[1 => ["pipe", "w"], 2 => ["pipe", "w"]], $pipes, $dir);
+
+		if (!is_resource($proc))
+			return null;
+
+		$tag = trim(stream_get_contents($pipes[1]));
+		stream_get_contents($pipes[2]);
+		proc_close($proc);
+
+		return $tag !== '' ? $tag : null;
 	}
 
 	static function get_migrations() : Db_Migrations {
