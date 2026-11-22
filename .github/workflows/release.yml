@@ -253,6 +253,8 @@ jobs:
 
           rm -f tt-rss.tar.gz tt-rss.zip
 
+          # Write archives outside the tree being scanned: creating them in "."
+          # makes tar exit with "file changed as we read it".
           tar --exclude='.git' \
               --exclude='.github' \
               --exclude='node_modules' \
@@ -263,9 +265,9 @@ jobs:
               --exclude='package-lock.json' \
               --exclude='pnpm-lock.yaml' \
               --exclude='dist' \
-              -czf tt-rss.tar.gz .
+              -czf /tmp/tt-rss.tar.gz . && mv /tmp/tt-rss.tar.gz .
 
-          zip -r tt-rss.zip . \
+          zip -r /tmp/tt-rss.zip . \
               -x '.git/*' \
               -x '.github/*' \
               -x 'node_modules/*' \
@@ -277,7 +279,7 @@ jobs:
               -x 'pnpm-lock.yaml' \
               -x 'dist/*' \
               -x '*.tar.gz' \
-              -x '*.zip'
+              -x '*.zip' && mv /tmp/tt-rss.zip .
 
           gh release upload "$TAG" tt-rss.tar.gz --clobber
           gh release upload "$TAG" tt-rss.zip --clobber
