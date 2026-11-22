@@ -389,16 +389,18 @@ class Config {
 	static function get_version_html() : string {
 		$version = self::get_version(false);
 
-		if (is_string($version))
+		if (is_string($version) === true)
 			return htmlspecialchars($version);
 
+		$timestamp = (int) ($version['timestamp'] ?? 0);
+
 		$title = array_filter([
-			empty($version['timestamp']) ? '' : date("Y-m-d H:i:s", (int) $version['timestamp']),
+			$timestamp === 0 ? '' : date("Y-m-d H:i:s", $timestamp),
 			(string) ($version['commit'] ?? ''),
 			(string) ($version['branch'] ?? ''),
 		]);
 
-		if ($title)
+		if ($title !== [])
 			return sprintf('<span title="%s">%s</span>',
 				htmlspecialchars(implode("\n", $title)),
 				htmlspecialchars((string) $version['version']));
@@ -426,7 +428,7 @@ class Config {
 			} else if (is_dir("$root_dir/.git")) {
 				$version = self::get_version_from_git($root_dir);
 
-				if ($version['status'] == 0) {
+				if ($version['status'] === 0) {
 					$this->version = $version;
 				} else {
 					user_error('Unable to determine version: ' . $version['version'], E_USER_WARNING);
@@ -450,7 +452,7 @@ class Config {
 	private static function get_version_static(string $dir): ?array {
 		$file = "$dir/version_static.txt";
 
-		if (!is_readable($file))
+		if (is_readable($file) === false)
 			return null;
 
 		$version = trim((string) file_get_contents($file));
@@ -514,7 +516,7 @@ class Config {
 		$proc = proc_open('git --no-pager describe --tags --exact-match HEAD',
 			[1 => ["pipe", "w"], 2 => ["pipe", "w"]], $pipes, $dir);
 
-		if (!is_resource($proc))
+		if (is_resource($proc) === false)
 			return null;
 
 		$tag = trim(stream_get_contents($pipes[1]));

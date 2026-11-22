@@ -318,10 +318,10 @@ class RPC extends Handler_Protected {
 	function checkforupdates(): void {
 		$rv = ["changeset" => [], "plugins" => []];
 
-		if (Config::get(Config::CHECK_FOR_UPDATES) && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN) {
+		if (Config::get(Config::CHECK_FOR_UPDATES) === true && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN) {
 			$release = self::_get_latest_release();
 
-			if ($release && self::_is_newer_release($release['tag_name'], (string) Config::get_version())) {
+			if ($release !== null && self::_is_newer_release($release['tag_name'], (string) Config::get_version())) {
 				$rv['changeset'] = [
 					'id' => $release['tag_name'],
 					'timestamp' => (int) strtotime($release['published_at']),
@@ -348,14 +348,14 @@ class RPC extends Handler_Protected {
 		$release = null;
 		$cached = $cache->get('latest_release.json');
 
-		if ($cached) {
+		if ($cached !== null) {
 			$mtime = $cache->get_mtime('latest_release.json');
 
 			if ($mtime !== false && $mtime > time() - self::RELEASE_CHECK_TTL)
 				$release = json_decode($cached, true);
 		}
 
-		if (!is_array($release)) {
+		if (is_array($release) === false) {
 			$content = UrlHelper::fetch([
 				'url' => self::RELEASES_LATEST_URL,
 				'useragent' => Config::get_user_agent(),
@@ -363,26 +363,26 @@ class RPC extends Handler_Protected {
 				'timeout' => 10,
 			]);
 
-			$release = $content ? json_decode($content, true) : null;
+			$release = $content !== false ? json_decode($content, true) : null;
 
-			if (is_array($release) && is_string($release['tag_name'] ?? null))
+			if (is_array($release) === true && is_string($release['tag_name'] ?? null) === true)
 				$cache->put('latest_release.json', json_encode($release));
 		}
 
-		if (!is_array($release))
+		if (is_array($release) === false)
 			return null;
 
 		$tag = $release['tag_name'] ?? null;
 		$html_url = $release['html_url'] ?? null;
 		$published_at = $release['published_at'] ?? null;
 
-		if (!is_string($tag) || $tag === '')
+		if (is_string($tag) === false || $tag === '')
 			return null;
 
 		return [
 			'tag_name' => $tag,
-			'html_url' => is_string($html_url) ? $html_url : '',
-			'published_at' => is_string($published_at) ? $published_at : '',
+			'html_url' => is_string($html_url) === true ? $html_url : '',
+			'published_at' => is_string($published_at) === true ? $published_at : '',
 		];
 	}
 
@@ -393,7 +393,7 @@ class RPC extends Handler_Protected {
 		$latest = ltrim(trim($latest), 'vV');
 		$current = ltrim(trim($current), 'vV');
 
-		if (!preg_match('/^\d+(\.\d+)*$/', $latest) || !preg_match('/^\d+(\.\d+)*$/', $current))
+		if (preg_match('/^\d+(\.\d+)*$/', $latest) !== 1 || preg_match('/^\d+(\.\d+)*$/', $current) !== 1)
 			return false;
 
 		return version_compare($latest, $current, '>');
