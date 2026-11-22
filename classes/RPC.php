@@ -321,7 +321,7 @@ class RPC extends Handler_Protected {
 		if (Config::get(Config::CHECK_FOR_UPDATES) === true && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN) {
 			$release = self::_get_latest_release();
 
-			if ($release !== null && self::_is_newer_release($release['tag_name'], (string) Config::get_version())) {
+			if ($release !== null && self::_is_newer_release($release['tag_name'], (string) Config::get_version()) === true) {
 				$rv['changeset'] = [
 					'id' => $release['tag_name'],
 					'timestamp' => (int) strtotime($release['published_at']),
