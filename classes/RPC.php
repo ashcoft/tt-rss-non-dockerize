@@ -324,8 +324,8 @@ class RPC extends Handler_Protected {
 			if ($release && self::_is_newer_release($release['tag_name'], (string) Config::get_version())) {
 				$rv['changeset'] = [
 					'id' => $release['tag_name'],
-					'timestamp' => strtotime($release['published_at'] ?? ''),
-					'compare_url' => $release['html_url'] ?? '',
+					'timestamp' => (int) strtotime($release['published_at']),
+					'compare_url' => $release['html_url'],
 				];
 			}
 

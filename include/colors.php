@@ -390,7 +390,6 @@ function colorPalette(string $imageFile, int $numColors, int $granularity = 5): 
 				$hsl = rgb2hsl(_color_unpack("#$p"));
 
 				if ($hsl[1] > 0.25 && $hsl[2] > 0.25 &&
-					!($hsl[0] >= 0 && $hsl[0] < 0.01 && $hsl[1] < 0.01) &&
 					!($hsl[0] >= 0 && $hsl[0] < 0.01 && $hsl[2] > 0.99)) {
 
 					return _color_pack(hsl2rgb($hsl));
