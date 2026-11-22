@@ -22,3 +22,4 @@ Thumbs.db
 /.phpstan-tmp
 /.rector-tmp
 /.tools/
+/version_static.txt
