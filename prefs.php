@@ -183,7 +183,8 @@
         </div>
 		<div id="footer" dojoType="dijit.layout.ContentPane" region="bottom">
 			<a class="text-muted" target="_blank" href="https://github.com/tt-rss/tt-rss">Tiny Tiny RSS</a>
-				<span>v<?= Config::get_version_html() ?></span>
+				<span>v<a class="text-muted" target="_blank" rel="noopener noreferrer"
+					href="https://github.com/ashcoft/tt-rss-non-dockerize/releases"><?= Config::get_version_html() ?></a></span>
     </div>
 </div>
 

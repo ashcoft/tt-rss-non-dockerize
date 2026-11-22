@@ -1,6 +1,9 @@
 <?php
 class RPC extends Handler_Protected {
 
+	private const RELEASES_LATEST_URL = 'https://api.github.com/repos/ashcoft/tt-rss-non-dockerize/releases/latest';
+	private const RELEASE_CHECK_TTL = 3600;
+
 	/*function csrf_ignore(string $method): bool {
 		$csrf_ignored = array("completelabels");
 
@@ -315,31 +318,85 @@ class RPC extends Handler_Protected {
 	function checkforupdates(): void {
 		$rv = ["changeset" => [], "plugins" => []];
 
-		$version = Config::get_version(false);
+		if (Config::get(Config::CHECK_FOR_UPDATES) && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN) {
+			$release = self::_get_latest_release();
 
-		$git_timestamp = $version["timestamp"] ?? false;
-		$git_commit = $version["commit"] ?? false;
-
-		if (Config::get(Config::CHECK_FOR_UPDATES) && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN && $git_timestamp) {
-			$content = @UrlHelper::fetch(['url' => 'https://tt-rss.org/tt-rss/version.json']);
-
-			if ($content) {
-				$content = json_decode($content, true);
-
-				if ($content && isset($content["changeset"])) {
-					if ($git_timestamp < (int)$content['changeset']['timestamp'] && $git_commit != $content['changeset']['id']) {
-						$rv['changeset'] = [
-							...$content['changeset'],
-							'compare_url' => "https://github.com/tt-rss/tt-rss/compare/{$git_commit}...{$content['changeset']['id']}",
-						];
-					}
-				}
+			if ($release && self::_is_newer_release($release['tag_name'], (string) Config::get_version())) {
+				$rv['changeset'] = [
+					'id' => $release['tag_name'],
+					'timestamp' => strtotime($release['published_at'] ?? ''),
+					'compare_url' => $release['html_url'] ?? '',
+				];
 			}
 
 			$rv["plugins"] = Pref_Prefs::_get_updated_plugins();
 		}
 
 		print json_encode($rv);
+	}
+
+	/**
+	 * Latest published release of this fork, cached for an hour so that several
+	 * admins polling do not run into the unauthenticated GitHub API rate limit.
+	 *
+	 * @return array{tag_name: string, html_url: string, published_at: string}|null
+	 */
+	private static function _get_latest_release(): ?array {
+		$cache = new Cache_Local();
+		$cache->set_dir('version');
+
+		$release = null;
+		$cached = $cache->get('latest_release.json');
+
+		if ($cached) {
+			$mtime = $cache->get_mtime('latest_release.json');
+
+			if ($mtime !== false && $mtime > time() - self::RELEASE_CHECK_TTL)
+				$release = json_decode($cached, true);
+		}
+
+		if (!is_array($release)) {
+			$content = UrlHelper::fetch([
+				'url' => self::RELEASES_LATEST_URL,
+				'useragent' => Config::get_user_agent(),
+				'http_accept' => 'application/vnd.github+json',
+				'timeout' => 10,
+			]);
+
+			$release = $content ? json_decode($content, true) : null;
+
+			if (is_array($release) && is_string($release['tag_name'] ?? null))
+				$cache->put('latest_release.json', json_encode($release));
+		}
+
+		if (!is_array($release))
+			return null;
+
+		$tag = $release['tag_name'] ?? null;
+		$html_url = $release['html_url'] ?? null;
+		$published_at = $release['published_at'] ?? null;
+
+		if (!is_string($tag) || $tag === '')
+			return null;
+
+		return [
+			'tag_name' => $tag,
+			'html_url' => is_string($html_url) ? $html_url : '',
+			'published_at' => is_string($published_at) ? $published_at : '',
+		];
+	}
+
+	/**
+	 * Only tagged releases are comparable; commit-based builds are not "behind".
+	 */
+	private static function _is_newer_release(string $latest, string $current): bool {
+		$latest = ltrim(trim($latest), 'vV');
+		$current = ltrim(trim($current), 'vV');
+
+		if (!preg_match('/^\d+(\.\d+)*$/', $latest) || !preg_match('/^\d+(\.\d+)*$/', $current))
+			return false;
+
+		return version_compare($latest, $current, '>');
 	}
 
 	/**
