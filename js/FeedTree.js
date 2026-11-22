@@ -216,6 +216,10 @@ define(["dojo/_base/declare", "dojo/dom-construct", "dojo/_base/array", "dojo/co
 			}
 		},
 		getTooltip: function (item) {
+			// The ForestStoreModel root is synthetic and does not belong to the store.
+			if (!this.model.store.isItem(item))
+				return '';
+
 			// ItemFileWriteStore keeps every attribute in an array, so read through
 			// the store to get the values the backend sent.
 			return [this.model.store.getValue(item, 'updated'),
@@ -237,7 +241,10 @@ define(["dojo/_base/declare", "dojo/dom-construct", "dojo/_base/array", "dojo/co
 			else
 				rc += " Is_Feed";
 
-			if (!is_cat && this.model.store.getValue(item, 'error')) rc += ' Error';
+			// The ForestStoreModel root is synthetic and does not belong to the store.
+			const error = this.model.store.isItem(item) ? this.model.store.getValue(item, 'error') : '';
+
+			if (!is_cat && error) rc += ' Error';
 			if (item.unread > 0) rc += " Unread";
 			if (item.auxcounter > 0) rc += " Has_Aux";
 			if (item.markedcounter > 0) rc += " Has_Marked";

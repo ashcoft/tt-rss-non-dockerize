@@ -421,6 +421,8 @@ class Config {
 					'status' => 0,
 				];
 				$this->version['version'] = sprintf('%s-%s', date('y.m', $this->version['timestamp']), getenv('CI_COMMIT_SHORT_SHA'));
+			} else if (ini_get("open_basedir")) {
+				$this->version = self::get_version_static($root_dir) ?? ['version' => 'UNKNOWN (open_basedir)', 'status' => -1];
 			} else if (is_dir("$root_dir/.git")) {
 				$version = self::get_version_from_git($root_dir);
 
