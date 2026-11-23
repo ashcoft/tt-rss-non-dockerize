@@ -119,6 +119,9 @@ jobs:
             sudo apt-get update && sudo apt-get install -y zip
           fi
 
+      - name: Stamp development version
+        run: printf 'tt-rss-dev-%s\n' "${GITHUB_SHA:0:8}" > version_static.txt
+
       - name: Create tt-rss.tar.gz
         run: |
           tar --exclude='.git' \
@@ -198,6 +201,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags are needed to stamp version_static.txt with the release tag.
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v4.0.0
@@ -232,14 +238,51 @@ jobs:
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
 
-      - name: Upload tt-rss artifacts to release
+      - name: Stamp release version and upload artifacts
         run: |
           TAG=$(git describe --tags --abbrev=0)
           echo "Uploading release assets for: $TAG"
-          if [ -f tt-rss.tar.gz ]; then
-            gh release upload "$TAG" tt-rss.tar.gz --clobber
-            gh release upload "$TAG" tt-rss.zip --clobber
+
+          # Release packages ship without .git, so bake the tag into the archive.
+          # Config::get_version() reads version_static.txt when git metadata is unavailable.
+          printf '%s\n' "$TAG" > version_static.txt
+
+          if ! command -v zip >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y zip
           fi
+
+          rm -f tt-rss.tar.gz tt-rss.zip
+
+          # Write archives outside the tree being scanned: creating them in "."
+          # makes tar exit with "file changed as we read it".
+          tar --exclude='.git' \
+              --exclude='.github' \
+              --exclude='node_modules' \
+              --exclude='*.log' \
+              --exclude='*.tmp' \
+              --exclude='*.ts' \
+              --exclude='*.less' \
+              --exclude='package-lock.json' \
+              --exclude='pnpm-lock.yaml' \
+              --exclude='dist' \
+              -czf /tmp/tt-rss.tar.gz . && mv /tmp/tt-rss.tar.gz .
+
+          zip -r /tmp/tt-rss.zip . \
+              -x '.git/*' \
+              -x '.github/*' \
+              -x 'node_modules/*' \
+              -x '*.log' \
+              -x '*.tmp' \
+              -x '*.ts' \
+              -x '*.less' \
+              -x 'package-lock.json' \
+              -x 'pnpm-lock.yaml' \
+              -x 'dist/*' \
+              -x '*.tar.gz' \
+              -x '*.zip' && mv /tmp/tt-rss.zip .
+
+          gh release upload "$TAG" tt-rss.tar.gz --clobber
+          gh release upload "$TAG" tt-rss.zip --clobber
           echo "=== Uploaded ==="
           gh release view "$TAG" --json assets
         env:

@@ -133,7 +133,12 @@ define(["dojo/_base/declare", "dojo/dom-construct", "lib/CheckBoxTree", "dojo/_b
 			this.tree.model.store.save();
 		},
 		getRowClass: function (item /*, opened */) {
-			let rc = (!item.error || item.error === '') ? "dijitTreeRow" :
+			// ItemFileWriteStore keeps every attribute in an array, so item.error
+			// is [""] for a feed without errors. Read through the store to compare
+			// the value the backend sent instead of the wrapper.
+			const error = this.model.store.getValue(item, 'error');
+
+			let rc = (!error) ? "dijitTreeRow" :
 				"dijitTreeRow Error";
 
 			if (item.updates_disabled > 0) rc += " UpdatesDisabled";
