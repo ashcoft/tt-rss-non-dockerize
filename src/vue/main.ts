@@ -16,10 +16,43 @@ import { api } from './api/client';
 // Create Pinia state management
 const pinia = createPinia();
 
-// Create Vuetify instance with default theme
+// Feedly is this fork's default theme. The light palette follows the Feedly
+// theme's base colours; the night variant mirrors feedly_night.css.
 const vuetify = createVuetify({
   theme: {
-    defaultTheme: 'light',
+    defaultTheme: 'feedly',
+    themes: {
+      feedly: {
+        dark: false,
+        colors: {
+          background: '#f4f4f4',
+          surface: '#ffffff',
+          primary: '#3399cc',
+          secondary: '#66bb55',
+          error: '#dd4455',
+          info: '#3399cc',
+          success: '#66bb55',
+          warning: '#ee8844',
+          'on-background': '#333333',
+          'on-surface': '#222222',
+        },
+      },
+      feedlyNight: {
+        dark: true,
+        colors: {
+          background: '#303030',
+          surface: '#3a3a3a',
+          primary: '#3399cc',
+          secondary: '#66bb55',
+          error: '#dd4455',
+          info: '#3399cc',
+          success: '#66bb55',
+          warning: '#ee8844',
+          'on-background': '#dddddd',
+          'on-surface': '#eeeeee',
+        },
+      },
+    },
   },
 });
 

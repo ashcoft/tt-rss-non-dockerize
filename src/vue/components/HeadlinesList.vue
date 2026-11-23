@@ -82,7 +82,17 @@
               @click.stop
               @update:model-value="(checked: boolean) => toggleSelected(headline.id, checked)"
             />
-            <!-- Read state is shown as an indicator, as in the legacy row. -->
+            <!-- Star and read state sit in the left icon strip, as in main. -->
+            <v-btn
+              icon
+              variant="text"
+              size="x-small"
+              :color="headline.is_marked ? 'amber' : 'grey'"
+              :title="headline.is_marked ? 'Unstar' : 'Star'"
+              @click.stop="emit('action', headline, 'toggle_star')"
+            >
+              <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+            </v-btn>
             <v-btn
               :icon="headline.is_read ? 'mdi-circle-outline' : 'mdi-circle'"
               :color="headline.is_read ? 'grey' : 'primary'"
@@ -93,90 +103,107 @@
             />
           </template>
 
-        <v-list-item-title class="headline-title">
-          {{ headline.title }}
-          <!-- Excerpt, as in the legacy row's title preview (an HTML fragment). -->
-          <span
-            v-if="headline.excerpt"
-            class="headline-preview"
-            v-html="sanitize(headline.excerpt)"
-          ></span>
-        </v-list-item-title>
+          <v-list-item-title class="headline-title">
+            {{ headline.title }}
+            <span v-if="headline.author" class="headline-author">{{ headline.author }}</span>
+            <!-- Excerpt, as in the legacy row's title preview (an HTML fragment). -->
+            <span
+              v-if="headline.excerpt"
+              class="headline-preview"
+              v-html="sanitize(headline.excerpt)"
+            ></span>
+          </v-list-item-title>
 
-        <v-list-item-subtitle class="headline-meta">
-          <span v-if="headline.author" class="headline-author">
-            {{ headline.author }}
-          </span>
-          <span v-if="headline.updated" class="headline-date">
-            {{ formatDate(headline.updated) }}
-          </span>
-          <!-- Score indicator, matching the legacy icon-score. -->
-          <v-icon
-            v-if="headline.score !== 0"
-            :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
-            :color="headline.score > 0 ? 'green' : 'red'"
-            size="14"
-            :title="`Score: ${headline.score}`"
-          />
-        </v-list-item-subtitle>
-
-        <!-- Combined mode: the article body is shown inline in the list. -->
-        <div v-if="combined" class="headline-content">
-          <a
-            class="headline-feed-label"
-            :style="{ backgroundColor: headline.feed_bg_color || undefined }"
-            :href="headline.link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ headline.feed_title }}
-          </a>
-          <img
-            v-if="headline.image_preview"
-            class="headline-image-preview"
-            :src="headline.image_preview"
-            alt=""
-            loading="lazy"
-          />
-          <div v-html="sanitize(headline.content)"></div>
-        </div>
-
-        <template #append>
-          <div class="headline-actions">
-            <v-btn
-              icon
-              variant="text"
-              size="small"
-              :color="headline.is_marked ? 'amber' : 'grey'"
-              :title="headline.is_marked ? 'Unstar' : 'Star'"
-              @click.stop="emit('action', headline, 'toggle_star')"
-            >
-              <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
-            </v-btn>
-
-                        <v-btn
-              icon
-              variant="text"
-              size="small"
-              :color="headline.is_published ? 'blue' : 'grey'"
-              :title="headline.is_published ? 'Unpublish' : 'Publish'"
-              @click.stop="emit('action', headline, 'toggle_publish')"
-            >
-              <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
-            </v-btn>
-
-            <v-btn
-              icon
-              variant="text"
-              size="small"
-              color="grey"
-              @click.stop="emit('action', headline, 'label')"
+          <!-- Legacy row metadata: tags with the (+) label action, comments link. -->
+          <div class="headline-tags">
+            <v-icon size="14">mdi-tag-outline</v-icon>
+            <template v-if="headline.tags.length > 0">
+              <v-chip
+                v-for="tag in headline.tags"
+                :key="tag"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ tag }}
+              </v-chip>
+            </template>
+            <span v-else class="headline-no-tags">no tags</span>
+            <a
+              href="#"
+              class="headline-label-add"
               title="Assign labels"
-            >
-              <v-icon>mdi-label</v-icon>
-            </v-btn>
+              @click.prevent.stop="emit('action', headline, 'label')"
+            >(+)</a>
+            <a
+              v-if="headline.comments_link"
+              class="headline-comments-link"
+              :href="headline.comments_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click.stop
+            >(comments)</a>
           </div>
-        </template>
+
+          <!-- Combined mode: the article body is shown inline in the list. -->
+          <div v-if="combined" class="headline-content">
+            <img
+              v-if="headline.image_preview"
+              class="headline-image-preview"
+              :src="headline.image_preview"
+              alt=""
+              loading="lazy"
+            />
+            <div v-html="sanitize(headline.content)"></div>
+          </div>
+
+          <template #append>
+            <div class="headline-side">
+              <div class="headline-side-meta">
+                <a
+                  class="headline-feed-label"
+                  :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+                  :href="headline.link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ headline.feed_title }}
+                </a>
+                <span v-if="headline.updated" class="headline-date">
+                  {{ formatDate(headline.updated) }}
+                </span>
+                <!-- Score indicator, matching the legacy icon-score. -->
+                <v-icon
+                  v-if="headline.score !== 0"
+                  :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
+                  :color="headline.score > 0 ? 'green' : 'red'"
+                  size="14"
+                  :title="`Score: ${headline.score}`"
+                />
+              </div>
+              <div class="headline-actions">
+                <v-btn
+                  icon
+                  variant="text"
+                  size="small"
+                  :color="headline.is_published ? 'blue' : 'grey'"
+                  :title="headline.is_published ? 'Unpublish' : 'Publish'"
+                  @click.stop="emit('action', headline, 'toggle_publish')"
+                >
+                  <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  variant="text"
+                  size="small"
+                  color="grey"
+                  @click.stop="emit('action', headline, 'label')"
+                  title="Assign labels"
+                >
+                  <v-icon>mdi-label</v-icon>
+                </v-btn>
+              </div>
+            </div>
+          </template>
       </v-list-item>
         </v-list>
       </div>
@@ -308,36 +335,92 @@ const sanitize = (html: string): string =>
 }
 
 .headlines-list-content {
-  padding: 0;
+  background: transparent;
+  padding: 8px 24px;
+}
+
+/* Feedly renders each article as a white card on the page background. */
+.headlines-list-content :deep(.v-list-item) {
+  margin: 16px 0;
+  padding: 20px 24px;
+  border-radius: 8px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.headlines-list-content :deep(.v-list-item__overlay),
+.headlines-list-content :deep(.v-list-item__underlay) {
+  display: none;
 }
 
 .headline-read {
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
-/* Keyboard cursor highlight; matches the legacy .hl.active treatment. */
+/* Keyboard cursor highlight: a ring instead of a tinted row. */
 .headline-active {
-  background: rgba(37, 122, 167, 0.12);
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.35);
 }
 
 .headline-title {
-  font-weight: 500;
+  font-size: 1.15rem;
+  font-weight: 600;
   white-space: normal;
   line-height: 1.3;
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .headline-preview {
   display: block;
+  margin-top: 0.25rem;
   font-weight: 400;
   font-size: 0.8125rem;
-  color: grey;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
-.headline-meta {
+.headline-author {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #666;
+}
+
+.headline-tags {
   display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.headline-no-tags {
+  color: rgba(var(--v-theme-on-surface), 0.4);
+}
+
+.headline-label-add,
+.headline-comments-link {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+.headline-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.headline-side-meta {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: grey;
+  color: #666;
+}
+
+.headline-date {
+  white-space: nowrap;
 }
 
 .headline-actions {
@@ -368,7 +451,6 @@ const sanitize = (html: string): string =>
 .headline-feed-label {
   display: inline-block;
   padding: 0 0.4rem;
-  margin-bottom: 0.35rem;
   border-radius: 3px;
   font-size: 0.75rem;
   color: inherit;
@@ -380,16 +462,19 @@ const sanitize = (html: string): string =>
 .headlines-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
-  gap: 8px;
-  padding: 8px;
+  gap: 16px;
+  padding: 16px 24px;
+}
+
+.headlines-grid :deep(.v-list-item) {
+  margin: 0;
 }
 
 .bulk-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid #eee;
+  padding: 0.25rem 24px;
 }
 
 .bulk-select-all {

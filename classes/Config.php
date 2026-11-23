@@ -313,8 +313,8 @@ class Config {
 		Config::SCHEDULE_EXPIRE_ERROR_LOG => ["@hourly", 			Config::T_STRING],
 		Config::SCHEDULE_EXPIRE_LOCK_FILES => ["@hourly", 			Config::T_STRING],
 		Config::SCHEDULE_SEND_HEADLINES_DIGESTS => ["@hourly", 	Config::T_STRING],
-		Config::DEFAULT_LIGHT_THEME => [ "light.css",     			Config::T_STRING],
-		Config::DEFAULT_DARK_THEME => [ "night.css",     			Config::T_STRING],
+		Config::DEFAULT_LIGHT_THEME => [ "feedly/dist/feedly.css", Config::T_STRING],
+		Config::DEFAULT_DARK_THEME => [ "feedly/dist/feedly_night.css", Config::T_STRING],
 	];
 
 	private static ?Config $instance = null;

@@ -4,7 +4,7 @@
       v-model="searchQuery"
       placeholder="Search feeds..."
       prepend-inner-icon="mdi-magnify"
-      variant="outlined"
+      variant="underlined"
       density="compact"
       hide-details
       class="search-input"
@@ -16,7 +16,7 @@
         <template #activator="{ props }">
           <v-list-item v-bind="props" title="Special">
             <template #prepend>
-              <v-icon>mdi-star</v-icon>
+              <v-icon>{{ groupIcon('special') }}</v-icon>
             </template>
           </v-list-item>
         </template>
@@ -95,7 +95,7 @@
             @click="handleSelect('cat-' + category.id)"
           >
             <template #prepend>
-              <v-icon>mdi-folder</v-icon>
+              <v-icon>{{ groupIcon('cat-' + category.id) }}</v-icon>
             </template>
             <template #append>
               <v-chip
@@ -189,7 +189,7 @@
         <template #activator="{ props }">
           <v-list-item v-bind="props" title="Uncategorized">
             <template #prepend>
-              <v-icon>mdi-rss</v-icon>
+              <v-icon>{{ groupIcon('uncategorized') }}</v-icon>
             </template>
             <template #append>
               <v-chip
@@ -354,6 +354,10 @@ const visible = (feed: Feed): boolean => {
   return (feed.unread ?? 0) > 0 || feed.id === props.activeFeedId;
 };
 
+/** +/- toggle glyph for an expandable group, matching the legacy tree. */
+const groupIcon = (value: string): string =>
+  openedGroups.value.includes(value) ? 'mdi-minus' : 'mdi-plus';
+
 /** Unread articles across all uncategorized feeds, shown on the group row. */
 const uncategorizedUnread = computed(() =>
   props.feeds.filter(feed => !feed.cat_id).reduce((sum, feed) => sum + (feed.unread ?? 0), 0)
@@ -416,12 +420,36 @@ const handleSelect = (index: string) => {
 }
 
 .search-input {
+  flex: 0 0 auto;
   padding: 0.5rem;
 }
 
 .feed-list {
   flex: 1;
   overflow-y: auto;
+  background: transparent;
+}
+
+.feed-list :deep(.v-list-item--active) {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgb(var(--v-theme-on-background));
+}
+
+/* The +/- prepend glyph replaces Vuetify's chevron, as in the legacy tree. */
+.feed-list :deep(.v-list-group__header > .v-list-item__append > .v-icon) {
+  display: none;
+}
+
+/* Row actions appear on hover, like the legacy tree icons. */
+.feed-list :deep(.v-btn) {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.feed-list :deep(.v-list-item:hover .v-btn),
+.feed-list :deep(.v-list-item:focus-within .v-btn),
+.feed-list :deep(.v-list-item--active .v-btn) {
+  opacity: 1;
 }
 
 .label-indicator {

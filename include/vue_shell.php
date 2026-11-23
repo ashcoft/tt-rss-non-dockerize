@@ -111,7 +111,7 @@ if ($authenticated === true) {
 	</style>
 
 	<noscript>
-		<?= stylesheet_tag("themes/light.css") ?>
+		<?= stylesheet_tag(get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), "themes/light.css")) ?>
 		<p style="margin : 16px">
 			<?= __('Javascript is disabled. Please enable it.') ?>
 		</p>

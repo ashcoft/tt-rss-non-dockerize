@@ -72,7 +72,7 @@ test.describe('Vue front-end', () => {
 
   test('logs in and shows the three-pane shell', async ({ page }) => {
     await login(page);
-    await expect(page.getByText('Tiny Tiny RSS')).toBeVisible();
+    await expect(page.locator('.feed-list')).toBeVisible();
     await expect(page.getByPlaceholder('Search feeds...')).toBeVisible();
     await expect(page.getByPlaceholder('Search articles...')).toBeVisible();
   });
@@ -104,7 +104,8 @@ test.describe('Vue front-end', () => {
 
   test('opens the keyboard-shortcuts help', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Keyboard shortcuts' }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
     // The dialog title and the help content both mention "Keyboard shortcuts".
     await expect(page.getByRole('dialog').getByText('Keyboard shortcuts').first()).toBeVisible();
@@ -474,10 +475,11 @@ test.describe('Vue front-end', () => {
   test('toggles the light/dark theme', async ({ page }) => {
     await login(page);
     const app = page.locator('.v-application');
-    await expect(app).toHaveClass(/v-theme--light/);
+    await expect(app).toHaveClass(/v-theme--feedly/);
 
-    await page.getByRole('button', { name: 'Toggle light/dark theme' }).click();
-    await expect(app).toHaveClass(/v-theme--dark/);
+    await page.locator('.toolbar-right button').last().click();
+    await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle light/dark theme' }).first().click();
+    await expect(app).toHaveClass(/v-theme--feedlyNight/);
   });
 
   test('applies the grid view in combined mode', async ({ page }) => {

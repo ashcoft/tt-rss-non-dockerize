@@ -67,7 +67,7 @@
         v-if="searchLanguages.length > 1"
         v-model="searchLanguage"
         :items="searchLanguages"
-        label="Language"
+        aria-label="Language"
         density="compact"
         variant="outlined"
         hide-details
@@ -95,7 +95,7 @@
       <v-select
         v-model="viewMode"
         :items="viewModeOptions"
-        label="Show"
+        aria-label="Show"
         density="compact"
         variant="outlined"
         hide-details
@@ -105,8 +105,8 @@
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props">
-            Sort: {{ sortLabel }}
+          <v-btn v-bind="props" title="Order by">
+            {{ sortLabel }}
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
         </template>
@@ -220,7 +220,11 @@ const actionOptions = [
   { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' },
   { title: 'Toggle hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' },
   { title: 'Toggle combined mode', value: 'toggleCombinedMode', icon: 'mdi-view-agenda-outline' },
-  { title: 'Keyboard shortcuts', value: 'hotkeyHelp', icon: 'mdi-keyboard' }
+  { title: 'Manage feeds', value: 'manageFeeds', icon: 'mdi-plus-box' },
+  { title: 'Preferences', value: 'preferences', icon: 'mdi-cog' },
+  { title: 'Keyboard shortcuts', value: 'hotkeyHelp', icon: 'mdi-keyboard' },
+  { title: 'Toggle light/dark theme', value: 'toggleTheme', icon: 'mdi-theme-light-dark' },
+  { title: 'Log out', value: 'logout', icon: 'mdi-logout' }
 ];
 
 // Mirrors the legacy #main-catchup-dropdown: the empty value marks everything,

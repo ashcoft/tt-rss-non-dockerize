@@ -6,14 +6,22 @@
     <div v-else class="ttrss-app">
       <header class="app-header">
         <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
-        <h1>Tiny Tiny RSS</h1>
-        <v-spacer />
-        <span class="subtitle">{{ authStore.username }}</span>
-        <v-btn icon="mdi-theme-light-dark" variant="text" @click="toggleTheme" title="Toggle light/dark theme" />
+        <Toolbar
+          :feed-info="feedsStore.currentFeed"
+          :feed-error="headlinesStore.feedError"
+          :search-languages="searchLanguages"
+          :model-search-language="headlinesStore.searchLanguage"
+          :model-view-mode="headlinesStore.viewMode"
+          :model-order-by="headlinesStore.orderBy"
+          :plugin-main-html="pluginMainHtml"
+          :plugin-toolbar-html="pluginToolbarHtml"
+          :update-url="updateUrl"
+          :plugin-updates="pluginUpdatesAvailable"
+          @action="handleToolbarAction"
+        />
+        <!-- Kept visible for quick access; the rest of the account actions live
+             in the toolbar's overflow menu, as in the legacy shell. -->
         <v-btn icon="mdi-cog" variant="text" @click="prefsOpen = true" title="Preferences" />
-        <v-btn icon="mdi-plus-box" variant="text" @click="feedsDialogOpen = true" title="Manage feeds" />
-        <v-btn icon="mdi-keyboard" variant="text" @click="hotkeyHelpOpen = true" title="Keyboard shortcuts" />
-        <v-btn icon="mdi-logout" variant="text" @click="onLogout" title="Log out" />
       </header>
 
       <main class="app-main">
@@ -34,20 +42,6 @@
         </aside>
 
         <section class="content">
-          <Toolbar
-            :feed-info="feedsStore.currentFeed"
-            :feed-error="headlinesStore.feedError"
-            :search-languages="searchLanguages"
-            :model-search-language="headlinesStore.searchLanguage"
-            :model-view-mode="headlinesStore.viewMode"
-            :model-order-by="headlinesStore.orderBy"
-            :plugin-main-html="pluginMainHtml"
-            :plugin-toolbar-html="pluginToolbarHtml"
-            :update-url="updateUrl"
-            :plugin-updates="pluginUpdatesAvailable"
-            @action="handleToolbarAction"
-          />
-
           <v-alert
             v-if="headlinesStore.notice && headlinesStore.headlines.length === 0"
             type="info"
@@ -194,7 +188,7 @@ const clearErrors = () => {
 
 // Theme toggle (Phase 5: light/dark support)
 const toggleTheme = () => {
-  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark';
+  theme.global.name.value = theme.global.current.value.dark ? 'feedly' : 'feedlyNight';
 };
 
 // Polling (Phase 5: real-time updates)
@@ -594,6 +588,15 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     case 'preferences':
       prefsOpen.value = true;
       break;
+    case 'manageFeeds':
+      feedsDialogOpen.value = true;
+      break;
+    case 'toggleTheme':
+      toggleTheme();
+      break;
+    case 'logout':
+      await onLogout();
+      break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
   }
@@ -662,7 +665,7 @@ onUnmounted(stopPolling);
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--ttrss-bg, #f5f5f5);
+  background: rgb(var(--v-theme-background));
 }
 
 .app-header {
@@ -670,21 +673,15 @@ onUnmounted(stopPolling);
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
-  background: var(--ttrss-header-bg, #fff);
-  border-bottom: 1px solid var(--ttrss-border, #ddd);
+  background: rgb(var(--v-theme-background));
 }
 
-.app-header h1 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--ttrss-primary, #1976d2);
-  white-space: nowrap;
-}
-
-.app-header .subtitle {
-  margin: 0 0 0 0.5rem;
-  font-size: 0.8rem;
-  color: #666;
+/* The toolbar is the header's main row, like the legacy shell. */
+.app-header .toolbar {
+  flex: 1;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
 }
 
 .app-main {
@@ -696,8 +693,7 @@ onUnmounted(stopPolling);
 .sidebar {
   width: 290px;
   overflow-y: auto;
-  background: var(--ttrss-sidebar-bg, #fff);
-  border-right: 1px solid var(--ttrss-border, #ddd);
+  background: rgb(var(--v-theme-background));
 }
 
 .content {
@@ -715,15 +711,17 @@ onUnmounted(stopPolling);
 .article-panel {
   width: 400px;
   overflow-y: auto;
-  background: var(--ttrss-article-bg, #fff);
-  border-left: 1px solid var(--ttrss-border, #ddd);
+  margin: 16px 16px 16px 0;
+  background: rgb(var(--v-theme-surface));
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .app-footer {
   padding: 0.5rem 1rem;
-  background: var(--ttrss-footer-bg, #f0f0f0);
-  border-top: 1px solid var(--ttrss-border, #ddd);
-  font-size: 0.875rem;
+  background: rgb(var(--v-theme-background));
+  color: rgba(var(--v-theme-on-background), 0.6);
+  font-size: 0.8125rem;
 }
 
 .status {

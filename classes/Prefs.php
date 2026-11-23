@@ -118,7 +118,7 @@ class Prefs {
 		//Prefs::AUTO_ASSIGN_LABELS => [ false, Config::T_BOOL ],
 		Prefs::_ENABLED_PLUGINS => [ "", Config::T_STRING ],
 		//Prefs::_MOBILE_REVERSE_HEADLINES => [ false, Config::T_BOOL ],
-		Prefs::USER_CSS_THEME => [ "" , Config::T_STRING ],
+		Prefs::USER_CSS_THEME => [ "feedly/dist/feedly.css" , Config::T_STRING],
 		Prefs::USER_LANGUAGE => [ "" , Config::T_STRING ],
 		Prefs::DEFAULT_SEARCH_LANGUAGE => [ "" , Config::T_STRING ],
 		Prefs::_PREFS_MIGRATED => [ false, Config::T_BOOL ],
