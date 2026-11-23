@@ -477,11 +477,16 @@ test.describe('Vue front-end', () => {
   test('toggles the light/dark theme', async ({ page }) => {
     await login(page);
     const app = page.locator('.v-application');
-    await expect(app).toHaveClass(/v-theme--feedly/);
+    const wasNight = ((await app.getAttribute('class')) ?? '').includes('feedlyNight');
 
     await page.locator('.toolbar-right button').last().click();
     await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'Toggle light/dark theme' }).first().click();
-    await expect(app).toHaveClass(/v-theme--feedlyNight/);
+
+    if (wasNight) {
+      await expect(app).toHaveClass(/v-theme--feedly(\s|$)/);
+    } else {
+      await expect(app).toHaveClass(/v-theme--feedlyNight/);
+    }
   });
 
   test('applies the grid view in combined mode', async ({ page }) => {

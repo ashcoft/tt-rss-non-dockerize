@@ -205,12 +205,18 @@ const clearErrors = () => {
 };
 
 // Theme toggle (Phase 5: light/dark support)
+let themeChosenByUser = false;
+
 const toggleTheme = () => {
+  themeChosenByUser = true;
   theme.global.name.value = theme.global.current.value.dark ? 'feedly' : 'feedlyNight';
 };
 
 /** Match the Vuetify palette to a night/light USER_CSS_THEME. */
 const applyThemePalette = () => {
+  // Do not overwrite an explicit toggle while the initial preferences load.
+  if (themeChosenByUser) return;
+
   theme.global.name.value = /(night|dark)/i.test(feedsStore.currentTheme)
     ? 'feedlyNight'
     : 'feedly';
@@ -367,6 +373,7 @@ const handleFeedAction = async (action: string, feedId: number) => {
 // Handlers
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
+  pendingAutoCatchup.clear();
   feedsStore.selectFeed(feedId, isCat);
   syncFeedHash(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
@@ -503,9 +510,29 @@ const handleMarkRelative = async (articleId: number, above: boolean) => {
   showMessage(`Marked ${ids.length} article(s) as read`, 'success');
 };
 
+// Read-on-scroll must not shrink the backend result set while the next page is
+// being fetched: the offset is computed from the still-unread loaded rows.
+const pendingAutoCatchup = new Set<number>();
+
 /** Mark articles that scrolled past the viewport read (CDM_AUTO_CATCHUP). */
 const handleAutoCatchup = async (ids: number[]) => {
   if (ids.length === 0) return;
+
+  if (headlinesStore.loadingMore) {
+    ids.forEach(id => pendingAutoCatchup.add(id));
+    return;
+  }
+
+  ids.forEach(id => pendingAutoCatchup.delete(id));
+  await headlinesStore.markAsRead(ids);
+};
+
+/** Flush read-on-scroll ids queued while a page was loading. */
+const flushPendingAutoCatchup = async () => {
+  if (pendingAutoCatchup.size === 0) return;
+
+  const ids = [...pendingAutoCatchup];
+  pendingAutoCatchup.clear();
   await headlinesStore.markAsRead(ids);
 };
 
@@ -563,6 +590,7 @@ const handleLoadMore = async () => {
   const feedId = feedsStore.currentFeedId;
   const isCat = feedsStore.currentIsCat;
   await headlinesStore.loadMore(feedId, isCat);
+  await flushPendingAutoCatchup();
 };
 
 /** Open the headline under the cursor, if there is one. */

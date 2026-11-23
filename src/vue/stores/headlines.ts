@@ -245,13 +245,21 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
     const sequence = loadSequence;
     loadingMore.value = true;
-    skip.value += pageSize;
+
+    // Unread-only views drop rows from the result set as they are marked read
+    // (including read-on-scroll), so the next offset must be the number of
+    // loaded rows that still match the view, not a fixed page counter.
+    const unreadOnly = viewMode.value === 'adaptive' || viewMode.value === 'unread';
+    const offset = unreadOnly
+      ? headlines.value.filter(headline => !headline.is_read).length
+      : headlines.value.length;
+    skip.value = offset;
 
     try {
       const response = await api.getHeadlines(feedId, {
         isCat,
         viewMode: viewMode.value,
-        skip: skip.value,
+        skip: offset,
         search: searchQuery.value,
         searchLanguage: searchLanguage.value,
         orderBy: orderBy.value,
@@ -261,17 +269,18 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
       if (response.status === 0) {
         const newHeadlines = response.content.headlines;
-        headlines.value.push(...newHeadlines);
-        // Only continue if we got a full page of results
+        const existing = new Set(headlines.value.map(headline => headline.id));
+        const unique = newHeadlines.filter(headline => !existing.has(headline.id));
+
+        headlines.value.push(...unique);
+        // Only continue if we got a full page of results.
         hasMore.value = newHeadlines.length >= pageSize;
       } else {
         console.warn('Load more returned non-success status:', response.status);
-        skip.value -= pageSize; // Revert skip on failure status
-        hasMore.value = false; // Stop pagination on failure
+        hasMore.value = false;
       }
     } catch (err) {
       console.error('Failed to load more headlines:', err);
-      skip.value -= pageSize; // Revert skip on error
     } finally {
       if (sequence === loadSequence) loadingMore.value = false;
     }

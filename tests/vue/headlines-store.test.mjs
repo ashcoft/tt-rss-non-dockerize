@@ -187,3 +187,38 @@ test('reset clears the cursor', () => {
 
   assert.equal(store.cursorId.value, null);
 });
+
+test('loadMore offsets by the rows still in an unread-only view', async () => {
+  const calls = [];
+  globalThis.window = { __csrf_token: 't', location: { href: 'http://localhost/index.php' } };
+  globalThis.document = { createElement: () => ({ sandbox: true }) };
+  globalThis.fetch = async (_url, options = {}) => {
+    calls.push(options.body ?? '');
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          headlines: { content: [], first_id: 0 },
+          'headlines-info': { count: 45 },
+        }),
+    };
+  };
+
+  const store = storeWith(Array.from({ length: 30 }, (_, index) => index + 1));
+  store.viewMode.value = 'adaptive';
+  store.hasMore.value = true;
+
+  await store.loadMore(6, false);
+  assert.match(calls.at(-1), /skip=30/);
+
+  // Read-on-scroll can mark loaded rows read before the next page is asked for.
+  // Only the five still-unread rows remain in an adaptive result set.
+  store.headlines.value.slice(0, 25).forEach(headline => {
+    headline.is_read = true;
+  });
+  store.hasMore.value = true;
+
+  await store.loadMore(6, false);
+  assert.match(calls.at(-1), /skip=5/);
+});
