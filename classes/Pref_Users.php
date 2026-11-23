@@ -20,7 +20,106 @@ class Pref_Users extends Handler_Administrative {
 			}
 		}
 
-		function userdetails(): void {
+		/**
+	 * JSON list for the Vue users screen.
+	 */
+	function getUsers(): void {
+		global $access_level_names;
+
+		$search = clean((string) ($_REQUEST['search'] ?? ''));
+		$sort = clean((string) ($_REQUEST['sort'] ?? ''));
+
+		$allowed = ['login', 'access_level', 'created', 'num_feeds', 'last_login'];
+
+		if (!in_array($sort, $allowed)) {
+			$sort = 'login';
+		}
+
+		$order = $sort === 'login' ? 'login' : "$sort DESC";
+
+		$users = ORM::for_table('ttrss_users')
+			->table_alias('u')
+			->left_outer_join('ttrss_feeds', ['owner_uid', '=', 'u.id'], 'f')
+			->select_expr('u.id, u.login, u.access_level, u.email, u.full_name, u.otp_enabled, u.created, u.last_login, COUNT(f.id) AS num_feeds')
+			->where_like('login', $search ? "%$search%" : "%")
+			->order_by_expr($order)
+			->group_by_expr('u.id')
+			->find_many();
+
+		$rv = [];
+
+		foreach ($users as $user) {
+			$level = (int) $user['access_level'];
+
+			$rv[] = [
+				'id' => (int) $user['id'],
+				'login' => $user['login'],
+				'access_level' => $level,
+				'access_level_name' => $access_level_names[$level] ?? '',
+				'email' => $user['email'],
+				'full_name' => $user['full_name'],
+				'otp_enabled' => (bool) $user['otp_enabled'],
+				'num_feeds' => (int) $user['num_feeds'],
+				'created' => TimeHelper::make_local_datetime($user['created']),
+				'last_login' => TimeHelper::make_local_datetime($user['last_login']),
+			];
+		}
+
+		print json_encode([
+			'users' => $rv,
+			'access_level_names' => $access_level_names,
+		]);
+	}
+
+	/**
+	 * JSON details for one user, including their subscribed feeds.
+	 */
+	function getUserDetails(): void {
+		$id = (int) clean($_REQUEST['id'] ?? 0);
+
+		$user = ORM::for_table('ttrss_users')
+			->table_alias('u')
+			->select_many('u.login', 'u.access_level')
+			->select_many_expr([
+				'created' => 'SUBSTRING_FOR_DATE(u.created,1,16)',
+				'last_login' => 'SUBSTRING_FOR_DATE(u.last_login,1,16)',
+				'stored_articles' => '(SELECT COUNT(ue.int_id) FROM ttrss_user_entries ue WHERE ue.owner_uid = u.id)',
+			])
+			->find_one($id);
+
+		if (!$user) {
+			print json_encode(['error' => __('User not found')]);
+			return;
+		}
+
+		$feeds = ORM::for_table('ttrss_feeds')
+			->select_many('id', 'title', 'site_url')
+			->where('owner_uid', $id)
+			->order_by_expr('LOWER(title)')
+			->find_many();
+
+		$feed_rows = [];
+
+		foreach ($feeds as $feed) {
+			$feed_rows[] = [
+				'id' => (int) $feed->id,
+				'title' => $feed->title,
+				'site_url' => $feed->site_url,
+				'icon_url' => Feeds::_get_icon_url($feed->id, 'images/blank_icon.gif'),
+			];
+		}
+
+		print json_encode([
+			'login' => $user->login,
+			'access_level' => (int) $user->access_level,
+			'created' => TimeHelper::make_local_datetime($user->created),
+			'last_login' => TimeHelper::make_local_datetime($user->last_login),
+			'stored_articles' => (int) $user->stored_articles,
+			'feeds' => $feed_rows,
+		]);
+	}
+
+	function userdetails(): void {
 			$id = (int) clean($_REQUEST["id"]);
 
 			$user = ORM::for_table('ttrss_users')

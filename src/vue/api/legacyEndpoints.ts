@@ -1370,3 +1370,576 @@ export function preparePluginSurfaceHtml(html: string): string {
     .replace(PLUGIN_HANDLER_ATTR, 'data-plugin="$2" data-method="$3"')
     .replace(/\son[a-z]+=("[^"]*"|'[^']*')/gi, '');
 }
+
+// ============================================
+// Administration: users
+// ============================================
+
+export interface UserRow {
+  id: number;
+  login: string;
+  access_level: number;
+  access_level_name: string;
+  email: string;
+  full_name: string;
+  otp_enabled: boolean;
+  num_feeds: number;
+  created: string;
+  last_login: string;
+}
+
+export interface UsersList {
+  users: UserRow[];
+  accessLevelNames: Record<string, string>;
+}
+
+export async function getUsers(
+  backend: LegacyBackend,
+  search = '',
+  sort = 'login'
+): Promise<UsersList> {
+  const response = await backend.call('Pref_Users', 'getUsers', { search, sort });
+  const body = requireBody(response, 'Pref_Users/getUsers');
+  const rows = expectArray(body.users, 'Pref_Users/getUsers.users');
+
+  const users = rows.map((raw) => {
+    const user = expectObject(raw, 'Pref_Users/getUsers.user');
+    return {
+      id: asNumber(user.id),
+      login: asString(user.login),
+      access_level: asNumber(user.access_level),
+      access_level_name: asString(user.access_level_name),
+      email: asString(user.email),
+      full_name: asString(user.full_name),
+      otp_enabled: asBoolean(user.otp_enabled),
+      num_feeds: asNumber(user.num_feeds),
+      created: asString(user.created),
+      last_login: asString(user.last_login),
+    };
+  });
+
+  const names: Record<string, string> = {};
+  const rawNames = expectObject(body.access_level_names, 'Pref_Users/getUsers.access_level_names');
+  for (const [key, value] of Object.entries(rawNames)) {
+    names[key] = asString(value);
+  }
+
+  return { users, accessLevelNames: names };
+}
+
+export interface UserDetails {
+  login: string;
+  access_level: number;
+  created: string;
+  last_login: string;
+  stored_articles: number;
+  feeds: Array<{ id: number; title: string; site_url: string; icon_url: string }>;
+}
+
+export async function getUserDetails(backend: LegacyBackend, id: number): Promise<UserDetails> {
+  const response = await backend.call('Pref_Users', 'getUserDetails', { id });
+  const body = requireBody(response, 'Pref_Users/getUserDetails');
+
+  const feeds = expectArray(body.feeds, 'Pref_Users/getUserDetails.feeds').map((raw) => {
+    const feed = expectObject(raw, 'Pref_Users/getUserDetails.feed');
+    return {
+      id: asNumber(feed.id),
+      title: asString(feed.title),
+      site_url: asString(feed.site_url),
+      icon_url: asString(feed.icon_url),
+    };
+  });
+
+  return {
+    login: asString(body.login),
+    access_level: asNumber(body.access_level),
+    created: asString(body.created),
+    last_login: asString(body.last_login),
+    stored_articles: asNumber(body.stored_articles),
+    feeds,
+  };
+}
+
+/** `Pref_Users/add` answers with a plain-text message (it may contain the password). */
+export async function addUser(backend: LegacyBackend, login: string): Promise<string> {
+  const response = await backend.call('Pref_Users', 'add', { login });
+  return response.raw;
+}
+
+export async function removeUsers(backend: LegacyBackend, ids: number[]): Promise<void> {
+  await backend.call('Pref_Users', 'remove', { ids: ids.join(',') });
+}
+
+export interface UserEdit {
+  id: number;
+  login: string;
+  access_level: number;
+  email: string;
+  full_name: string;
+  otp_enabled: boolean;
+  password?: string;
+}
+
+export async function saveUser(backend: LegacyBackend, user: UserEdit): Promise<void> {
+  await backend.call('Pref_Users', 'editSave', {
+    id: user.id,
+    login: user.login,
+    access_level: user.access_level,
+    email: user.email,
+    full_name: user.full_name,
+    otp_enabled: checkboxValue(user.otp_enabled),
+    password: user.password ?? '',
+  });
+}
+
+export async function resetUserPassword(backend: LegacyBackend, id: number): Promise<void> {
+  await backend.call('Pref_Users', 'resetPass', { id });
+}
+
+// ============================================
+// Administration: system
+// ============================================
+
+export interface SystemLogEntry {
+  errno: number;
+  errno_name: string;
+  filename: string;
+  message: string;
+  context: string;
+  login: string;
+  date: string;
+}
+
+export interface SystemLog {
+  entries: SystemLogEntry[];
+  page: number;
+  pages: number;
+  total: number;
+  severity: number;
+}
+
+export async function getSystemLog(
+  backend: LegacyBackend,
+  page = 0,
+  severity = 512
+): Promise<SystemLog> {
+  const response = await backend.call('Pref_System', 'getLog', { page, severity });
+  const body = requireBody(response, 'Pref_System/getLog');
+
+  const entries = expectArray(body.entries, 'Pref_System/getLog.entries').map((raw) => {
+    const entry = expectObject(raw, 'Pref_System/getLog.entry');
+    return {
+      errno: asNumber(entry.errno),
+      errno_name: asString(entry.errno_name),
+      filename: asString(entry.filename),
+      message: asString(entry.message),
+      context: asString(entry.context),
+      login: asString(entry.login),
+      date: asString(entry.date),
+    };
+  });
+
+  return {
+    entries,
+    page: asNumber(body.page),
+    pages: asNumber(body.pages, 1),
+    total: asNumber(body.total),
+    severity: asNumber(body.severity, severity),
+  };
+}
+
+export async function clearSystemLog(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_System', 'clearLog');
+}
+
+export interface TestEmailResult {
+  ok: boolean;
+  error: string;
+}
+
+export async function sendTestEmail(
+  backend: LegacyBackend,
+  address: string
+): Promise<TestEmailResult> {
+  const response = await backend.call('Pref_System', 'sendTestEmail', { mail_address: address });
+  const body = requireBody(response, 'Pref_System/sendTestEmail');
+  return { ok: asBoolean(body.rc), error: asString(body.error) };
+}
+
+export interface ScheduledTask {
+  task_name: string;
+  schedule: string;
+  last_run: string;
+  duration: number;
+  rc: number;
+}
+
+export async function getScheduledTasks(backend: LegacyBackend): Promise<ScheduledTask[]> {
+  const response = await backend.call('Pref_System', 'getScheduledTasksList');
+  const body = requireBody(response, 'Pref_System/getScheduledTasksList');
+  return expectArray(body.tasks, 'Pref_System/getScheduledTasksList.tasks').map((raw) => {
+    const task = expectObject(raw, 'Pref_System/getScheduledTasksList.task');
+    return {
+      task_name: asString(task.task_name),
+      schedule: asString(task.schedule),
+      last_run: asString(task.last_run),
+      duration: asNumber(task.duration),
+      rc: asNumber(task.rc),
+    };
+  });
+}
+
+export async function getPhpInfo(backend: LegacyBackend): Promise<string> {
+  const response = await backend.call('Pref_System', 'getphpinfo');
+  return response.raw;
+}
+
+// ============================================
+// Account: personal data, OTP, app passwords
+// ============================================
+
+export interface PersonalData {
+  email: string;
+  full_name: string;
+  otp_enabled: boolean;
+  otp_qrcode: string | null;
+}
+
+export async function getPersonalData(backend: LegacyBackend): Promise<PersonalData> {
+  const response = await backend.call('Pref_Prefs', 'getPersonalData');
+  const body = requireBody(response, 'Pref_Prefs/getPersonalData');
+  return {
+    email: asString(body.email),
+    full_name: asString(body.full_name),
+    otp_enabled: asBoolean(body.otp_enabled),
+    otp_qrcode: typeof body.otp_qrcode === 'string' && body.otp_qrcode ? body.otp_qrcode : null,
+  };
+}
+
+export async function changePersonalData(
+  backend: LegacyBackend,
+  email: string,
+  fullName: string
+): Promise<string> {
+  const response = await backend.call('Pref_Prefs', 'changePersonalData', {
+    email,
+    full_name: fullName,
+  });
+  return response.raw;
+}
+
+export async function enableOtp(
+  backend: LegacyBackend,
+  password: string,
+  otp: string
+): Promise<string> {
+  const response = await backend.call('Pref_Prefs', 'otpenable', { password, otp });
+  return response.raw;
+}
+
+export async function disableOtp(backend: LegacyBackend, password: string): Promise<string> {
+  const response = await backend.call('Pref_Prefs', 'otpdisable', { password });
+  return response.raw;
+}
+
+export interface AppPassword {
+  id: number;
+  title: string;
+  created: string;
+  last_used: string;
+}
+
+export async function getAppPasswords(backend: LegacyBackend): Promise<AppPassword[]> {
+  const response = await backend.call('Pref_Prefs', 'getAppPasswords');
+  const body = requireBody(response, 'Pref_Prefs/getAppPasswords');
+  return expectArray(body.passwords, 'Pref_Prefs/getAppPasswords.passwords').map((raw) => {
+    const pass = expectObject(raw, 'Pref_Prefs/getAppPasswords.password');
+    return {
+      id: asNumber(pass.id),
+      title: asString(pass.title),
+      created: asString(pass.created),
+      last_used: asString(pass.last_used),
+    };
+  });
+}
+
+export interface AppPasswordResult {
+  password: string;
+  error: string | null;
+}
+
+export async function createAppPassword(
+  backend: LegacyBackend,
+  title: string
+): Promise<AppPasswordResult> {
+  const response = await backend.call('Pref_Prefs', 'createAppPassword', { title });
+  const body = requireBody(response, 'Pref_Prefs/createAppPassword');
+  return {
+    password: asString(body.password),
+    error: body.error ? asString(body.error) : null,
+  };
+}
+
+export async function deleteAppPasswords(backend: LegacyBackend, ids: number[]): Promise<void> {
+  await backend.call('Pref_Prefs', 'deleteAppPasswords', { ids });
+}
+
+// ============================================
+// Account: profiles, custom CSS, digest
+// ============================================
+
+export async function activateProfile(backend: LegacyBackend, id: number): Promise<void> {
+  await backend.call('Pref_Prefs', 'activateprofile', { id });
+}
+
+export async function cloneProfile(
+  backend: LegacyBackend,
+  oldProfile: number,
+  newTitle: string
+): Promise<void> {
+  await backend.call('Pref_Prefs', 'cloneprofile', {
+    old_profile: oldProfile,
+    new_title: newTitle,
+  });
+}
+
+export async function addProfile(backend: LegacyBackend, title: string): Promise<void> {
+  await backend.call('Pref_Prefs', 'addprofile', { title });
+}
+
+export async function saveProfile(
+  backend: LegacyBackend,
+  id: number,
+  title: string
+): Promise<void> {
+  await backend.call('Pref_Prefs', 'saveprofile', { id, value: title });
+}
+
+export async function removeProfiles(backend: LegacyBackend, ids: number[]): Promise<void> {
+  await backend.call('Pref_Prefs', 'remprofiles', { ids });
+}
+
+export async function customizeCss(backend: LegacyBackend): Promise<string> {
+  const response = await backend.call('Pref_Prefs', 'customizeCSS');
+  const body = requireBody(response, 'Pref_Prefs/customizeCSS');
+  return asString(body.value);
+}
+
+/** The digest preview is `[html, count, affected_ids, text]`. */
+export async function previewDigest(backend: LegacyBackend): Promise<string> {
+  const response = await backend.call('Pref_Prefs', 'previewDigest');
+  const body = requireBody(response, 'Pref_Prefs/previewDigest');
+  const data = expectArray(body.data, 'Pref_Prefs/previewDigest');
+  return asString(data[0]);
+}
+
+export async function resetConfig(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_Prefs', 'resetconfig');
+}
+
+// ============================================
+// Feeds: sharing, maintenance, batch operations
+// ============================================
+
+export interface FeedSharingUrl {
+  title: string;
+  link: string;
+}
+
+export async function getSharedUrl(
+  backend: LegacyBackend,
+  id: number,
+  isCat: boolean,
+  search = ''
+): Promise<FeedSharingUrl> {
+  const response = await backend.call('Pref_Feeds', 'getSharedURL', {
+    id,
+    is_cat: isCat ? 1 : 0,
+    search,
+  });
+  const body = requireBody(response, 'Pref_Feeds/getSharedURL');
+  return { title: asString(body.title), link: asString(body.link) };
+}
+
+export async function regenFeedKey(
+  backend: LegacyBackend,
+  id: number,
+  isCat: boolean
+): Promise<string> {
+  const response = await backend.call('Pref_Feeds', 'regenFeedKey', {
+    id,
+    is_cat: isCat ? 1 : 0,
+  });
+  const body = requireBody(response, 'Pref_Feeds/regenFeedKey');
+  return asString(body.link);
+}
+
+export async function clearFeedKeys(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_Feeds', 'clearKeys');
+}
+
+export interface InactiveFeed {
+  id: number;
+  title: string;
+  site_url: string;
+  feed_url: string;
+  last_article: string;
+}
+
+export async function getInactiveFeeds(backend: LegacyBackend): Promise<InactiveFeed[]> {
+  const response = await backend.call('Pref_Feeds', 'inactiveFeeds');
+  const body = requireBody(response, 'Pref_Feeds/inactiveFeeds');
+  return expectArray(body.data, 'Pref_Feeds/inactiveFeeds').map((raw) => {
+    const feed = expectObject(raw, 'Pref_Feeds/inactiveFeeds.feed');
+    return {
+      id: asNumber(feed.id),
+      title: asString(feed.title),
+      site_url: asString(feed.site_url),
+      feed_url: asString(feed.feed_url),
+      last_article: asString(feed.last_article),
+    };
+  });
+}
+
+export interface FeedWithError {
+  id: number;
+  title: string;
+  feed_url: string;
+  last_error: string;
+  site_url: string;
+}
+
+export async function getFeedsWithErrors(backend: LegacyBackend): Promise<FeedWithError[]> {
+  const response = await backend.call('Pref_Feeds', 'feedsWithErrors');
+  const body = requireBody(response, 'Pref_Feeds/feedsWithErrors');
+  return expectArray(body.data, 'Pref_Feeds/feedsWithErrors').map((raw) => {
+    const feed = expectObject(raw, 'Pref_Feeds/feedsWithErrors.feed');
+    return {
+      id: asNumber(feed.id),
+      title: asString(feed.title),
+      feed_url: asString(feed.feed_url),
+      last_error: asString(feed.last_error),
+      site_url: asString(feed.site_url),
+    };
+  });
+}
+
+export async function batchAddFeeds(
+  backend: LegacyBackend,
+  feeds: string,
+  catId: number,
+  login = '',
+  pass = ''
+): Promise<void> {
+  await backend.call('Pref_Feeds', 'batchAddFeeds', {
+    cat: catId || '',
+    feeds,
+    login,
+    pass,
+  });
+}
+
+export async function batchEditFeeds(
+  backend: LegacyBackend,
+  ids: number[],
+  fields: Record<string, string>
+): Promise<void> {
+  await backend.call('Pref_Feeds', 'batchEditSave', {
+    ids: ids.join(','),
+    ...fields,
+  });
+}
+
+export async function resetFeedOrder(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_Feeds', 'feedsortreset');
+}
+
+export async function resetCategoryOrder(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_Feeds', 'catsortreset');
+}
+
+// ============================================
+// Plugins: installer and updates
+// ============================================
+
+export interface AvailablePlugin {
+  name: string;
+  description: string;
+  topics: string[];
+  html_url: string;
+  clone_url: string;
+  last_update: string;
+}
+
+export async function getAvailablePlugins(backend: LegacyBackend): Promise<AvailablePlugin[]> {
+  const response = await backend.call('Pref_Prefs', 'getAvailablePlugins');
+  const body = requireBody(response, 'Pref_Prefs/getAvailablePlugins');
+  return expectArray(body.data, 'Pref_Prefs/getAvailablePlugins').map((raw) => {
+    const plugin = expectObject(raw, 'Pref_Prefs/getAvailablePlugins.plugin');
+    return {
+      name: asString(plugin.name),
+      description: asString(plugin.description),
+      topics: Array.isArray(plugin.topics) ? plugin.topics.map((topic) => asString(topic)) : [],
+      html_url: asString(plugin.html_url),
+      clone_url: asString(plugin.clone_url),
+      last_update: asString(plugin.last_update),
+    };
+  });
+}
+
+export async function installPlugin(
+  backend: LegacyBackend,
+  name: string
+): Promise<Record<string, unknown>> {
+  const response = await backend.call('Pref_Prefs', 'installPlugin', { plugin: name });
+  return requireBody(response, 'Pref_Prefs/installPlugin');
+}
+
+export async function uninstallPlugin(backend: LegacyBackend, name: string): Promise<void> {
+  await backend.call('Pref_Prefs', 'uninstallPlugin', { plugin: name });
+}
+
+export async function checkForPluginUpdates(backend: LegacyBackend): Promise<unknown[]> {
+  const response = await backend.call('Pref_Prefs', 'checkForPluginUpdates');
+  const body = requireBody(response, 'Pref_Prefs/checkForPluginUpdates');
+  return expectArray(body.data, 'Pref_Prefs/checkForPluginUpdates');
+}
+
+export async function updateLocalPlugins(
+  backend: LegacyBackend,
+  plugins: string[]
+): Promise<unknown[]> {
+  const response = await backend.call('Pref_Prefs', 'updateLocalPlugins', {
+    plugins: plugins.join(','),
+  });
+  const body = requireBody(response, 'Pref_Prefs/updateLocalPlugins');
+  return expectArray(body.data, 'Pref_Prefs/updateLocalPlugins');
+}
+
+export async function clearPluginData(backend: LegacyBackend, name: string): Promise<void> {
+  await backend.call('Pref_Prefs', 'clearplugindata', { name });
+}
+
+export interface PluginPrefsTab {
+  id: string;
+  section: string;
+  plugin: string;
+  title: string;
+  html: string;
+}
+
+/** Fetch the plugin-provided preference tabs (`HOOK_PREFS_TAB`). */
+export async function getPluginPrefsTabs(backend: LegacyBackend): Promise<PluginPrefsTab[]> {
+  const response = await backend.call('RPC', 'getPluginPrefsTabs');
+  const body = requireBody(response, 'RPC/getPluginPrefsTabs');
+  return expectArray(body.tabs, 'RPC/getPluginPrefsTabs.tabs').map((raw) => {
+    const tab = expectObject(raw, 'RPC/getPluginPrefsTabs.tab');
+    return {
+      id: asString(tab.id),
+      section: asString(tab.section),
+      plugin: asString(tab.plugin),
+      title: asString(tab.title),
+      html: asString(tab.html),
+    };
+  });
+}

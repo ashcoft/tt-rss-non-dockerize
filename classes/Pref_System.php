@@ -2,6 +2,8 @@
 
 class Pref_System extends Handler_Administrative {
 
+	private const LOG_PAGE_LIMIT = 15;
+
 	function csrf_ignore(string $method): bool {
 		return $method === 'index';
 	}
@@ -58,6 +60,90 @@ class Pref_System extends Handler_Administrative {
 		?>
 		</table>
 		<?php
+	}
+
+	/**
+	 * JSON event log for the Vue system screen.
+	 */
+	function getLog(): void {
+		$severity = (int) ($_REQUEST['severity'] ?? E_USER_WARNING);
+		$page = max(0, (int) ($_REQUEST['page'] ?? 0));
+
+		$errno_values = match ($severity) {
+			E_USER_ERROR => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR],
+			E_USER_WARNING => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR, E_WARNING, E_USER_WARNING, E_DEPRECATED, E_USER_DEPRECATED],
+			default => [],
+		};
+
+		if (count($errno_values) > 0) {
+			$errno_qmarks = arr_qmarks($errno_values);
+			$errno_filter_qpart = "errno IN ($errno_qmarks)";
+		} else {
+			$errno_filter_qpart = "true";
+		}
+
+		$sth = $this->pdo->prepare("SELECT COUNT(id) AS total FROM ttrss_error_log WHERE $errno_filter_qpart");
+		$sth->execute($errno_values);
+		$row = $sth->fetch();
+		$total = $row ? (int) $row['total'] : 0;
+
+		$pages = max(1, (int) ceil($total / self::LOG_PAGE_LIMIT));
+		$page = min($page, $pages - 1);
+		$offset = self::LOG_PAGE_LIMIT * $page;
+
+		$sth = $this->pdo->prepare("SELECT errno, errstr, filename, lineno, created_at, login, context
+			FROM ttrss_error_log LEFT JOIN ttrss_users ON (owner_uid = ttrss_users.id)
+			WHERE $errno_filter_qpart
+			ORDER BY ttrss_error_log.id DESC
+			LIMIT " . self::LOG_PAGE_LIMIT . " OFFSET $offset");
+		$sth->execute($errno_values);
+
+		$entries = [];
+
+		while ($line = $sth->fetch()) {
+			$errno = (int) $line['errno'];
+
+			$entries[] = [
+				'errno' => $errno,
+				'errno_name' => Logger::ERROR_NAMES[$errno] ?? '',
+				'filename' => $line['filename'] . ':' . $line['lineno'],
+				'message' => $line['errstr'],
+				'context' => $line['context'],
+				'login' => $line['login'] ?? '',
+				'date' => TimeHelper::make_local_datetime($line['created_at']),
+			];
+		}
+
+		print json_encode([
+			'entries' => $entries,
+			'page' => $page,
+			'pages' => $pages,
+			'total' => $total,
+			'severity' => $severity,
+		]);
+	}
+
+	/**
+	 * JSON scheduled-task table for the Vue system screen.
+	 */
+	function getScheduledTasksList(): void {
+		$task_records = ORM::for_table('ttrss_scheduled_tasks')
+			->order_by_asc(['last_cron_expression', 'task_name'])
+			->find_many();
+
+		$rv = [];
+
+		foreach ($task_records as $task) {
+			$rv[] = [
+				'task_name' => $task->task_name,
+				'schedule' => $task->last_cron_expression,
+				'last_run' => TimeHelper::make_local_datetime($task->last_run),
+				'duration' => $task->last_duration,
+				'rc' => (int) $task->last_rc,
+			];
+		}
+
+		print json_encode(['tasks' => $rv]);
 	}
 
 	function getphpinfo(): void {

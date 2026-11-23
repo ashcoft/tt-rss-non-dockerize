@@ -1478,3 +1478,144 @@ test('preparePluginSurfaceHtml strips handlers that need arguments and other inl
 
   assert.equal(prepared, '<i>note</i><img src="x.png">');
 });
+
+test('getUsers maps the user list and access-level names', async () => {
+  installGlobals();
+  const payload = {
+    users: [
+      {
+        id: 1,
+        login: 'admin',
+        access_level: 10,
+        access_level_name: 'Administrator',
+        email: 'admin@example.com',
+        full_name: 'Admin',
+        otp_enabled: false,
+        num_feeds: 2,
+        created: '2026-01-01 10:00',
+        last_login: '2026-01-02 11:00',
+      },
+    ],
+    access_level_names: { '10': 'Administrator' },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getUsers(backend, 'adm', 'login');
+
+  assert.equal(result.users.length, 1);
+  assert.equal(result.users[0].login, 'admin');
+  assert.equal(result.users[0].num_feeds, 2);
+  assert.equal(result.accessLevelNames['10'], 'Administrator');
+});
+
+test('getSystemLog maps entries and pagination', async () => {
+  installGlobals();
+  const payload = {
+    entries: [
+      {
+        errno: 256,
+        errno_name: 'E_USER_ERROR',
+        filename: 'classes/Feeds.php:12',
+        message: 'boom',
+        context: '',
+        login: 'admin',
+        date: '2026-01-01 10:00',
+      },
+    ],
+    page: 0,
+    pages: 2,
+    total: 20,
+    severity: 256,
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getSystemLog(backend, 0, 256);
+
+  assert.equal(result.entries[0].errno_name, 'E_USER_ERROR');
+  assert.equal(result.pages, 2);
+  assert.equal(result.total, 20);
+});
+
+test('getPersonalData maps the OTP QR code', async () => {
+  installGlobals();
+  stubFetch([
+    {
+      text: JSON.stringify({
+        email: 'a@b',
+        full_name: 'A',
+        otp_enabled: false,
+        otp_qrcode: 'data:image/png;base64,xxx',
+      }),
+    },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getPersonalData(backend);
+
+  assert.equal(result.email, 'a@b');
+  assert.equal(result.otp_qrcode, 'data:image/png;base64,xxx');
+});
+
+test('getInactiveFeeds accepts a top-level JSON array', async () => {
+  installGlobals();
+  const payload = [
+    {
+      id: 7,
+      title: 'Old feed',
+      site_url: 'https://example.com',
+      feed_url: 'https://example.com/feed.xml',
+      last_article: '2025-01-01 10:00',
+    },
+  ];
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getInactiveFeeds(backend);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].title, 'Old feed');
+});
+
+test('getSharedUrl maps the generated feed URL', async () => {
+  installGlobals();
+  stubFetch([
+    { text: JSON.stringify({ title: 'Published', link: 'https://example.com/public.php?op=rss&id=-2' }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const result = await endpoints.getSharedUrl(backend, -2, false);
+
+  assert.equal(result.title, 'Published');
+  assert.ok(result.link.includes('id=-2'));
+});
+
+test('getPluginPrefsTabs maps the plugin tab fragments', async () => {
+  installGlobals();
+  const payload = {
+    tabs: [
+      {
+        id: 'prefFeeds-Psql_Trgm',
+        section: 'prefFeeds',
+        plugin: 'Psql_Trgm',
+        title: 'Similar articles',
+        html: '<form></form>',
+      },
+    ],
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const tabs = await endpoints.getPluginPrefsTabs(backend);
+
+  assert.equal(tabs.length, 1);
+  assert.equal(tabs[0].plugin, 'Psql_Trgm');
+  assert.equal(tabs[0].title, 'Similar articles');
+});

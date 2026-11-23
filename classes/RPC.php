@@ -481,6 +481,15 @@ class RPC extends Handler_Protected {
 		}
 		$params["prefs"] = $prefs;
 
+		$user = ORM::for_table('ttrss_users')->find_one($_SESSION['uid']);
+
+		$params["access_level"] = (int) ($_SESSION['access_level'] ?? 0);
+		$params["is_admin"] = $params["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN;
+		$params["email"] = $user ? (string) $user->email : '';
+		$params["full_name"] = $user ? (string) $user->full_name : '';
+		$params["otp_enabled"] = $user ? (bool) $user->otp_enabled : false;
+		$params["enable_plugin_installer"] = (bool) Config::get(Config::ENABLE_PLUGIN_INSTALLER);
+
 		return $params;
 	}
 
@@ -843,6 +852,62 @@ class RPC extends Handler_Protected {
 	}
 
 	/** HTML for one plugin-provided preferences section. */
+	/**
+	 * Plugin-provided preference tabs (HOOK_PREFS_TAB).
+	 *
+	 * Each plugin decides which legacy tab it belongs to, so the hook is
+	 * invoked once per known tab id and only non-empty answers are returned.
+	 */
+	function getPluginPrefsTabs(): void {
+		$tabs = [];
+		$host = PluginHost::getInstance();
+		$method = 'hook_prefs_tab';
+
+		foreach (['prefPrefs', 'prefFeeds', 'prefFilters', 'prefLabels', 'prefUsers', 'prefSystem'] as $section) {
+			if (in_array($section, ['prefUsers', 'prefSystem']) &&
+					($_SESSION['access_level'] ?? 0) < UserHelper::ACCESS_LEVEL_ADMIN) {
+				continue;
+			}
+
+			foreach ($host->get_hooks(PluginHost::HOOK_PREFS_TAB) as $plugin) {
+				if (!$host->implements_hook($plugin, PluginHost::HOOK_PREFS_TAB)) {
+					continue;
+				}
+
+				ob_start();
+
+				try {
+					$plugin->$method($section);
+					$html = trim((string) ob_get_clean());
+				} catch (\Throwable $err) {
+					ob_end_clean();
+					Debug::log("plugin prefs tab $section failed: " . $err->getMessage());
+					continue;
+				}
+
+				if ($html === '') {
+					continue;
+				}
+
+				$title = $section;
+
+				if (preg_match('/<div\b[^>]*\btitle="([^"]*)"/i', $html, $match)) {
+					$title = trim(strip_tags($match[1]));
+				}
+
+				$tabs[] = [
+					'id' => $section . '-' . strtolower($plugin::class),
+					'section' => $section,
+					'plugin' => $plugin::class,
+					'title' => $title,
+					'html' => $html,
+				];
+			}
+		}
+
+		print json_encode(['tabs' => $tabs]);
+	}
+
 	function getPluginPrefsSection(): void {
 		$section = clean((string) ($_REQUEST['section'] ?? ''));
 

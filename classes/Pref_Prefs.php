@@ -147,6 +147,77 @@ class Pref_Prefs extends Handler_Protected {
 		print __("Your personal data has been saved.");
 	}
 
+	/**
+	 * Personal data and OTP state for the Vue account screen.
+	 */
+	function getPersonalData(): void {
+		$user = ORM::for_table('ttrss_users')->find_one($_SESSION['uid']);
+
+		if (!$user) {
+			print json_encode(['error' => __('User not found')]);
+			return;
+		}
+
+		$otp_enabled = (bool) $user->otp_enabled;
+
+		print json_encode([
+			'email' => (string) $user->email,
+			'full_name' => (string) $user->full_name,
+			'otp_enabled' => $otp_enabled,
+			'otp_qrcode' => $otp_enabled ? null : $this->_get_otp_qrcode_img(),
+		]);
+	}
+
+	/**
+	 * JSON app-password list for the Vue account screen.
+	 */
+	function getAppPasswords(): void {
+		$passwords = ORM::for_table('ttrss_app_passwords')
+			->where('owner_uid', $_SESSION['uid'])
+			->order_by_asc('title')
+			->find_many();
+
+		$rv = [];
+
+		foreach ($passwords as $pass) {
+			$rv[] = [
+				'id' => (int) $pass->id,
+				'title' => $pass->title,
+				'created' => TimeHelper::make_local_datetime($pass->created),
+				'last_used' => TimeHelper::make_local_datetime($pass->last_used),
+			];
+		}
+
+		print json_encode(['passwords' => $rv]);
+	}
+
+	/**
+	 * Create an app password and return the plaintext once.
+	 */
+	function createAppPassword(): void {
+		$title = clean($_REQUEST['title'] ?? '');
+
+		if (!$title) {
+			print json_encode(['error' => __('Description is required')]);
+			return;
+		}
+
+		$new_password = make_password(16);
+		$new_salt = UserHelper::get_salt();
+		$new_password_hash = UserHelper::hash_password($new_password, $new_salt, UserHelper::HASH_ALGOS[0]);
+
+		$password = ORM::for_table('ttrss_app_passwords')->create();
+
+		$password->title = $title;
+		$password->owner_uid = $_SESSION['uid'];
+		$password->pwd_hash = "$new_password_hash:$new_salt";
+		$password->service = Auth_Base::AUTH_SERVICE_API;
+		$password->created = Db::NOW();
+		$password->save();
+
+		print json_encode(['password' => $new_password]);
+	}
+
 	function resetconfig(): void {
 		Prefs::reset($_SESSION["uid"], $_SESSION["profile"] ?? null);
 

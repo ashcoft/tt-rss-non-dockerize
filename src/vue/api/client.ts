@@ -478,6 +478,284 @@ class ApiClient {
   }
 
   // ============================================
+  // Administration: users
+  // ============================================
+
+  async getUsers(search = '', sort = 'login'): Promise<ApiResponse<endpoints.UsersList>> {
+    return this.wrap(() => endpoints.getUsers(legacyBackend, search, sort), {
+      users: [],
+      accessLevelNames: {},
+    });
+  }
+
+  async getUserDetails(id: number): Promise<ApiResponse<endpoints.UserDetails | null>> {
+    return this.wrap(() => endpoints.getUserDetails(legacyBackend, id), null);
+  }
+
+  async addUser(login: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.addUser(legacyBackend, login), '');
+  }
+
+  async removeUsers(ids: number[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.removeUsers(legacyBackend, ids);
+      return true;
+    }, false);
+  }
+
+  async saveUser(user: endpoints.UserEdit): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveUser(legacyBackend, user);
+      return true;
+    }, false);
+  }
+
+  async resetUserPassword(id: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetUserPassword(legacyBackend, id);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Administration: system
+  // ============================================
+
+  async getSystemLog(page = 0, severity = 512): Promise<ApiResponse<endpoints.SystemLog>> {
+    return this.wrap(() => endpoints.getSystemLog(legacyBackend, page, severity), {
+      entries: [],
+      page: 0,
+      pages: 1,
+      total: 0,
+      severity,
+    });
+  }
+
+  async clearSystemLog(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.clearSystemLog(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  async sendTestEmail(address: string): Promise<ApiResponse<endpoints.TestEmailResult>> {
+    return this.wrap(() => endpoints.sendTestEmail(legacyBackend, address), {
+      ok: false,
+      error: '',
+    });
+  }
+
+  async getScheduledTasks(): Promise<ApiResponse<endpoints.ScheduledTask[]>> {
+    return this.wrap(() => endpoints.getScheduledTasks(legacyBackend), []);
+  }
+
+  async getPhpInfo(): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.getPhpInfo(legacyBackend), '');
+  }
+
+  // ============================================
+  // Account: personal data, OTP, app passwords
+  // ============================================
+
+  async getPersonalData(): Promise<ApiResponse<endpoints.PersonalData | null>> {
+    return this.wrap(() => endpoints.getPersonalData(legacyBackend), null);
+  }
+
+  async changePersonalData(email: string, fullName: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.changePersonalData(legacyBackend, email, fullName), '');
+  }
+
+  async enableOtp(password: string, otp: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.enableOtp(legacyBackend, password, otp), '');
+  }
+
+  async disableOtp(password: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.disableOtp(legacyBackend, password), '');
+  }
+
+  async getAppPasswords(): Promise<ApiResponse<endpoints.AppPassword[]>> {
+    return this.wrap(() => endpoints.getAppPasswords(legacyBackend), []);
+  }
+
+  async createAppPassword(title: string): Promise<ApiResponse<endpoints.AppPasswordResult>> {
+    return this.wrap(() => endpoints.createAppPassword(legacyBackend, title), {
+      password: '',
+      error: null,
+    });
+  }
+
+  async deleteAppPasswords(ids: number[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.deleteAppPasswords(legacyBackend, ids);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Account: profiles, custom CSS, digest
+  // ============================================
+
+  async getProfiles(): Promise<ApiResponse<Array<{ id: number; title: string; active: boolean }>>> {
+    return this.wrap(() => endpoints.getProfiles(legacyBackend), []);
+  }
+
+  async activateProfile(id: number): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.activateProfile(legacyBackend, id);
+      return true;
+    }, false);
+  }
+
+  async cloneProfile(oldProfile: number, newTitle: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.cloneProfile(legacyBackend, oldProfile, newTitle);
+      return true;
+    }, false);
+  }
+
+  async addProfile(title: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.addProfile(legacyBackend, title);
+      return true;
+    }, false);
+  }
+
+  async saveProfile(id: number, title: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveProfile(legacyBackend, id, title);
+      return true;
+    }, false);
+  }
+
+  async removeProfiles(ids: number[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.removeProfiles(legacyBackend, ids);
+      return true;
+    }, false);
+  }
+
+  async customizeCss(): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.customizeCss(legacyBackend), '');
+  }
+
+  async previewDigest(): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.previewDigest(legacyBackend), '');
+  }
+
+  async resetConfig(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetConfig(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Feeds: sharing, maintenance, batch operations
+  // ============================================
+
+  async getInactiveFeeds(): Promise<ApiResponse<endpoints.InactiveFeed[]>> {
+    return this.wrap(() => endpoints.getInactiveFeeds(legacyBackend), []);
+  }
+
+  async getFeedsWithErrors(): Promise<ApiResponse<endpoints.FeedWithError[]>> {
+    return this.wrap(() => endpoints.getFeedsWithErrors(legacyBackend), []);
+  }
+
+  async getSharedUrl(
+    id: number,
+    isCat: boolean,
+    search = ''
+  ): Promise<ApiResponse<endpoints.FeedSharingUrl | null>> {
+    return this.wrap(() => endpoints.getSharedUrl(legacyBackend, id, isCat, search), null);
+  }
+
+  async regenFeedKey(id: number, isCat: boolean): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.regenFeedKey(legacyBackend, id, isCat), '');
+  }
+
+  async clearFeedKeys(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.clearFeedKeys(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  async batchAddFeeds(
+    feeds: string,
+    catId: number,
+    login = '',
+    pass = ''
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.batchAddFeeds(legacyBackend, feeds, catId, login, pass);
+      return true;
+    }, false);
+  }
+
+  async batchEditFeeds(
+    ids: number[],
+    fields: Record<string, string>
+  ): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.batchEditFeeds(legacyBackend, ids, fields);
+      return true;
+    }, false);
+  }
+
+  async resetFeedOrder(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetFeedOrder(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  async resetCategoryOrder(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetCategoryOrder(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  // ============================================
+  // Plugins: installer and updates
+  // ============================================
+
+  async getAvailablePlugins(): Promise<ApiResponse<endpoints.AvailablePlugin[]>> {
+    return this.wrap(() => endpoints.getAvailablePlugins(legacyBackend), []);
+  }
+
+  async installPlugin(name: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.wrap(() => endpoints.installPlugin(legacyBackend, name), {});
+  }
+
+  async uninstallPlugin(name: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.uninstallPlugin(legacyBackend, name);
+      return true;
+    }, false);
+  }
+
+  async checkForPluginUpdates(): Promise<ApiResponse<unknown[]>> {
+    return this.wrap(() => endpoints.checkForPluginUpdates(legacyBackend), []);
+  }
+
+  async updateLocalPlugins(plugins: string[]): Promise<ApiResponse<unknown[]>> {
+    return this.wrap(() => endpoints.updateLocalPlugins(legacyBackend, plugins), []);
+  }
+
+  async clearPluginData(name: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.clearPluginData(legacyBackend, name);
+      return true;
+    }, false);
+  }
+
+  /** Plugin-provided preference tabs (`HOOK_PREFS_TAB`). */
+  async getPluginPrefsTabs(): Promise<ApiResponse<endpoints.PluginPrefsTab[]>> {
+    return this.wrap(() => endpoints.getPluginPrefsTabs(legacyBackend), []);
+  }
+
+  // ============================================
   // Internal
   // ============================================
 

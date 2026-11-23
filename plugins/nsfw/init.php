@@ -81,17 +81,6 @@ class NSFW extends Plugin {
 			<form>
 
 				<?= \Controls\pluginhandler_tags($this, "save") ?>
-
-				<script type="dojo/method" event="onSubmit" args="evt">
-					evt.preventDefault();
-					if (this.validate()) {
-						Notify.progress('Saving data...', true);
-						xhr.post("backend.php", this.getValues(), (reply) => {
-							Notify.info(reply);
-						})
-					}
-				</script>
-
 				<header><?= __("Tags to consider NSFW (comma-separated):") ?></header>
 
 				<fieldset>

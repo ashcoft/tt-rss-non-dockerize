@@ -673,20 +673,9 @@ class Feeds extends Handler_Protected {
 				}
 
 			</style>
-			<script>
-				dojoConfig = {
-					async: true,
-					cacheBust: "<?= get_scripts_timestamp(); ?>",
-					packages: [
-						{ name: "fox", location: "../../js" },
-					]
-				};
-			</script>
-			<?= javascript_tag("js/utility.js") ?>
-			<?= javascript_tag("js/common.js") ?>
 			<?= Config::get_override_links() ?>
 		</head>
-		<body class="flat ttrss_utility feed_debugger css_loading">
+		<body class="flat ttrss_utility feed_debugger">
 			<div class="container">
 				<h1>Feed Debugger: <?= "$feed_id: " . static::_get_title($feed_id, $_SESSION['uid']) ?></h1>
 				<div class="content">

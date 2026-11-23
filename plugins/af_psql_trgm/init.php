@@ -73,17 +73,6 @@ class Af_Psql_Trgm extends Plugin {
 			<form>
 
 				<?= \Controls\pluginhandler_tags($this, "save") ?>
-
-				<script type="dojo/method" event="onSubmit" args="evt">
-					evt.preventDefault();
-					if (this.validate()) {
-						Notify.progress('Saving data...', true);
-						xhr.post("backend.php", this.getValues(), (reply) => {
-							Notify.info(reply);
-						})
-					}
-				</script>
-
 				<?= format_notice("Enable for specific feeds in the feed editor.") ?>
 
 				<fieldset>

@@ -10,9 +10,12 @@
         <v-tabs v-model="tab" color="primary">
           <v-tab value="add">Add Feed</v-tab>
           <v-tab value="edit">Edit Feed</v-tab>
+          <v-tab value="batch">Batch</v-tab>
           <v-tab value="remove">Remove / Purge</v-tab>
           <v-tab value="categories">Categories</v-tab>
           <v-tab value="opml">OPML</v-tab>
+          <v-tab value="sharing">Sharing</v-tab>
+          <v-tab value="maintenance">Maintenance</v-tab>
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
@@ -214,6 +217,177 @@
             <v-checkbox v-model="opmlIncludeSettings" label="Include tt-rss settings" hide-details density="compact" />
             <v-btn class="mt-2" prepend-icon="mdi-download" @click="exportOpml">Export OPML</v-btn>
           </v-window-item>
+
+          <!-- Batch subscribe / edit -->
+          <v-window-item value="batch">
+            <p class="text-subtitle-2 mb-2">Batch subscribe</p>
+            <v-textarea
+              v-model="batchFeeds"
+              label="One feed URL per line"
+              rows="4"
+              density="compact"
+            />
+            <v-select
+              v-model="batchCategory"
+              :items="categoryOptions"
+              item-title="title"
+              item-value="id"
+              label="Category"
+              density="compact"
+              clearable
+            />
+            <v-text-field v-model="batchLogin" label="HTTP username" density="compact" />
+            <v-text-field v-model="batchPass" label="HTTP password" type="password" density="compact" />
+            <v-btn color="primary" :disabled="!batchFeeds" :loading="busy" @click="submitBatchSubscribe">
+              Subscribe
+            </v-btn>
+
+            <v-divider class="my-4" />
+
+            <p class="text-subtitle-2 mb-2">Batch edit</p>
+            <v-select
+              v-model="batchIds"
+              :items="feedStore.feeds"
+              item-title="title"
+              item-value="id"
+              label="Feeds"
+              multiple
+              chips
+              density="compact"
+            />
+
+            <div class="d-flex align-center ga-2">
+              <v-checkbox v-model="batchApply.cat_id" label="Category" hide-details density="compact" />
+              <v-select
+                v-model="batchCat"
+                :items="categoryOptions"
+                item-title="title"
+                item-value="id"
+                density="compact"
+                hide-details
+                clearable
+                :disabled="!batchApply.cat_id"
+              />
+            </div>
+            <div class="d-flex align-center ga-2">
+              <v-checkbox v-model="batchApply.update_interval" label="Update interval" hide-details density="compact" />
+              <v-select
+                v-model="batchUpdateInterval"
+                :items="updateIntervals"
+                item-title="title"
+                item-value="value"
+                density="compact"
+                hide-details
+                :disabled="!batchApply.update_interval"
+              />
+            </div>
+            <div class="d-flex align-center ga-2">
+              <v-checkbox v-model="batchApply.purge_interval" label="Purge interval" hide-details density="compact" />
+              <v-select
+                v-model="batchPurgeInterval"
+                :items="purgeIntervals"
+                item-title="title"
+                item-value="value"
+                density="compact"
+                hide-details
+                :disabled="!batchApply.purge_interval"
+              />
+            </div>
+            <div class="d-flex align-center ga-2">
+              <v-checkbox v-model="batchApply.auth_login" label="HTTP username" hide-details density="compact" />
+              <v-text-field v-model="batchAuthLogin" density="compact" hide-details :disabled="!batchApply.auth_login" />
+            </div>
+            <div class="d-flex align-center ga-2">
+              <v-checkbox v-model="batchApply.auth_pass" label="HTTP password" hide-details density="compact" />
+              <v-text-field
+                v-model="batchAuthPass"
+                type="password"
+                density="compact"
+                hide-details
+                :disabled="!batchApply.auth_pass"
+              />
+            </div>
+            <v-checkbox v-model="batchFlags.include_in_digest" label="Include in digest" hide-details density="compact" />
+            <v-checkbox v-model="batchApply.include_in_digest" label="Apply include-in-digest" hide-details density="compact" />
+            <v-checkbox v-model="batchFlags.always_display_enclosures" label="Always display enclosures" hide-details density="compact" />
+            <v-checkbox v-model="batchApply.always_display_enclosures" label="Apply enclosure setting" hide-details density="compact" />
+            <v-checkbox v-model="batchFlags.hide_images" label="Do not embed media" hide-details density="compact" />
+            <v-checkbox v-model="batchApply.hide_images" label="Apply media setting" hide-details density="compact" />
+            <v-checkbox v-model="batchFlags.cache_images" label="Cache media" hide-details density="compact" />
+            <v-checkbox v-model="batchApply.cache_images" label="Apply caching setting" hide-details density="compact" />
+            <v-checkbox v-model="batchFlags.mark_unread_on_update" label="Mark updated articles as unread" hide-details density="compact" />
+            <v-checkbox v-model="batchApply.mark_unread_on_update" label="Apply unread-on-update setting" hide-details density="compact" />
+            <v-btn color="primary" :disabled="batchIds.length === 0" :loading="busy" @click="submitBatchEdit">
+              Apply
+            </v-btn>
+          </v-window-item>
+
+          <!-- Sharing -->
+          <v-window-item value="sharing">
+            <p class="text-subtitle-2 mb-2">Published articles feed</p>
+            <div class="d-flex ga-2 mb-3">
+              <v-btn size="small" variant="tonal" @click="loadPublishedUrl">Display URL</v-btn>
+              <v-btn size="small" variant="tonal" @click="regenPublishedKey">Regenerate key</v-btn>
+              <v-btn size="small" color="error" variant="tonal" @click="clearKeys">Clear all generated URLs</v-btn>
+            </div>
+            <v-text-field
+              v-if="publishedUrl"
+              :model-value="publishedUrl.link"
+              label="Published feed URL"
+              readonly
+              density="compact"
+            />
+            <p v-if="publishedUrl" class="text-caption text-grey">{{ publishedUrl.title }}</p>
+
+            <v-divider class="my-4" />
+
+            <p class="text-subtitle-2 mb-2">Per-feed sharing</p>
+            <v-select
+              v-model="shareFeedId"
+              :items="feedStore.feeds"
+              item-title="title"
+              item-value="id"
+              label="Feed"
+              density="compact"
+            />
+            <div class="d-flex ga-2 mb-3">
+              <v-btn size="small" variant="tonal" :disabled="!shareFeedId" @click="loadFeedUrl">Display URL</v-btn>
+              <v-btn size="small" variant="tonal" :disabled="!shareFeedId" @click="regenFeedKey">Regenerate key</v-btn>
+            </div>
+            <v-text-field
+              v-if="feedUrl"
+              :model-value="feedUrl.link"
+              label="Feed URL"
+              readonly
+              density="compact"
+            />
+          </v-window-item>
+
+          <!-- Maintenance -->
+          <v-window-item value="maintenance">
+            <div class="d-flex flex-wrap ga-2 mb-3">
+              <v-btn size="small" variant="tonal" @click="loadInactive">Inactive feeds</v-btn>
+              <v-btn size="small" variant="tonal" @click="loadErrors">Feeds with errors</v-btn>
+              <v-btn size="small" variant="tonal" @click="resetFeedSort">Reset feed order</v-btn>
+              <v-btn size="small" variant="tonal" @click="resetCatSort">Reset category order</v-btn>
+            </div>
+
+            <v-list v-if="inactiveFeeds.length" density="compact">
+              <v-list-item v-for="feed in inactiveFeeds" :key="feed.id">
+                <v-list-item-title>{{ feed.title }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  last article {{ feed.last_article }} · {{ feed.feed_url }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+
+            <v-list v-if="feedsWithErrors.length" density="compact">
+              <v-list-item v-for="feed in feedsWithErrors" :key="feed.id">
+                <v-list-item-title>{{ feed.title }}</v-list-item-title>
+                <v-list-item-subtitle>{{ feed.last_error }}</v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-window-item>
         </v-window>
 
         <v-alert v-if="message" :type="messageType" variant="tonal" density="compact" class="mt-4">
@@ -235,11 +409,14 @@ import { useFeedsStore, type Category } from '../../stores';
 import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 import {
+  FEED_PUBLISHED,
   FEED_PURGE_INTERVALS,
   FEED_UPDATE_INTERVALS,
   ICON_FILE_TOO_LARGE,
   ICON_UPLOAD_SUCCESS,
   type FeedDetails,
+  type FeedWithError,
+  type InactiveFeed,
 } from '../../api/legacyEndpoints';
 
 defineProps<{ modelValue: boolean }>();
@@ -271,6 +448,46 @@ const opmlIncludeSettings = ref(true);
 // Feed icon upload
 const iconFile = ref<File | File[] | null>(null);
 const iconPreviewUrl = ref('');
+
+// Batch subscribe / edit
+const batchFeeds = ref('');
+const batchCategory = ref<number | null>(null);
+const batchLogin = ref('');
+const batchPass = ref('');
+const batchIds = ref<number[]>([]);
+const batchCat = ref<number | null>(null);
+const batchUpdateInterval = ref(0);
+const batchPurgeInterval = ref(0);
+const batchAuthLogin = ref('');
+const batchAuthPass = ref('');
+const batchFlags = ref({
+  include_in_digest: false,
+  always_display_enclosures: false,
+  hide_images: false,
+  cache_images: false,
+  mark_unread_on_update: false,
+});
+const batchApply = ref({
+  cat_id: false,
+  update_interval: false,
+  purge_interval: false,
+  auth_login: false,
+  auth_pass: false,
+  include_in_digest: false,
+  always_display_enclosures: false,
+  hide_images: false,
+  cache_images: false,
+  mark_unread_on_update: false,
+});
+
+// Sharing
+const publishedUrl = ref<{ title: string; link: string } | null>(null);
+const feedUrl = ref<{ title: string; link: string } | null>(null);
+const shareFeedId = ref<number | null>(null);
+
+// Maintenance
+const inactiveFeeds = ref<InactiveFeed[]>([]);
+const feedsWithErrors = ref<FeedWithError[]>([]);
 
 /** The import log is an HTML fragment; sanitize it before rendering. */
 const sanitizedOpmlResult = computed(() => DOMPurify.sanitize(opmlResult.value));
@@ -446,6 +663,130 @@ const exportOpml = () => {
   // The export is a GET that sets Content-Disposition; navigate so the browser
   // handles the download instead of fetch returning the XML as text.
   window.open(api.opmlExportUrl(opmlIncludeSettings.value), '_blank', 'noreferrer');
+};
+
+const submitBatchSubscribe = async () => {
+  busy.value = true;
+  try {
+    const response = await api.batchAddFeeds(
+      batchFeeds.value,
+      batchCategory.value ?? 0,
+      batchLogin.value,
+      batchPass.value
+    );
+    if (response.status === 0) {
+      batchFeeds.value = '';
+      notify('Feeds subscribed');
+      await feedStore.loadFeeds();
+    } else {
+      notify(response.error ?? 'Failed to subscribe feeds', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
+};
+
+const submitBatchEdit = async () => {
+  const fields: Record<string, string> = {};
+
+  if (batchApply.value.cat_id) fields.cat_id = String(batchCat.value ?? 0);
+  if (batchApply.value.update_interval) fields.update_interval = String(batchUpdateInterval.value);
+  if (batchApply.value.purge_interval) fields.purge_interval = String(batchPurgeInterval.value);
+  if (batchApply.value.auth_login) fields.auth_login = batchAuthLogin.value;
+  if (batchApply.value.auth_pass) fields.auth_pass = batchAuthPass.value;
+
+  for (const [name, checked] of Object.entries(batchFlags.value)) {
+    if (batchApply.value[name as keyof typeof batchApply.value]) {
+      fields[name] = checked ? 'on' : '';
+    }
+  }
+
+  if (Object.keys(fields).length === 0) {
+    notify('Select at least one field to apply', 'error');
+    return;
+  }
+
+  busy.value = true;
+  try {
+    const response = await api.batchEditFeeds(batchIds.value, fields);
+    if (response.status === 0) {
+      notify('Feeds updated');
+      await feedStore.loadFeeds();
+    } else {
+      notify(response.error ?? 'Failed to update feeds', 'error');
+    }
+  } finally {
+    busy.value = false;
+  }
+};
+
+const loadPublishedUrl = async () => {
+  const response = await api.getSharedUrl(FEED_PUBLISHED, false);
+  if (response.status === 0) publishedUrl.value = response.content;
+  else notify(response.error ?? 'Failed to load the published feed URL', 'error');
+};
+
+const regenPublishedKey = async () => {
+  const response = await api.regenFeedKey(FEED_PUBLISHED, false);
+  if (response.status === 0) await loadPublishedUrl();
+  else notify(response.error ?? 'Failed to regenerate the key', 'error');
+};
+
+const loadFeedUrl = async () => {
+  if (shareFeedId.value === null) return;
+  const response = await api.getSharedUrl(shareFeedId.value, false);
+  if (response.status === 0) feedUrl.value = response.content;
+  else notify(response.error ?? 'Failed to load the feed URL', 'error');
+};
+
+const regenFeedKey = async () => {
+  if (shareFeedId.value === null) return;
+  const response = await api.regenFeedKey(shareFeedId.value, false);
+  if (response.status === 0) await loadFeedUrl();
+  else notify(response.error ?? 'Failed to regenerate the key', 'error');
+};
+
+const clearKeys = async () => {
+  const response = await api.clearFeedKeys();
+  if (response.status === 0) {
+    publishedUrl.value = null;
+    feedUrl.value = null;
+    notify('Generated URLs cleared');
+  } else {
+    notify(response.error ?? 'Failed to clear generated URLs', 'error');
+  }
+};
+
+const loadInactive = async () => {
+  const response = await api.getInactiveFeeds();
+  if (response.status === 0) inactiveFeeds.value = response.content;
+  else notify(response.error ?? 'Failed to load inactive feeds', 'error');
+};
+
+const loadErrors = async () => {
+  const response = await api.getFeedsWithErrors();
+  if (response.status === 0) feedsWithErrors.value = response.content;
+  else notify(response.error ?? 'Failed to load feeds with errors', 'error');
+};
+
+const resetFeedSort = async () => {
+  const response = await api.resetFeedOrder();
+  if (response.status === 0) {
+    notify('Feed order reset');
+    await feedStore.loadFeeds();
+  } else {
+    notify(response.error ?? 'Failed to reset feed order', 'error');
+  }
+};
+
+const resetCatSort = async () => {
+  const response = await api.resetCategoryOrder();
+  if (response.status === 0) {
+    notify('Category order reset');
+    await feedStore.loadFeeds();
+  } else {
+    notify(response.error ?? 'Failed to reset category order', 'error');
+  }
 };
 
 // Use emit instead of $emit for v-model binding

@@ -4,6 +4,7 @@ import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
 import api from '@/api/client';
+import ShareDialog from './dialogs/ShareDialog.vue';
 
 const props = defineProps<{
   article: Article;
@@ -29,6 +30,8 @@ const pluginIcon = (icon: string): string => PLUGIN_ICONS[icon] ?? 'mdi-extensio
 
 const pluginDialog = ref<{ title: string; html: string } | null>(null);
 const pluginBusy = ref(false);
+const shareDialogOpen = ref(false);
+const shareArticleId = ref(props.article.id);
 
 /** Sanitize the plugin's dialog body before rendering it. */
 const sanitizedPluginHtml = computed(() =>
@@ -36,6 +39,13 @@ const sanitizedPluginHtml = computed(() =>
 );
 
 async function runPluginButton(button: { plugin: string; method: string; title: string }): Promise<void> {
+  // The share plugin's legacy JS owned its dialog; the Vue app does the same.
+  if (button.plugin.toLowerCase() === 'share' && button.method === 'shareArticle') {
+    shareArticleId.value = props.article.id;
+    shareDialogOpen.value = true;
+    return;
+  }
+
   pluginBusy.value = true;
   try {
     const response = await api.invokePluginHandler(button.plugin, button.method, {
@@ -238,6 +248,9 @@ const sanitizedContent = computed(() => {
         </div>
       </footer>
     </article>
+
+    <!-- Share plugin: the legacy JS drove this dialog, so the Vue app owns it. -->
+    <ShareDialog v-model="shareDialogOpen" :article-id="shareArticleId" />
 
     <!-- Plugin handler output (a dialog body from the backend). -->
     <v-dialog

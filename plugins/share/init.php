@@ -64,6 +64,19 @@ class Share extends Plugin {
 	 * @param array<string,mixed> $line
 	 *
 	 * @return string */
+	/**
+	 * Remove sharing for one article.
+	 */
+	function unshare(): void {
+		$id = (int) ($_REQUEST['id'] ?? 0);
+
+		$sth = $this->pdo->prepare("UPDATE ttrss_user_entries SET uuid = '' WHERE int_id = ?
+			AND owner_uid = ?");
+		$sth->execute([$id, $_SESSION['uid']]);
+
+		print __("Article unshared");
+	}
+
 	function hook_article_button($line) {
 		$icon_class = !empty($line['uuid']) ? "is-shared" : "";
 

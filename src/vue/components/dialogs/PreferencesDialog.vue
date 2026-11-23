@@ -10,9 +10,12 @@
         <v-tabs v-model="tab" color="primary">
           <v-tab value="general">General</v-tab>
           <v-tab value="advanced">Advanced</v-tab>
+          <v-tab value="account">Account</v-tab>
           <v-tab value="filters">Filters</v-tab>
           <v-tab value="password">Password</v-tab>
           <v-tab value="plugins">Plugins</v-tab>
+          <v-tab v-if="isAdmin" value="users">Users</v-tab>
+          <v-tab v-if="isAdmin" value="system">System</v-tab>
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
@@ -67,6 +70,10 @@
                 />
               </v-list-item>
             </v-list>
+          </v-window-item>
+
+          <v-window-item value="account">
+            <AccountPanel v-if="tab === 'account'" />
           </v-window-item>
 
           <v-window-item value="filters">
@@ -158,6 +165,26 @@
             <PluginSurface section="prefPrefsPrefsInside" />
             <PluginSurface section="prefPrefsPrefsOutside" />
             <PluginSurface section="prefFeedsPublishedGenerated" />
+
+            <v-expansion-panels v-if="pluginTabs.length" variant="accordion" class="mt-4">
+              <v-expansion-panel
+                v-for="pluginTab in pluginTabs"
+                :key="pluginTab.id"
+                :title="pluginTab.title"
+              >
+                <v-expansion-panel-text>
+                  <PluginSurface :html="pluginTab.html" />
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-window-item>
+
+          <v-window-item v-if="isAdmin" value="users">
+            <UsersPanel v-if="tab === 'users'" />
+          </v-window-item>
+
+          <v-window-item v-if="isAdmin" value="system">
+            <SystemPanel v-if="tab === 'system'" />
           </v-window-item>
         </v-window>
 
@@ -186,6 +213,10 @@ import api from '../../api/client';
 import FilterEditorDialog from './FilterEditorDialog.vue';
 import PluginManagerPanel from './PluginManagerDialog.vue';
 import PluginSurface from '../PluginSurface.vue';
+import AccountPanel from './AccountPanel.vue';
+import UsersPanel from './UsersPanel.vue';
+import SystemPanel from './SystemPanel.vue';
+import type { PluginPrefsTab } from '../../api/legacyEndpoints';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
@@ -193,6 +224,7 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
 const tab = ref('general');
 const loadingPrefs = ref(false);
 const loadingFilters = ref(false);
+const isAdmin = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
 
@@ -251,6 +283,7 @@ const editablePrefs = ref<EditablePref[]>([]);
 // Advanced tab so the whole set is editable.
 const advancedPrefs = ref<EditablePref[]>([]);
 const filters = ref<Array<Record<string, unknown>>>([]);
+const pluginTabs = ref<PluginPrefsTab[]>([]);
 
 watch(
   () => props.modelValue,
@@ -261,7 +294,10 @@ watch(
     tab.value = 'general';
     // Both loaders report failures through `message`; the explicit void keeps
     // the watcher callback synchronous.
-    runDetached(Promise.all([loadPrefs(), loadFilters()]), 'load preferences');
+    runDetached(
+      Promise.all([loadPrefs(), loadFilters(), loadPluginTabs()]),
+      'load preferences'
+    );
   }
 );
 
@@ -277,6 +313,7 @@ async function loadPrefs() {
     // payload's `prefs` map carries every user preference with its type.
     const response = await api.getInitParams();
     const params = response.status === 0 ? response.content : {};
+    isAdmin.value = Boolean(params.is_admin);
     const backendPrefs = (params.prefs ?? {}) as Record<string, { value: unknown; type: number }>;
 
     const labelled = new Set(prefDefinitions.map(d => d.name));
@@ -318,6 +355,15 @@ async function savePref(name: string, value: string) {
   } catch (err) {
     console.error('Failed to save preference:', err);
     notify('Failed to save preference', 'error');
+  }
+}
+
+async function loadPluginTabs() {
+  const response = await api.getPluginPrefsTabs();
+  if (response.status === 0) {
+    pluginTabs.value = response.content;
+  } else {
+    notify(response.error ?? 'Failed to load plugin settings', 'error');
   }
 }
 

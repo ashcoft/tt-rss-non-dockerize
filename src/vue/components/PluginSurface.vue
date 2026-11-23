@@ -1,5 +1,11 @@
 <template>
-  <div v-if="sanitizedHtml" class="plugin-surface" @click="onClick" v-html="sanitizedHtml" />
+  <div
+    v-if="sanitizedHtml"
+    class="plugin-surface"
+    @click="onClick"
+    @submit.prevent="onSubmit"
+    v-html="sanitizedHtml"
+  />
 
   <v-dialog v-model="dialogOpen" max-width="560">
     <v-card>
@@ -77,6 +83,35 @@ function showResult(title: string, content: string): void {
   dialogHtml.value = dialogIsHtml.value ? DOMPurify.sanitize(content) : '';
   dialogText.value = dialogIsHtml.value ? '' : content || 'Done';
   dialogOpen.value = true;
+}
+
+async function onSubmit(event: Event): Promise<void> {
+  const form = event.target as HTMLFormElement | null;
+  if (!form || form.tagName !== 'FORM') return;
+
+  event.preventDefault();
+
+  const data = new FormData(form);
+  const plugin = String(data.get('plugin') ?? '');
+  const method = String(data.get('method') ?? '');
+  if (!plugin || !method) {
+    snackbarText.value = 'This plugin form has no handler.';
+    snackbar.value = true;
+    return;
+  }
+
+  const params: Record<string, string> = {};
+  for (const [key, value] of data.entries()) {
+    if (key === 'op' || key === 'plugin' || key === 'method' || key === 'csrf_token') continue;
+    params[key] = typeof value === 'string' ? value : value.name;
+  }
+
+  const response = await api.invokePluginHandler(plugin, method, params);
+  if (response.status === 0) {
+    showResult(method, response.content);
+  } else {
+    showResult('Plugin action failed', response.error ?? 'Plugin action failed');
+  }
 }
 
 async function onClick(event: MouseEvent): Promise<void> {

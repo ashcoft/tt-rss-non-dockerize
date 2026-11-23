@@ -197,10 +197,34 @@ arguments relied on the plugin's own JS (deleted with the Dojo stack) to build
 the request; their `onclick` is removed rather than executed, so such plugins
 need a small Vue handler before their buttons work.
 
-What this does not yet cover, and which the legacy shell used to provide:
+`HOOK_PREFS_TAB` is hosted too: `RPC/getPluginPrefsTabs` invokes the hook for
+the legacy tab ids and returns each plugin's fragment with its title. The
+Plugins tab renders them in expansion panels, and `PluginSurface` also
+intercepts native form submissions: the hidden `op`/`plugin`/`method` fields
+written by `Controls\pluginhandler_tags()` are turned into a `PluginHandler`
+call, so plugin settings forms (for example `af_psql_trgm` and `nsfw`) work
+without their deleted JS.
 
-- **Some `Pref_*` screens** (feed-level preferences, users, system) are not yet
-  fully represented in the Vue dialog.
+The bundled `share` plugin's article button is handled by a dedicated
+`ShareDialog` (the legacy JS owned that dialog): it shows the unique URL,
+regenerates the key and unshares the article. The plugin's `unshare()` handler
+was restored server-side.
+
+The legacy `Pref_*` screens now all have Vue hosts:
+
+- **Account** covers personal data, OTP enable/disable, app passwords, settings
+  profiles, custom CSS, digest preview and reset-to-defaults.
+- **Users** (admin) lists, searches, sorts, creates, edits, removes and resets
+  passwords, with a per-user details view.
+- **System** (admin) shows the event log with severity/pagination and clear,
+  sends test email, lists scheduled tasks and renders PHP information.
+- **Manage Feeds** adds batch subscribe/edit, published/feed sharing URLs,
+  inactive feeds, feeds with errors and feed/category sort resets.
+- **Plugins** adds the installer, local-plugin updates, data clearing and
+  uninstall controls, plus plugin-provided preference tabs.
+
+No `dojoType`, `dijit.*`, `dojoConfig` or `<script type="dojo/method">`
+references remain in the PHP or plugin markup.
 
 ### End-to-end verification
 
@@ -274,11 +298,19 @@ the hashed entry script and stylesheet. Two details are easy to get wrong:
   loaded user and throw when there is none, so they are emitted only when
   authenticated.
 
-### Next production gate
+### Migration status
 
-Removing the Dojo libraries requires the items under "Still on Dojo", in this
-order: the preference screens, then the plugin UI surfaces. Do not weaken
-authentication or CSRF checks to make the frontend work.
+The Dojo libraries, AMD modules and `dojoType` markup are gone. Every legacy
+`Pref_*` screen now has a Vue host (see above), and the bundled plugin UI
+surfaces render through `PluginSurface`. Do not weaken authentication or CSRF
+checks to make the frontend work.
+
+Remaining limitations are plugin-specific rather than core:
+
+- A third-party plugin whose toolbar/prefs button needs arguments still needs a
+  small Vue handler, because the plugin's own JS was removed with Dojo.
+- Plugin-provided tabs are rendered as sanitized HTML with native forms; plugins
+  that depend on custom JS behavior beyond form submission need a Vue adapter.
 
 
 This document describes the migration from the legacy Dojo build system to Vite with Vue 3 and Vuetify while maintaining backward compatibility.
@@ -592,42 +624,22 @@ src/vue/
 в””в”Ђв”Ђ main.ts               # Entry point with Pinia/Vuetify
 ```
 
-## Dojo/Dijit Files Still Used
+## Legacy files removed
 
-### Core Application
-- `js/App.js` - Main application controller
-- `js/tt-rss.js` - Core TT-RSS functionality
-- `js/common.js` - Common utilities
-
-### Article & Headlines
-- `js/Article.js` - Article operations
-- `js/Headlines.js` - Headlines view with actions
-- `js/Feeds.js` - Feed operations
-
-### Common Components
-- `js/CommonDialogs.js` - Dialog components
-- `js/CommonFilters.js` - Filter components
-- `js/Toolbar.js` - Toolbar (more features)
-
-### Feed Tree
-- `js/FeedTree.js` - Feed tree with categories, drag-drop
-
-### Preferences
-- `js/prefs.js`, `js/Pref*.js` - All preferences modules
-
-### Form & Other
-- `js/form/` - Form widgets
-- `js/SingleUseDialog.js`, `js/PluginHost.js`, etc.
+The Dojo/Dijit libraries, the AMD modules under `js/`, `js/form/`,
+`lib/CheckBox*.js` and `src/shim/` are deleted. The only remaining `js/` files
+are the plain helpers `common.js` and `utility.js`, which public/plugin pages
+still include.
 
 ## Future Enhancements
 
 Potential improvements for future phases:
 
-1. **Complete Component Migration**: Migrate remaining Dojo components to Vue
-2. **Vue Router Integration**: Add client-side routing for preferences, etc.
-3. **Bundle Optimization**: Analyze and optimize the production bundle
-4. **Full TypeScript Adoption**: Convert all Vue components to TypeScript
-5. **Full ESM Migration**: Gradually convert Dojo modules to ESM
+1. **Vue Router Integration**: Add client-side routing for preferences, etc.
+2. **Bundle Optimization**: Analyze and optimize the production bundle
+3. **Full TypeScript Adoption**: Convert all Vue components to TypeScript
+4. **Plugin API**: Replace the legacy HTML-hook bridge with a structured Vue
+   plugin API for third-party plugins that need custom behavior.
 
 ## Contributing
 

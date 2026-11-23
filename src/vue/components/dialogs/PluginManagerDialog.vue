@@ -60,6 +60,51 @@
         {{ message }}
       </v-alert>
     </div>
+
+    <v-expansion-panels v-if="isAdmin" variant="accordion" class="mt-4">
+      <v-expansion-panel title="Install plugins" @click="loadAvailable">
+        <v-expansion-panel-text>
+          <v-alert v-if="!installerEnabled" type="info" variant="tonal" density="compact">
+            The plugin installer is disabled in the server configuration.
+          </v-alert>
+          <template v-else>
+            <v-list density="compact" class="available-plugins">
+              <v-list-item v-for="plugin in availablePlugins" :key="plugin.name">
+                <v-list-item-title>{{ plugin.name }}</v-list-item-title>
+                <v-list-item-subtitle>{{ plugin.description }}</v-list-item-subtitle>
+                <template #append>
+                  <v-btn size="small" variant="tonal" @click="install(plugin.name)">Install</v-btn>
+                </template>
+              </v-list-item>
+              <v-list-item v-if="availablePlugins.length === 0">
+                <v-list-item-title>No plugins available.</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </template>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel title="Local plugin maintenance">
+        <v-expansion-panel-text>
+          <div class="d-flex flex-wrap ga-2 mb-3">
+            <v-btn size="small" variant="tonal" :loading="busy" @click="checkUpdates">Check for updates</v-btn>
+            <v-btn size="small" variant="tonal" :loading="busy" @click="updatePlugins">Update local plugins</v-btn>
+          </div>
+          <v-alert v-if="updateResult" type="info" variant="tonal" density="compact" class="mb-3">
+            {{ updateResult }}
+          </v-alert>
+          <v-list density="compact">
+            <v-list-item v-for="plugin in localPlugins" :key="plugin.name">
+              <v-list-item-title>{{ plugin.name }}</v-list-item-title>
+              <template #append>
+                <v-btn size="small" variant="text" @click="clearData(plugin.name)">Clear data</v-btn>
+                <v-btn size="small" variant="text" color="error" @click="uninstall(plugin.name)">Uninstall</v-btn>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
   </div>
 </template>
 
@@ -67,6 +112,7 @@
 import { computed, onMounted, ref } from 'vue';
 import api from '../../api/client';
 import type { PluginInfo } from '../../api/client';
+import type { AvailablePlugin } from '../../api/legacyEndpoints';
 
 const plugins = ref<PluginInfo[]>([]);
 // The user-enabled set being edited; system plugins are excluded because
@@ -77,6 +123,13 @@ const loading = ref(false);
 const busy = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
+const isAdmin = ref(false);
+const installerEnabled = ref(false);
+const availablePlugins = ref<AvailablePlugin[]>([]);
+const availableLoaded = ref(false);
+const updateResult = ref('');
+
+const localPlugins = computed(() => plugins.value.filter((plugin) => plugin.is_local));
 
 const filteredPlugins = computed(() => {
   const query = search.value.trim().toLowerCase();
@@ -96,9 +149,15 @@ async function load(): Promise<void> {
     const response = await api.getPluginsList();
     if (response.status === 0) {
       plugins.value = response.content.plugins;
+      isAdmin.value = response.content.isAdmin;
       enabled.value = new Set(
         response.content.plugins.filter((p) => p.user_enabled).map((p) => p.name)
       );
+
+      const params = await api.getInitParams();
+      if (params.status === 0) {
+        installerEnabled.value = Boolean(params.content.enable_plugin_installer);
+      }
     } else {
       message.value = response.error ?? 'Failed to load plugins';
       messageType.value = 'error';
@@ -141,6 +200,73 @@ async function save(): Promise<void> {
   } finally {
     busy.value = false;
   }
+}
+
+async function loadAvailable(): Promise<void> {
+  if (availableLoaded.value || !installerEnabled.value) return;
+  const response = await api.getAvailablePlugins();
+  if (response.status === 0) {
+    availablePlugins.value = response.content;
+    availableLoaded.value = true;
+  } else {
+    message.value = response.error ?? 'Failed to load available plugins';
+    messageType.value = 'error';
+  }
+}
+
+async function install(name: string): Promise<void> {
+  busy.value = true;
+  try {
+    const response = await api.installPlugin(name);
+    message.value =
+      response.status === 0
+        ? `Installed ${name}`
+        : response.error ?? `Failed to install ${name}`;
+    messageType.value = response.status === 0 ? 'success' : 'error';
+    await load();
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function checkUpdates(): Promise<void> {
+  busy.value = true;
+  try {
+    const response = await api.checkForPluginUpdates();
+    updateResult.value =
+      response.status === 0
+        ? `Checked ${response.content.length} plugin(s) for updates.`
+        : response.error ?? 'Failed to check for updates';
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function updatePlugins(): Promise<void> {
+  busy.value = true;
+  try {
+    const response = await api.updateLocalPlugins([]);
+    updateResult.value =
+      response.status === 0
+        ? `Updated ${response.content.length} plugin(s).`
+        : response.error ?? 'Failed to update plugins';
+    await load();
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function clearData(name: string): Promise<void> {
+  const response = await api.clearPluginData(name);
+  message.value = response.status === 0 ? `Cleared data for ${name}` : response.error ?? 'Failed to clear plugin data';
+  messageType.value = response.status === 0 ? 'success' : 'error';
+}
+
+async function uninstall(name: string): Promise<void> {
+  const response = await api.uninstallPlugin(name);
+  message.value = response.status === 0 ? `Uninstalled ${name}` : response.error ?? `Failed to uninstall ${name}`;
+  messageType.value = response.status === 0 ? 'success' : 'error';
+  await load();
 }
 </script>
 
