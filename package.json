@@ -32,7 +32,7 @@
     "lint:js": "eslint js src",
     "phpunit": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
     "phpunit:integration": "./tests_integration/run.sh",
-    "release:vite-dev": "semantic-release --extends ./.releaserc.vite-dev.json"
+    "release:vite-dev": "bash scripts/release-vite-dev.sh"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
