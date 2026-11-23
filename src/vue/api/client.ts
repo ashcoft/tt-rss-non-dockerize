@@ -337,6 +337,7 @@ class ApiClient {
       searchLanguage?: string;
       orderBy?: string;
       forceUpdate?: boolean;
+      firstId?: number;
     } = {}
   ): Promise<ApiResponse<endpoints.HeadlinesPage>> {
     return this.wrap(() => endpoints.getHeadlines(legacyBackend, feedId, options), {
@@ -346,6 +347,7 @@ class ApiClient {
       message: null,
       feedError: null,
       feedSiteUrl: '',
+      firstIdChanged: false,
     });
   }
 
@@ -547,12 +549,16 @@ class ApiClient {
   }
 
   /** Plugin-provided toolbar button HTML (main and action toolbar). */
-  async getPluginButtons(): Promise<ApiResponse<endpoints.PluginSurfaces>> {
-    return this.wrap(() => endpoints.getPluginButtons(legacyBackend), {
+  async getPluginButtons(
+    feedId?: number,
+    isCat?: boolean
+  ): Promise<ApiResponse<endpoints.PluginSurfaces>> {
+    return this.wrap(() => endpoints.getPluginButtons(legacyBackend, feedId, isCat), {
       mainToolbar: '',
       toolbar: '',
       feedTree: '',
       actionItems: '',
+      headlineToolbar: '',
       customSortMap: {},
     });
   }

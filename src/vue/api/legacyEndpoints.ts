@@ -44,6 +44,8 @@ export interface AdaptedFeed {
   cat_id: number | null;
   feed_url: string;
   site_url: string;
+  /** True when the backend has a cached favicon for this feed. */
+  has_icon: boolean;
 }
 
 export interface AdaptedCategory {
@@ -252,6 +254,7 @@ function adaptTreeNode(
     // from Pref_Feeds/editfeed. Leave them empty rather than fabricating.
     feed_url: '',
     site_url: '',
+    has_icon: asString(node.icon) !== '',
   };
 }
 
@@ -349,6 +352,8 @@ export interface HeadlinesPage {
   feedError: string | null;
   /** Feed site URL reported by the toolbar payload, or "". */
   feedSiteUrl: string;
+  /** Set when the first article changed while paging through a feed. */
+  firstIdChanged: boolean;
 }
 
 /**
@@ -450,6 +455,7 @@ export async function getHeadlines(
     searchLanguage?: string;
     orderBy?: string;
     forceUpdate?: boolean;
+    firstId?: number;
   } = {}
 ): Promise<HeadlinesPage> {
   // A search without a language makes PostgreSQL raise "invalid name syntax",
@@ -471,6 +477,7 @@ export async function getHeadlines(
     order_by: options.orderBy ?? '',
     // "ForceUpdate" makes the backend refresh the feed before listing.
     m: options.forceUpdate ? 'ForceUpdate' : '',
+    fid: options.firstId ?? 0,
   });
 
   const body = requireBody(response, 'Feeds/view');
@@ -488,10 +495,11 @@ export async function getHeadlines(
     : {};
   const feedError = asString(toolbar.error).trim() || null;
   const feedSiteUrl = asString(toolbar.site_url);
+  const firstIdChanged = headlines.first_id_changed === true;
 
   if (typeof content === 'string') {
     // A string body is the legacy empty/error marker.
-    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError, feedSiteUrl };
+    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError, feedSiteUrl, firstIdChanged };
   }
 
   const rows = expectArray(content, 'Feeds/view.headlines.content');
@@ -502,6 +510,7 @@ export async function getHeadlines(
     message: null,
     feedError,
     feedSiteUrl,
+    firstIdChanged,
   };
 }
 
@@ -1368,6 +1377,8 @@ export interface PluginSurfaces {
   feedTree: string;
   /** HTML for HOOK_ACTION_ITEM (inside the actions menu). */
   actionItems: string;
+  /** HTML for HOOK_HEADLINE_TOOLBAR_BUTTON (per-feed headline toolbar). */
+  headlineToolbar: string;
   /** Extra sort options from HOOK_HEADLINES_CUSTOM_SORT_MAP. */
   customSortMap: Record<string, string>;
 }
@@ -1380,8 +1391,15 @@ export interface PluginSurfaces {
  * for handlers that follow the `Plugins.<Class>.<method>()` convention; see
  * `preparePluginSurfaceHtml`.
  */
-export async function getPluginButtons(backend: LegacyBackend): Promise<PluginSurfaces> {
-  const response = await backend.call('RPC', 'getPluginButtons');
+export async function getPluginButtons(
+  backend: LegacyBackend,
+  feedId?: number,
+  isCat?: boolean
+): Promise<PluginSurfaces> {
+  const response = await backend.call('RPC', 'getPluginButtons', {
+    feed: feedId ?? 0,
+    is_cat: isCat ? 1 : 0,
+  });
   const body = requireBody(response, 'RPC/getPluginButtons');
 
   const customSortMap: Record<string, string> = {};
@@ -1396,6 +1414,7 @@ export async function getPluginButtons(backend: LegacyBackend): Promise<PluginSu
     toolbar: asString(body.toolbar),
     feedTree: asString(body.feed_tree),
     actionItems: asString(body.action_items),
+    headlineToolbar: asString(body.headline_toolbar),
     customSortMap,
   };
 }

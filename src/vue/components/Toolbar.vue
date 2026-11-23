@@ -17,6 +17,7 @@
 
       <!-- Plugin-provided main toolbar buttons (HOOK_MAIN_TOOLBAR_BUTTON). -->
       <PluginSurface v-if="pluginMainHtml" :html="pluginMainHtml" class="plugin-main-toolbar" />
+      <PluginSurface v-if="pluginHeadlineHtml" :html="pluginHeadlineHtml" class="plugin-headline-toolbar" />
 
       <a
         v-if="updateUrl"
@@ -162,6 +163,8 @@ interface Props {
   pluginToolbarHtml?: string;
   /** Plugin HTML for HOOK_ACTION_ITEM. */
   pluginActionHtml?: string;
+  /** Plugin HTML for HOOK_HEADLINE_TOOLBAR_BUTTON. */
+  pluginHeadlineHtml?: string;
   /** Extra sort options from HOOK_HEADLINES_CUSTOM_SORT_MAP. */
   customSortMap?: Record<string, string>;
   /** Link to a newer core release, when one is available. */
@@ -181,6 +184,7 @@ const props = withDefaults(defineProps<Props>(), {
   pluginMainHtml: '',
   pluginToolbarHtml: '',
   pluginActionHtml: '',
+  pluginHeadlineHtml: '',
   customSortMap: () => ({}),
   updateUrl: '',
   pluginUpdates: false,

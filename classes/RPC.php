@@ -848,6 +848,38 @@ class RPC extends Handler_Protected {
 	 *
 	 * @param PluginHost::HOOK_* $hook
 	 */
+	/**
+	 * Render a hook whose plugin method takes positional arguments.
+	 *
+	 * @param array<int, mixed> $args
+	 */
+	private function _render_plugin_hook_args(string $hook, array $args): string {
+		$html = '';
+		$host = PluginHost::getInstance();
+		$method = strtolower($hook);
+
+		foreach ($host->get_hooks($hook) as $plugin) {
+			if (!$host->implements_hook($plugin, $hook)) {
+				continue;
+			}
+
+			ob_start();
+
+			try {
+				$result = $plugin->$method(...$args);
+				$html .= (string) ob_get_clean();
+
+				if (is_string($result)) {
+					$html .= $result;
+				}
+			} catch (\Throwable $err) {
+				ob_end_clean();
+				Debug::log("plugin hook $hook failed: " . $err->getMessage());
+			}
+		}
+
+		return $html;
+	}
 	private function _render_plugin_hook(string $hook, ?string $section = null): string {
 		$html = '';
 		$host = PluginHost::getInstance();
@@ -878,9 +910,27 @@ class RPC extends Handler_Protected {
 
 	/** HTML for the plugin-provided main and action toolbar buttons. */
 	function getPluginButtons(): void {
+		$custom_sort_map = [];
+
+		PluginHost::getInstance()->run_hooks_callback(PluginHost::HOOK_HEADLINES_CUSTOM_SORT_MAP,
+			function ($result) use (&$custom_sort_map) {
+				if (is_array($result)) {
+					$custom_sort_map = array_merge($custom_sort_map, $result);
+				}
+			});
+
+		$feed = (int) ($_REQUEST['feed'] ?? 0);
+		$is_cat = self::_param_to_bool($_REQUEST['is_cat'] ?? false);
+
 		print json_encode([
 			'main_toolbar' => $this->_render_plugin_hook(PluginHost::HOOK_MAIN_TOOLBAR_BUTTON),
 			'toolbar' => $this->_render_plugin_hook(PluginHost::HOOK_TOOLBAR_BUTTON),
+			'feed_tree' => $this->_render_plugin_hook(PluginHost::HOOK_FEED_TREE),
+			'action_items' => $this->_render_plugin_hook(PluginHost::HOOK_ACTION_ITEM),
+			'headline_toolbar' => $feed > 0
+				? $this->_render_plugin_hook_args(PluginHost::HOOK_HEADLINE_TOOLBAR_BUTTON, [$feed, $is_cat])
+				: '',
+			'custom_sort_map' => $custom_sort_map,
 		]);
 	}
 

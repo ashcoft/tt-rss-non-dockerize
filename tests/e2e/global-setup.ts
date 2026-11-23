@@ -125,6 +125,7 @@ export default function globalSetup(): void {
     ['USER_CSS_THEME', 'feedly/dist/feedly.css'],
     ['DEFAULT_SEARCH_LANGUAGE', 'english'],
     ['CDM_EXPANDED', '1'],
+    ['WIDESCREEN_MODE', '0'],
     ['VFEED_GROUP_BY_FEED', '0'],
     ['DEBUG_HEADLINE_IDS', '0'],
     ['_ENABLED_PLUGINS', 'auth_internal,note'],

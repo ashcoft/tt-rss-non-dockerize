@@ -239,6 +239,10 @@
         </template>
       </div>
 
+      <div v-if="firstIdChanged && !loading" class="headlines-end">
+        <a href="#" @click.prevent="emit('reload-current')">New articles found, reload feed to continue.</a>
+      </div>
+
       <div v-if="!hasMore && !loading && headlines.length > 0" class="headlines-end">
         <a href="#" @click.prevent="emit('next-unread')">Click to open next unread feed.</a>
       </div>
@@ -284,6 +288,8 @@ const props = defineProps<{
   cdmExpanded?: boolean;
   /** The current feed's site URL, for the feed pill link. */
   feedSiteUrl?: string;
+  /** Feeds/view reports that the first article changed while paging. */
+  firstIdChanged?: boolean;
   /** Ids currently checked for bulk actions. */
   selectedIds?: Set<number>;
   /** CDM_AUTO_CATCHUP: mark articles read as they scroll past. */
@@ -298,6 +304,7 @@ const emit = defineEmits<{
   'load-more': [];
   'bulk-action': [action: string, ids: number[]];
   'next-unread': [];
+  'reload-current': [];
 }>();
 
 // Infinite scroll wiring (Phase 5)

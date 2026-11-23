@@ -98,6 +98,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const feedError = ref<string | null>(null);
   /** The current feed's site URL, from the toolbar payload. */
   const feedSiteUrl = ref('');
+  /** Feeds/view reports that the first article changed while paging. */
+  const firstIdChanged = ref(false);
   const viewMode = ref<string>('adaptive');
   /** Feeds/view `order_by`; must be one of default/feed_dates/date_reverse/title. */
   const orderBy = ref<string>('default');
@@ -225,6 +227,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         search: searchQuery.value,
         searchLanguage: searchLanguage.value,
         orderBy: orderBy.value,
+        firstId: headlines.value[0]?.id,
       });
 
       if (sequence !== loadSequence) return;
@@ -239,6 +242,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         notice.value = response.content.message;
         feedError.value = response.content.feedError;
         feedSiteUrl.value = response.content.feedSiteUrl;
+        firstIdChanged.value = response.content.firstIdChanged;
       } else {
         error.value = response.error ?? 'Failed to load headlines';
       }
@@ -274,6 +278,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         search: searchQuery.value,
         searchLanguage: searchLanguage.value,
         orderBy: orderBy.value,
+        firstId: headlines.value[0]?.id,
       });
 
       if (sequence !== loadSequence) return;
@@ -284,6 +289,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         const unique = newHeadlines.filter(headline => !existing.has(headline.id));
 
         headlines.value.push(...unique);
+        firstIdChanged.value = response.content.firstIdChanged;
         // Only continue if we got a full page of results.
         hasMore.value = newHeadlines.length >= pageSize;
       } else {
@@ -703,6 +709,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     notice,
     feedError,
     feedSiteUrl,
+    firstIdChanged,
     viewMode,
     searchQuery,
     searchLanguage,

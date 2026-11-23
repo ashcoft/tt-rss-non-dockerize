@@ -37,6 +37,7 @@
             :plugin-main-html="pluginMainHtml"
             :plugin-toolbar-html="pluginToolbarHtml"
             :plugin-action-html="pluginActionHtml"
+            :plugin-headline-html="pluginHeadlineHtml"
             :custom-sort-map="pluginCustomSortMap"
             :update-url="updateUrl"
             :plugin-updates="pluginUpdatesAvailable"
@@ -84,6 +85,7 @@
             :cdm-expanded="feedsStore.cdmExpanded"
             :auto-catchup="feedsStore.cdmAutoCatchup"
             :feed-site-url="headlinesStore.feedSiteUrl"
+            :first-id-changed="headlinesStore.firstIdChanged"
             @toggle-select="headlinesStore.toggleHeadlineSelected"
             @auto-catchup="handleAutoCatchup"
             @select="handleHeadlineSelect"
@@ -91,6 +93,7 @@
             @load-more="handleLoadMore"
             @bulk-action="handleBulkAction"
             @next-unread="handleNextUnread"
+            @reload-current="handleReloadCurrent"
           />
         </section>
 
@@ -109,6 +112,7 @@
           <ArticleView
             :article="headlinesStore.selectedArticle"
             :feed-site-url="headlinesStore.feedSiteUrl"
+            :first-id-changed="headlinesStore.firstIdChanged"
             @close="handleArticleClose"
             @mark-relative="handleMarkRelative"
           />
@@ -334,6 +338,7 @@ const pluginMainHtml = ref('');
 const pluginToolbarHtml = ref('');
 const pluginFeedTreeHtml = ref('');
 const pluginActionHtml = ref('');
+const pluginHeadlineHtml = ref('');
 const pluginCustomSortMap = ref<Record<string, string>>({});
 const updateUrl = ref('');
 const pluginUpdatesAvailable = ref(false);
@@ -429,6 +434,7 @@ const openInitialFeed = async () => {
   feedsStore.selectFeed(target.feedId, target.isCat);
   syncFeedHash(target.feedId, target.isCat);
   await headlinesStore.loadHeadlines(target.feedId, target.isCat);
+  await loadPluginButtons(target.feedId, target.isCat);
 };
 
 // Auth flow (Phase 3)
@@ -466,13 +472,14 @@ const onLoggedIn = async () => {
 };
 
 /** Load the plugin-provided toolbar button fragments for this session. */
-const loadPluginButtons = async () => {
-  const response = await api.getPluginButtons();
+const loadPluginButtons = async (feedId?: number, isCat?: boolean) => {
+  const response = await api.getPluginButtons(feedId, isCat);
   if (response.status === 0) {
     pluginMainHtml.value = response.content.mainToolbar;
     pluginToolbarHtml.value = response.content.toolbar;
     pluginFeedTreeHtml.value = response.content.feedTree;
     pluginActionHtml.value = response.content.actionItems;
+    pluginHeadlineHtml.value = response.content.headlineToolbar;
     pluginCustomSortMap.value = response.content.customSortMap;
   }
 };
@@ -564,6 +571,7 @@ const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   feedsStore.selectFeed(feedId, isCat);
   syncFeedHash(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
+  await loadPluginButtons(typeof feedId === 'number' ? feedId : Number(feedId), isCat);
 };
 
 /** Drag-and-drop feed ordering: move a feed next to another feed. */
@@ -792,6 +800,12 @@ const handleLoadMore = async () => {
   const isCat = feedsStore.currentIsCat;
   await headlinesStore.loadMore(feedId, isCat);
   await flushPendingAutoCatchup();
+};
+
+/** Reload the current feed after Feeds/view reports a changed first article. */
+const handleReloadCurrent = async () => {
+  headlinesStore.firstIdChanged = false;
+  await headlinesStore.loadHeadlines(feedsStore.currentFeedId ?? FEED_ALL, feedsStore.currentIsCat);
 };
 
 /** Open the next feed/category with unread articles, as the legacy end link does. */

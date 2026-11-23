@@ -1439,6 +1439,7 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
     toolbar: '<button onclick="Plugins.Foo.bar()">Bar</button>',
     feed_tree: '<div class="plugin-tree">Tree</div>',
     action_items: '<button onclick="Plugins.Foo.baz()">Baz</button>',
+    headline_toolbar: '<button onclick="Plugins.Foo.qux()">Qux</button>',
     custom_sort_map: { relevance: 'Relevance' },
   };
   const calls = stubFetch([{ text: JSON.stringify(payload) }]);
@@ -1454,6 +1455,7 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
     toolbar: payload.toolbar,
     feedTree: payload.feed_tree,
     actionItems: payload.action_items,
+    headlineToolbar: payload.headline_toolbar,
     customSortMap: payload.custom_sort_map,
   });
 });

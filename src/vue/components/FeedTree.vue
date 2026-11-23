@@ -145,7 +145,7 @@
           </v-menu>
           <template #prepend>
             <img
-              v-if="!iconFailed.has(feed.id)"
+              v-if="feed.has_icon !== false && !iconFailed.has(feed.id)"
               :src="feedIconUrl(feed.id)"
               class="feed-icon"
               width="16"
@@ -236,7 +236,7 @@
           </v-menu>
           <template #prepend>
             <img
-              v-if="!iconFailed.has(feed.id)"
+              v-if="feed.has_icon !== false && !iconFailed.has(feed.id)"
               :src="feedIconUrl(feed.id)"
               class="feed-icon"
               width="16"
