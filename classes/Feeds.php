@@ -2305,8 +2305,11 @@ class Feeds extends Handler_Protected {
 					try {
 						$tz = new DateTimeZone(Prefs::get(Prefs::USER_TIMEZONE, $owner_uid));
 					} catch (Exception) {
-					 	$tz = new DateTimeZone('UTC');
+						$tz = new DateTimeZone('UTC');
 					}
+
+					$query_date = trim(substr($k, 1));
+
 					/* This class supports days expressed as 2024-11-28, 2025/11/28,
 					 * 16-11-2025, 17 nov 2025, november 17 (current year), today,
 					 * yesterday, last monday, 2 days ago, etc. See "Relative Formats" of
