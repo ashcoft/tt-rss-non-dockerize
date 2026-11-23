@@ -59,6 +59,10 @@ export const useFeedsStore = defineStore('feeds', () => {
   const confirmFeedCatchup = ref(true);
   /** CDM_AUTO_CATCHUP: mark combined-mode articles read as they scroll past. */
   const cdmAutoCatchup = ref(false);
+  /** USER_CSS_THEME currently selected for this user. */
+  const currentTheme = ref('');
+  /** Theme paths the backend can serve (relative to themes/). */
+  const availableThemes = ref<string[]>([]);
   /** Base URL of public.php, from init-params; used for feed icons. */
   const iconsUrl = ref('/public.php');
   /** Unread counters for the virtual ("special") feeds, keyed by feed id. */
@@ -412,6 +416,10 @@ export const useFeedsStore = defineStore('feeds', () => {
       feedsSortByUnread.value = Number(params.feeds_sort_by_unread) === 1;
       confirmFeedCatchup.value = Number(params.confirm_feed_catchup) !== 0;
       cdmAutoCatchup.value = Number(params.cdm_auto_catchup) === 1;
+      currentTheme.value = typeof params.theme === 'string' ? params.theme : '';
+      availableThemes.value = Array.isArray(params.available_themes)
+        ? params.available_themes.filter((theme): theme is string => typeof theme === 'string')
+        : [];
       // public.php streams a feed's icon; the backend tells us the base URL so
       // the app works behind a sub-path install.
       if (typeof params.icons_url === 'string' && params.icons_url !== '') {
@@ -492,6 +500,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     feedsSortByUnread,
     confirmFeedCatchup,
     cdmAutoCatchup,
+    currentTheme,
+    availableThemes,
     iconsUrl,
     specialCounters,
     

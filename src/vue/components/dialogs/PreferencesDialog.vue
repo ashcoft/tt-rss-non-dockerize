@@ -4,10 +4,10 @@
     @update:model-value="emit('update:modelValue', $event)"
     max-width="720"
   >
-    <v-card>
+    <v-card class="d-flex flex-column" style="height: 80vh; flex: 0 0 auto">
       <v-card-title>Preferences</v-card-title>
-      <v-card-text>
-        <v-tabs v-model="tab" color="primary">
+      <v-card-text style="overflow-y: auto; flex: 1 1 auto">
+        <v-tabs v-model="tab" color="primary" class="prefs-tabs">
           <v-tab value="general">General</v-tab>
           <v-tab value="advanced">Advanced</v-tab>
           <v-tab value="account">Account</v-tab>
@@ -22,6 +22,20 @@
 
         <v-window v-model="tab" class="mt-4">
           <v-window-item value="general">
+            <div class="mb-4">
+              <v-select
+                v-model="selectedTheme"
+                :items="themeOptions"
+                label="Theme"
+                density="compact"
+                hide-details
+                @update:model-value="saveTheme"
+              />
+              <p class="text-caption text-grey mt-1">
+                Theme changes reload the app.
+              </p>
+            </div>
+
             <div v-if="loadingPrefs" class="text-center py-6">
               <v-progress-circular indeterminate color="primary" />
             </div>
@@ -319,12 +333,41 @@ const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: 
 /** Map a UI pref key back to the Prefs::* name `RPC/setpref` expects. */
 const prefConstant = (name: string) => name.toUpperCase();
 const feedsStore = useFeedsStore();
+const selectedTheme = ref('');
 
 const editablePrefs = ref<EditablePref[]>([]);
 // Preferences the backend exposes that have no curated label; shown on the
 // Advanced tab so the whole set is editable.
 const advancedPrefs = ref<EditablePref[]>([]);
 const filters = ref<Array<Record<string, unknown>>>([]);
+
+const titleCase = (value: string): string =>
+  value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+    .trim();
+
+const themeTitle = (value: string): string => {
+  const base = value.split('/').pop()?.replace(/\.css$/i, '') ?? value;
+
+  if (value.startsWith('feedly/')) {
+    const variant = base.replace(/^feedly[-_]?/i, '');
+    return variant ? `Feedly ${titleCase(variant)}` : 'Feedly';
+  }
+
+  return titleCase(base);
+};
+
+const themeOptions = computed(() => {
+  const available = feedsStore.availableThemes ?? [];
+  const current = feedsStore.currentTheme ?? '';
+  const values = available.length ? available : [current];
+
+  return values
+    .filter((theme): theme is string => typeof theme === 'string' && theme !== '')
+    .map(value => ({ title: themeTitle(value), value }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+});
 const pluginTabs = ref<PluginPrefsTab[]>([]);
 
 watch(
@@ -356,6 +399,10 @@ async function loadPrefs() {
     const response = await api.getInitParams();
     const params = response.status === 0 ? response.content : {};
     isAdmin.value = Boolean(params.is_admin);
+    selectedTheme.value =
+      typeof params.theme === 'string' && params.theme !== ''
+        ? params.theme
+        : feedsStore.currentTheme;
     const backendPrefs = (params.prefs ?? {}) as Record<string, { value: unknown; type: number }>;
 
     const labelled = new Set(prefDefinitions.map(d => d.name));
@@ -411,6 +458,22 @@ async function savePref(name: string, value: string) {
     console.error('Failed to save preference:', err);
     notify('Failed to save preference', 'error');
   }
+}
+
+async function saveTheme(value: string) {
+  if (!value || value === (feedsStore.currentTheme ?? '')) return;
+
+  const response = await api.setPref('USER_CSS_THEME', value);
+
+  if (response.status !== 0) {
+    notify(response.error ?? 'Failed to save theme', 'error');
+    selectedTheme.value = feedsStore.currentTheme ?? '';
+    return;
+  }
+
+  feedsStore.currentTheme = value;
+  notify('Theme saved; reloading…', 'success');
+  window.setTimeout(() => window.location.reload(), 500);
 }
 
 async function loadPluginTabs() {
@@ -541,3 +604,11 @@ function closeDialog() {
 }
 </script>
 
+<style scoped>
+.prefs-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgb(var(--v-theme-surface));
+}
+</style>

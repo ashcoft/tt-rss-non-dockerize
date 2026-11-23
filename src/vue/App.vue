@@ -209,6 +209,13 @@ const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? 'feedly' : 'feedlyNight';
 };
 
+/** Match the Vuetify palette to a night/light USER_CSS_THEME. */
+const applyThemePalette = () => {
+  theme.global.name.value = /(night|dark)/i.test(feedsStore.currentTheme)
+    ? 'feedlyNight'
+    : 'feedly';
+};
+
 // Polling (Phase 5: real-time updates)
 /** Reload the current feed and its counters. */
 const refreshCurrentFeed = async () => {
@@ -280,6 +287,7 @@ const onLoggedIn = async () => {
     loadPluginButtons(),
     loadUpdates(),
   ]);
+  applyThemePalette();
   await openInitialFeed();
   startPolling();
 };
@@ -693,6 +701,7 @@ onMounted(async () => {
       loadPluginButtons(),
       loadUpdates(),
     ]);
+    applyThemePalette();
     await openInitialFeed();
     startPolling();
   }

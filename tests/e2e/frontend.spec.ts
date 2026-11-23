@@ -571,8 +571,16 @@ test.describe('Vue front-end', () => {
       timeout: 15000,
     });
 
-    // The Advanced tab lists the rest of the backend's preferences.
+    // The theme selector lives here too.
+    await expect(dialog.getByRole('combobox', { name: 'Theme' })).toBeVisible();
+
+    // Every tab uses the same fixed dialog size.
+    const card = dialog.locator('.v-card').first();
+    const generalSize = await card.boundingBox();
     await dialog.getByRole('tab', { name: 'Advanced' }).click();
+    await page.waitForTimeout(300);
+    const advancedSize = await card.boundingBox();
+    expect(Math.round(advancedSize!.height)).toBe(Math.round(generalSize!.height));
     const advanced = dialog.locator('.v-window-item').nth(1);
     await expect(advanced.locator('.v-list-item').first()).toBeVisible();
     expect(await advanced.locator('.v-list-item').count()).toBeGreaterThan(0);
@@ -620,6 +628,41 @@ test.describe('Vue front-end', () => {
     await expect(page.getByRole('dialog').locator('.v-alert')).toContainText(/saved/i, {
       timeout: 10000,
     });
+  });
+
+  test('switches themes from the preferences dialog', async ({ page }) => {
+    await login(page);
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.waitForTimeout(800);
+
+    const theme = page.getByRole('combobox', { name: 'Theme' });
+    await expect(theme).toBeVisible();
+    const current = await theme.inputValue();
+    const target = current === 'Feedly' ? 'Feedly Night' : 'Feedly';
+
+    await theme.focus();
+    await page.keyboard.press('ArrowDown');
+    const option = page.getByRole('option', { name: target, exact: true });
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await option.evaluate((el) => (el as HTMLElement).click());
+
+    // The app reloads with the selected stylesheet and palette.
+    const expected = target === 'Feedly Night' ? /v-theme--feedlyNight/ : /v-theme--feedly/;
+    const expectedCss = target === 'Feedly Night' ? /feedly_night\.css/ : /feedly\.css/;
+    await expect(page.locator('.v-application')).toHaveClass(expected, { timeout: 15000 });
+    await expect(page.locator('#theme_css')).toHaveAttribute('href', expectedCss);
+
+    // Restore the original theme for the rest of the run.
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.waitForTimeout(800);
+    const themeAgain = page.getByRole('combobox', { name: 'Theme' });
+    await themeAgain.focus();
+    await page.keyboard.press('ArrowDown');
+    const original = page.getByRole('option', { name: current, exact: true });
+    await expect(original).toBeVisible({ timeout: 5000 });
+    await original.evaluate((el) => (el as HTMLElement).click());
+    const originalExpected = current === 'Feedly Night' ? /v-theme--feedlyNight/ : /v-theme--feedly/;
+    await expect(page.locator('.v-application')).toHaveClass(originalExpected, { timeout: 15000 });
   });
 
   test('mobile layout uses a drawer and fits the viewport', async ({ page }) => {

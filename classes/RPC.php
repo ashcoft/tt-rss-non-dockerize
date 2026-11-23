@@ -444,6 +444,38 @@ class RPC extends Handler_Protected {
 		$theme = Prefs::get(Prefs::USER_CSS_THEME, $_SESSION['uid'], $profile);
 		$params["theme"] = theme_exists($theme) ? $theme : "";
 
+		// Themes available to the Vue preferences dialog. Values are the
+		// paths theme_exists()/get_theme_path() expect (relative to themes).
+		$theme_dirs = ['themes'];
+		$local_theme_dir = (string)Config::get(Config::LOCAL_THEMES_DIR);
+		if ($local_theme_dir !== '') {
+			$theme_dirs[] = $local_theme_dir;
+		}
+
+		$available_themes = [];
+		foreach (array_unique($theme_dirs) as $theme_dir) {
+			if (!is_dir($theme_dir)) {
+				continue;
+			}
+
+			foreach (glob("$theme_dir/*.css") as $file) {
+				$name = basename($file);
+				if ($name !== 'local-overrides.css') {
+					$available_themes[] = $name;
+				}
+			}
+
+			foreach (glob("$theme_dir/*/dist/*.css") as $file) {
+				$name = substr($file, strlen($theme_dir) + 1);
+				if (!str_ends_with($name, 'local-overrides.css')) {
+					$available_themes[] = $name;
+				}
+			}
+		}
+
+		sort($available_themes);
+		$params["available_themes"] = array_values(array_unique($available_themes));
+
 		$params["plugins"] = implode(", ", PluginHost::getInstance()->get_plugin_names());
 
 		$params["php_platform"] = PHP_OS;
