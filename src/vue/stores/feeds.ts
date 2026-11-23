@@ -511,6 +511,22 @@ export const useFeedsStore = defineStore('feeds', () => {
     return saveOrder();
   }
 
+  /** Move a feed next to another feed in the same category, then persist. */
+  async function moveFeedTo(feedId: number, targetFeedId: number): Promise<boolean> {
+    if (feedId === targetFeedId) return false;
+
+    const feed = feeds.value.find(f => f.id === feedId);
+    const target = feeds.value.find(f => f.id === targetFeedId);
+    if (!feed || !target) return false;
+    if ((feed.cat_id ?? null) !== (target.cat_id ?? null)) return false;
+
+    const from = feeds.value.indexOf(feed);
+    const to = feeds.value.indexOf(target);
+    feeds.value.splice(from, 1);
+    feeds.value.splice(to, 0, feed);
+    return saveOrder();
+  }
+
   /** Move a category one position up/down, then persist. */
   async function moveCategory(categoryId: number, delta: -1 | 1): Promise<boolean> {
     const index = categories.value.findIndex(c => c.id === categoryId);
@@ -569,6 +585,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     catchupFeed,
     saveOrder,
     moveFeed,
+    moveFeedTo,
     moveCategory,
     toggleCdmExpanded,
     toggleWideScreen,

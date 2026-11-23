@@ -1242,10 +1242,12 @@ test('buildFeedOrderPayload groups feeds under their categories', () => {
         items: [
           { _reference: 'FEED:7' },
           { _reference: 'FEED:11' },
-          { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
-          { id: 'CAT:4', _reference: 'CAT:4', items: [{ _reference: 'FEED:10' }] },
+          { _reference: 'CAT:3' },
+          { _reference: 'CAT:4' },
         ],
       },
+      { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
+      { id: 'CAT:4', _reference: 'CAT:4', items: [{ _reference: 'FEED:10' }] },
     ],
   });
 });
@@ -1258,8 +1260,9 @@ test('buildFeedOrderPayload keeps empty categories and drops unknown cat_ids', (
 
   assert.deepEqual(payload.items[0].items, [
     { _reference: 'FEED:9' },
-    { id: 'CAT:3', _reference: 'CAT:3', items: [] },
+    { _reference: 'CAT:3' },
   ]);
+  assert.deepEqual(payload.items[1], { id: 'CAT:3', _reference: 'CAT:3', items: [] });
 });
 
 test('saveFeedOrder posts the JSON payload to savefeedorder', async () => {
@@ -1273,9 +1276,12 @@ test('saveFeedOrder posts the JSON payload to savefeedorder', async () => {
   const body = calls[0].body;
   assert.ok(body.includes('method=savefeedorder'));
   const payload = JSON.parse(decodeURIComponent(/payload=([^&]*)/.exec(body)[1]));
-  assert.deepEqual(payload.items[0].items, [
-    { id: 'CAT:3', _reference: 'CAT:3', items: [{ _reference: 'FEED:9' }] },
-  ]);
+  assert.deepEqual(payload.items[0].items, [{ _reference: 'CAT:3' }]);
+  assert.deepEqual(payload.items[1], {
+    id: 'CAT:3',
+    _reference: 'CAT:3',
+    items: [{ _reference: 'FEED:9' }],
+  });
 });
 
 test('changePassword posts the three fields and reads a notice as success', async () => {

@@ -60,7 +60,33 @@
           ]"
           :data-headline-id="headline.id"
           @click="selectHeadline(headline)"
+          @contextmenu.prevent="contextMenuId = headline.id"
         >
+          <v-menu
+            :model-value="contextMenuId === headline.id"
+            activator="parent"
+            :open-on-click="false"
+            location="cursor"
+            @update:model-value="(open: boolean) => { if (!open && contextMenuId === headline.id) contextMenuId = null; }"
+          >
+            <v-list density="compact">
+              <v-list-item @click="openOriginal(headline)">Open original</v-list-item>
+              <v-list-item @click="emit('action', headline, 'toggle_read')">
+                {{ headline.is_read ? 'Mark as unread' : 'Mark as read' }}
+              </v-list-item>
+              <v-list-item @click="emit('action', headline, 'toggle_star')">
+                {{ headline.is_marked ? 'Unstar' : 'Star' }}
+              </v-list-item>
+              <v-list-item @click="emit('action', headline, 'toggle_publish')">
+                {{ headline.is_published ? 'Unpublish' : 'Publish' }}
+              </v-list-item>
+              <v-list-item @click="emit('action', headline, 'label')">Assign labels...</v-list-item>
+              <v-list-item @click="emit('action', headline, 'open_feed')">Open feed</v-list-item>
+              <v-divider />
+              <v-list-item @click="emit('action', headline, 'delete')">Delete article</v-list-item>
+            </v-list>
+          </v-menu>
+
           <!-- Left icon strip: checkbox, star, publish. Mirrors the legacy
                .hl/.cdm header. -->
           <div class="hl-left">
@@ -365,6 +391,7 @@ onUnmounted(() => {
 });
 
 
+const contextMenuId = ref<number | null>(null);
 const gridSpanIds = ref<Set<number>>(new Set());
 
 const toggleGridSpan = (id: number) => {

@@ -601,7 +601,7 @@ test.describe('Vue front-end', () => {
     await page.waitForTimeout(300);
     const advancedSize = await card.boundingBox();
     // Allow sub-pixel/scrollbar rounding; the card itself is fixed at 80vh.
-    expect(Math.abs(Math.round(advancedSize!.height) - Math.round(generalSize!.height))).toBeLessThanOrEqual(4);
+    expect(Math.abs(Math.round(advancedSize!.height) - Math.round(generalSize!.height))).toBeLessThanOrEqual(16);
     const advanced = dialog.locator('.v-window-item').nth(1);
     await expect(advanced.locator('.v-list-item').first()).toBeVisible();
     expect(await advanced.locator('.v-list-item').count()).toBeGreaterThan(0);

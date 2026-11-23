@@ -104,8 +104,30 @@
           :key="feed.id"
           :title="feed.title"
           :value="String(feed.id)"
+          draggable="true"
+          :class="{ 'drag-source': draggedFeedId === feed.id, 'drag-over': dragOverFeedId === feed.id }"
           @click="handleSelect(String(feed.id))"
+          @contextmenu.prevent="contextMenuKey = 'feed-' + feed.id"
+          @dragstart="onDragStart(feed.id, $event)"
+          @dragover.prevent="onDragOver(feed.id)"
+          @dragleave="dragOverFeedId = null"
+          @drop.prevent="onDrop(feed.id)"
+          @dragend="onDragEnd"
         >
+          <v-menu
+            :model-value="contextMenuKey === 'feed-' + feed.id"
+            activator="parent"
+            :open-on-click="false"
+            location="cursor"
+            @update:model-value="(open: boolean) => { if (!open && contextMenuKey === 'feed-' + feed.id) contextMenuKey = null; }"
+          >
+            <v-list density="compact">
+              <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
+              <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed</v-list-item>
+              <v-list-item @click="emit('reorder', 'feed', feed.id, -1)">Move up</v-list-item>
+              <v-list-item @click="emit('reorder', 'feed', feed.id, 1)">Move down</v-list-item>
+            </v-list>
+          </v-menu>
           <template #prepend>
             <img
               v-if="!iconFailed.has(feed.id)"
@@ -172,8 +194,30 @@
           :key="feed.id"
           :title="feed.title"
           :value="String(feed.id)"
+          draggable="true"
+          :class="{ 'drag-source': draggedFeedId === feed.id, 'drag-over': dragOverFeedId === feed.id }"
           @click="handleSelect(String(feed.id))"
+          @contextmenu.prevent="contextMenuKey = 'feed-' + feed.id"
+          @dragstart="onDragStart(feed.id, $event)"
+          @dragover.prevent="onDragOver(feed.id)"
+          @dragleave="dragOverFeedId = null"
+          @drop.prevent="onDrop(feed.id)"
+          @dragend="onDragEnd"
         >
+          <v-menu
+            :model-value="contextMenuKey === 'feed-' + feed.id"
+            activator="parent"
+            :open-on-click="false"
+            location="cursor"
+            @update:model-value="(open: boolean) => { if (!open && contextMenuKey === 'feed-' + feed.id) contextMenuKey = null; }"
+          >
+            <v-list density="compact">
+              <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
+              <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed</v-list-item>
+              <v-list-item @click="emit('reorder', 'feed', feed.id, -1)">Move up</v-list-item>
+              <v-list-item @click="emit('reorder', 'feed', feed.id, 1)">Move down</v-list-item>
+            </v-list>
+          </v-menu>
           <template #prepend>
             <img
               v-if="!iconFailed.has(feed.id)"
@@ -255,6 +299,33 @@ const LABEL_BASE_INDEX = -1024;
 
 // State
 const searchQuery = ref('');
+const contextMenuKey = ref<string | null>(null);
+const draggedFeedId = ref<number | null>(null);
+const dragOverFeedId = ref<number | null>(null);
+
+const onDragStart = (feedId: number, event: DragEvent) => {
+  draggedFeedId.value = feedId;
+  event.dataTransfer?.setData('text/plain', String(feedId));
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+};
+
+const onDragOver = (feedId: number) => {
+  dragOverFeedId.value = feedId;
+};
+
+const onDrop = (targetFeedId: number) => {
+  const sourceFeedId = draggedFeedId.value;
+  draggedFeedId.value = null;
+  dragOverFeedId.value = null;
+  if (sourceFeedId && sourceFeedId !== targetFeedId) {
+    emit('move-feed', sourceFeedId, targetFeedId);
+  }
+};
+
+const onDragEnd = () => {
+  draggedFeedId.value = null;
+  dragOverFeedId.value = null;
+};
 // The virtual feed group starts expanded, like the legacy tree.
 const openedGroups = ref<string[]>(['special']);
 // Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
@@ -418,6 +489,14 @@ const handleSelect = (index: string) => {
 
 .feed-list :deep(.v-list-group__header) {
   min-height: 30px;
+}
+
+.feed-list :deep(.v-list-item.drag-source) {
+  opacity: 0.45;
+}
+
+.feed-list :deep(.v-list-item.drag-over) {
+  box-shadow: inset 0 2px 0 rgb(var(--v-theme-primary));
 }
 
 .feed-list :deep(.v-list-item--active) {

@@ -1292,15 +1292,19 @@ export function buildFeedOrderPayload(
     }
   }
 
+  // The backend indexes `items` by node id at the top level, so categories
+  // must be siblings of root (root references them) rather than nested.
+  const categoryNodes = categories.map(category => ({
+    id: `CAT:${category.id}`,
+    _reference: `CAT:${category.id}`,
+    items: catItems.get(category.id) ?? [],
+  }));
+
   for (const category of categories) {
-    rootItems.push({
-      id: `CAT:${category.id}`,
-      _reference: `CAT:${category.id}`,
-      items: catItems.get(category.id) ?? [],
-    });
+    rootItems.push({ _reference: `CAT:${category.id}` });
   }
 
-  return { items: [{ id: 'root', items: rootItems }] };
+  return { items: [{ id: 'root', items: rootItems }, ...categoryNodes] };
 }
 
 /** Persist the feed/category tree order and category membership. */

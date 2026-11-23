@@ -19,6 +19,7 @@
           @select="handleFeedSelect"
           @feed-action="handleFeedAction"
           @reorder="handleFeedReorder"
+          @move-feed="handleFeedMove"
         />
       </aside>
       <div class="sidebar-splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
@@ -509,13 +510,25 @@ const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   await headlinesStore.loadHeadlines(feedId, isCat);
 };
 
+/** Drag-and-drop feed ordering: move a feed next to another feed. */
+const handleFeedMove = async (feedId: number, targetFeedId: number) => {
+  const ok = await feedsStore.moveFeedTo(feedId, targetFeedId);
+  if (ok) {
+    await feedsStore.loadFeeds();
+  } else if (feedsStore.error) {
+    showMessage(feedsStore.error, 'error');
+  }
+};
+
 /** Move a feed or category one position and persist the new order. */
 const handleFeedReorder = async (kind: 'feed' | 'category', id: number, delta: -1 | 1) => {
   const ok =
     kind === 'category'
       ? await feedsStore.moveCategory(id, delta)
       : await feedsStore.moveFeed(id, delta);
-  if (!ok && feedsStore.error) {
+  if (ok) {
+    await feedsStore.loadFeeds();
+  } else if (feedsStore.error) {
     showMessage(feedsStore.error, 'error');
   }
 };
@@ -1010,9 +1023,40 @@ onUnmounted(stopPolling);
   background: rgb(var(--v-theme-surface));
 }
 
-/* WIDESCREEN_MODE: hide the tree and let the list use the full width. */
-.wide-screen .sidebar {
-  display: none;
+/* WIDESCREEN_MODE: hide the tree and let the list use the full width. The
+   header toggle still opens it as a drawer so the feed list is never lost. */
+@media (min-width: 901px) {
+  .wide-screen .sidebar:not(.open) {
+    display: none;
+  }
+
+  .wide-screen .sidebar.open {
+    display: block;
+    position: fixed;
+    top: 44px;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    width: min(85vw, 320px);
+    background: rgb(var(--v-theme-surface));
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .wide-screen .nav-toggle {
+    display: inline-flex;
+  }
+
+  .wide-screen .sidebar-splitter {
+    display: none;
+  }
+
+  .wide-screen .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 44px 0 0 0;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.35);
+  }
 }
 
 .feed-search-counter {
