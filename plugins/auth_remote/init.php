@@ -66,7 +66,7 @@ class Auth_Remote extends Auth_Base {
 		);
 
 		foreach ($sources as $hdr) {
-			if (!empty($_SERVER[$hdr]) && is_string($_SERVER[$hdr])) {
+			if (empty($_SERVER[$hdr]) === false && is_string($_SERVER[$hdr]) === true) {
 				$try_login = strtolower($_SERVER[$hdr]);
 				break;
 			}
