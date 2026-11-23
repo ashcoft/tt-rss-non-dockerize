@@ -1,25 +1,32 @@
 # Vite + Vue 3 + Vuetify Migration Guide for Tiny Tiny RSS
 
-## Verified status (2026-10-25)
+## Verified status (2026-11-23)
 
-**`index.php` now serves the Vue app; the Dojo client is no longer the main
-entry point.** The reading flow (login, feed tree, headlines, search, view
-modes, sorting, article actions, tags, scoring, feed editing, feed-icon upload,
-feed/category reordering, labels and label colours), content-filter management
-(list, create, edit, delete), OPML import/export and password changes run
-entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php` through the
-legacy adapter.
+The migration is complete: `index.php` and `prefs.php` serve the Vue 3 +
+Vuetify + Pinia app, the Dojo/Dijit stack and AMD modules are deleted, and
+every legacy `Pref_*` screen and bundled plugin UI surface has a Vue host.
 
-The Dojo stack has since been **deleted** (see "Dojo removed" below); this
-section records the state at the time of that migration.
+The reading flow (login, feed tree, headlines, search, view modes, sorting,
+article actions, tags, scoring, feed editing, feed-icon upload,
+feed/category reordering, labels and label colours), content filters
+(list, create, edit, clone, reorder, test, delete), OPML import/export,
+password changes, account/OTP/app-password/profile settings, users and
+system administration, feed batch/sharing/maintenance tools and plugin
+settings run entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php`
+through the legacy adapter.
+
+The verification notes below record earlier sessions; the current test
+suite has grown to 112 Node tests, and `build`, `type-check`, `test:vue`,
+`lint:vue` and `lint:js` pass.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
 instance):
 
 - `npm run build`, `npm run type-check`, `npm run lint:vue`, `npm run lint:js`
   all pass.
-- `npm run test:vue` runs 43 Node tests: renderer/scroll regressions, adapter
-  tests, headline-store cursor tests, and FeedTree selection tests.
+- `npm run test:vue` ran 43 Node tests at that point (the suite now has 112):
+  renderer/scroll regressions, adapter tests, headline-store cursor tests and
+  FeedTree selection tests.
 - The adapter, the Pinia stores, **and the browser UI** were exercised against
   the live backend: login, feed tree, headlines list, search, view modes,
   sort orders, read/star/publish/delete, tags with autocomplete, scoring,
