@@ -51,6 +51,10 @@ export const useFeedsStore = defineStore('feeds', () => {
   const combinedMode = ref(false);
   /** CDM_ENABLE_GRID: tile the inline articles in a grid on wide screens. */
   const gridEnabled = ref(false);
+  /** CDM_EXPANDED: expand every combined-mode row instead of only the active one. */
+  const cdmExpanded = ref(true);
+  /** WIDESCREEN_MODE: hide the feed tree and let the content use the full width. */
+  const wideScreen = ref(false);
   /** SHOW_CONTENT_PREVIEW: show the content preview in headline rows. */
   const showContentPreview = ref(true);
   /** FEEDS_SORT_BY_UNREAD: sort feeds by unread count. */
@@ -412,6 +416,8 @@ export const useFeedsStore = defineStore('feeds', () => {
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
       combinedMode.value = Number(params.combined_display_mode) === 1;
       gridEnabled.value = Number(params.cdm_enable_grid) === 1;
+      cdmExpanded.value = Number(params.cdm_expanded) !== 0;
+      wideScreen.value = Number(params.widescreen) === 1;
       showContentPreview.value = Number(params.show_content_preview) !== 0;
       feedsSortByUnread.value = Number(params.feeds_sort_by_unread) === 1;
       confirmFeedCatchup.value = Number(params.confirm_feed_catchup) !== 0;
@@ -437,6 +443,40 @@ export const useFeedsStore = defineStore('feeds', () => {
       const response = await api.setPref('COMBINED_DISPLAY_MODE', next ? '1' : '0');
       if (response.status === 0) {
         combinedMode.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
+    }
+  }
+
+  /** Toggle CDM_EXPANDED (expand all combined rows vs. only the active one). */
+  async function toggleCdmExpanded(): Promise<boolean> {
+    const next = !cdmExpanded.value;
+    try {
+      const response = await api.setPref('CDM_EXPANDED', next ? '1' : '0');
+      if (response.status === 0) {
+        cdmExpanded.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
+    }
+  }
+
+  /** Toggle WIDESCREEN_MODE and persist it. */
+  async function toggleWideScreen(): Promise<boolean> {
+    const next = !wideScreen.value;
+    try {
+      const response = await api.setPref('WIDESCREEN_MODE', next ? '1' : '0');
+      if (response.status === 0) {
+        wideScreen.value = next;
         return true;
       }
       error.value = response.error ?? 'Failed to save preference';
@@ -496,6 +536,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     hideReadShowsSpecial,
     combinedMode,
     gridEnabled,
+    cdmExpanded,
+    wideScreen,
     showContentPreview,
     feedsSortByUnread,
     confirmFeedCatchup,
@@ -528,6 +570,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     saveOrder,
     moveFeed,
     moveCategory,
+    toggleCdmExpanded,
+    toggleWideScreen,
     toggleHideRead,
     toggleCombinedMode,
     loadDisplayPrefs,

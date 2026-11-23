@@ -248,6 +248,7 @@ class ApiClient {
       first_id: 0,
       message: null,
       feedError: null,
+      feedSiteUrl: '',
     });
   }
 

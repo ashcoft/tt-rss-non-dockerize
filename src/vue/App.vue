@@ -3,45 +3,43 @@
     <!-- Login gate (Phase 3) -->
     <LoginForm v-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
 
-    <div v-else class="ttrss-app">
-      <header class="app-header">
-        <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
-        <Toolbar
-          :feed-info="feedsStore.currentFeed"
-          :feed-error="headlinesStore.feedError"
-          :search-languages="searchLanguages"
-          :model-search-language="headlinesStore.searchLanguage"
-          :model-view-mode="headlinesStore.viewMode"
-          :model-order-by="headlinesStore.orderBy"
-          :plugin-main-html="pluginMainHtml"
-          :plugin-toolbar-html="pluginToolbarHtml"
-          :update-url="updateUrl"
-          :plugin-updates="pluginUpdatesAvailable"
-          @action="handleToolbarAction"
+    <div v-else class="ttrss-app" :class="{ 'wide-screen': feedsStore.wideScreen }">
+      <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
+      <aside class="sidebar" :class="{ open: sidebarOpen }" :style="sidebarStyle">
+        <FeedTree
+          :feeds="feedsStore.feeds"
+          :categories="feedsStore.categories"
+          :labels="labelsStore.labels"
+          :hide-read="feedsStore.hideReadFeeds"
+          :active-feed-id="feedsStore.currentFeedId"
+          :icons-url="feedsStore.iconsUrl"
+          :special-counters="feedsStore.specialCounters"
+          :hide-read-shows-special="feedsStore.hideReadShowsSpecial"
+          :sort-by-unread="feedsStore.feedsSortByUnread"
+          @select="handleFeedSelect"
+          @feed-action="handleFeedAction"
+          @reorder="handleFeedReorder"
         />
-        <!-- Kept visible for quick access; the rest of the account actions live
-             in the toolbar's overflow menu, as in the legacy shell. -->
-        <v-btn icon="mdi-cog" class="prefs-button" variant="text" @click="prefsOpen = true" title="Preferences" />
-      </header>
+      </aside>
+      <div class="sidebar-splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
 
-      <main class="app-main">
-        <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
-                <aside class="sidebar" :class="{ open: sidebarOpen }">
-          <FeedTree
-            :feeds="feedsStore.feeds"
-            :categories="feedsStore.categories"
-            :labels="labelsStore.labels"
-            :hide-read="feedsStore.hideReadFeeds"
-            :active-feed-id="feedsStore.currentFeedId"
-            :icons-url="feedsStore.iconsUrl"
-            :special-counters="feedsStore.specialCounters"
-            :hide-read-shows-special="feedsStore.hideReadShowsSpecial"
-            :sort-by-unread="feedsStore.feedsSortByUnread"
-            @select="handleFeedSelect"
-            @feed-action="handleFeedAction"
-            @reorder="handleFeedReorder"
+      <div class="app-content">
+        <header class="app-header">
+          <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
+          <Toolbar
+            :feed-info="feedsStore.currentFeed"
+            :feed-error="headlinesStore.feedError"
+            :model-view-mode="headlinesStore.viewMode"
+            :model-order-by="headlinesStore.orderBy"
+            :plugin-main-html="pluginMainHtml"
+            :plugin-toolbar-html="pluginToolbarHtml"
+            :update-url="updateUrl"
+            :plugin-updates="pluginUpdatesAvailable"
+            :cdm-expanded="feedsStore.cdmExpanded"
+            :wide-screen="feedsStore.wideScreen"
+            @action="handleToolbarAction"
           />
-        </aside>
+        </header>
 
         <section class="content">
           <v-alert
@@ -66,7 +64,7 @@
             {{ headlinesStore.error || feedsStore.error }}
           </v-alert>
 
-                              <HeadlinesList
+          <HeadlinesList
             :headlines="headlinesStore.headlines"
             :loading="headlinesStore.loading"
             :loading-more="headlinesStore.loadingMore"
@@ -76,36 +74,38 @@
             :grid="feedsStore.gridEnabled"
             :show-preview="feedsStore.showContentPreview"
             :selected-ids="headlinesStore.selectedHeadlineIds"
+            :cdm-expanded="feedsStore.cdmExpanded"
             :auto-catchup="feedsStore.cdmAutoCatchup"
+            :feed-site-url="headlinesStore.feedSiteUrl"
             @toggle-select="headlinesStore.toggleHeadlineSelected"
             @auto-catchup="handleAutoCatchup"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
             @bulk-action="handleBulkAction"
-                    />
+          />
         </section>
 
         <!-- In combined mode the content is inline in the list, so no panel. -->
+        <div
+          v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
+          class="article-splitter"
+          title="Resize article pane"
+          @pointerdown="startArticleResize"
+        />
         <aside
           class="article-panel"
+          :style="articleStyle"
           v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
         >
           <ArticleView
             :article="headlinesStore.selectedArticle"
+            :feed-site-url="headlinesStore.feedSiteUrl"
             @close="handleArticleClose"
             @mark-relative="handleMarkRelative"
           />
         </aside>
-      </main>
-
-      <footer class="app-footer">
-        <span class="status">{{ statusMessage }}</span>
-        <v-spacer />
-        <span v-if="pollingActive" class="status">
-          <v-icon size="14" icon="mdi-sync" class="mr-1" />Auto-refresh on
-        </span>
-      </footer>
+      </div>
     </div>
 
     <!-- Dialogs (Phase 3/4) -->
@@ -113,6 +113,64 @@
     <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
     <PreferencesDialog v-model="prefsOpen" />
     <HotkeyHelpDialog v-model="hotkeyHelpOpen" />
+
+    <!-- Legacy "Search..." dialog: the toolbar has no permanent search box. -->
+    <v-dialog v-model="searchDialogOpen" max-width="520">
+      <v-card>
+        <v-card-title>Search articles</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="searchDraft"
+            placeholder="Search articles..."
+            autofocus
+            hide-details
+            @keyup.enter="submitSearch"
+          />
+          <v-select
+            v-if="searchLanguages.length > 1"
+            v-model="searchLanguageDraft"
+            :items="searchLanguages"
+            label="Language"
+            title="Used for word stemming"
+            density="compact"
+            hide-details
+            class="mt-3"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="searchDialogOpen = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="submitSearch">Search</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Legacy "Search feeds..." dialog. -->
+    <v-dialog v-model="feedSearchOpen" max-width="520">
+      <v-card>
+        <v-card-title>Search feeds</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="feedSearchDraft"
+            placeholder="Search feeds..."
+            autofocus
+            hide-details
+          />
+          <v-list class="mt-2 overflow-y-auto" density="compact" max-height="360">
+            <v-list-item
+              v-for="item in feedSearchResults"
+              :key="`${item.isCat ? 'cat' : 'feed'}-${item.id}`"
+              @click="selectFeedSearchResult(item)"
+            >
+              <v-list-item-title>{{ item.title }}</v-list-item-title>
+              <template #append>
+                <span class="feed-search-counter">{{ item.unread }}</span>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar
       v-model="snackbar"
@@ -166,7 +224,95 @@ const prefsOpen = ref(
     (window as unknown as { __open_preferences?: boolean }).__open_preferences === true
 );
 const hotkeyHelpOpen = ref(false);
+const searchDialogOpen = ref(false);
+const searchDraft = ref('');
+const searchLanguageDraft = ref(headlinesStore.searchLanguage);
+const feedSearchOpen = ref(false);
+const feedSearchDraft = ref('');
+
+// Splitter sizes are persisted locally, mirroring the legacy draggable panes.
+const SIDEBAR_WIDTH_KEY = 'ttrss.sidebarWidth';
+const ARTICLE_HEIGHT_KEY = 'ttrss.articleHeight';
+const sidebarWidth = ref(Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || 0);
+const articleHeight = ref(Number(localStorage.getItem(ARTICLE_HEIGHT_KEY)) || 0);
+const sidebarStyle = computed(() =>
+  sidebarWidth.value > 0
+    ? { flexBasis: `${sidebarWidth.value}px`, width: `${sidebarWidth.value}px` }
+    : {}
+);
+const articleStyle = computed(() =>
+  articleHeight.value > 0 ? { flexBasis: `${articleHeight.value}px` } : {}
+);
+
+const startSidebarResize = (event: PointerEvent) => {
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth =
+    sidebarWidth.value ||
+    document.querySelector<HTMLElement>('.sidebar')?.getBoundingClientRect().width ||
+    300;
+  const onMove = (moveEvent: PointerEvent) => {
+    const width = Math.min(
+      Math.max(startWidth + moveEvent.clientX - startX, 200),
+      Math.min(window.innerWidth * 0.5, 600)
+    );
+    sidebarWidth.value = Math.round(width);
+  };
+  const onUp = () => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value));
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+  };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+};
+
+const startArticleResize = (event: PointerEvent) => {
+  event.preventDefault();
+  const startY = event.clientY;
+  const startHeight =
+    articleHeight.value ||
+    document.querySelector<HTMLElement>('.article-panel')?.getBoundingClientRect().height ||
+    400;
+  const onMove = (moveEvent: PointerEvent) => {
+    const height = Math.min(
+      Math.max(startHeight - (moveEvent.clientY - startY), 150),
+      window.innerHeight - 150
+    );
+    articleHeight.value = Math.round(height);
+  };
+  const onUp = () => {
+    localStorage.setItem(ARTICLE_HEIGHT_KEY, String(articleHeight.value));
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+  };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+};
 const labelArticleId = ref<number | null>(null);
+
+/** Feed/category matches for the "Search feeds..." dialog. */
+const feedSearchResults = computed(() => {
+  const query = feedSearchDraft.value.trim().toLowerCase();
+  const specialFeeds = [
+    { id: -4, title: 'All articles' },
+    { id: -3, title: 'Fresh articles' },
+    { id: -1, title: 'Starred articles' },
+    { id: -2, title: 'Published articles' },
+    { id: 0, title: 'Archived articles' },
+    { id: -6, title: 'Recently read' },
+  ].map(feed => ({
+    ...feed,
+    unread: feedsStore.specialCounters[feed.id] ?? 0,
+    isCat: false,
+  }));
+  const items = [
+    ...specialFeeds,
+    ...feedsStore.categories.map(cat => ({ id: cat.id, title: cat.title, unread: cat.unread ?? 0, isCat: true })),
+    ...feedsStore.feeds.map(feed => ({ id: feed.id, title: feed.title, unread: feed.unread ?? 0, isCat: false })),
+  ];
+  return query ? items.filter(item => item.title.toLowerCase().includes(query)) : items;
+});
 const searchLanguages = ref<string[]>([]);
 const pluginMainHtml = ref('');
 const pluginToolbarHtml = ref('');
@@ -176,11 +322,6 @@ const pluginUpdatesAvailable = ref(false);
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-const pollingActive = computed(() => pollTimer !== null);
-
-const statusMessage = computed(() => {
-  return `${headlinesStore.headlines.length} articles, ${headlinesStore.unreadCount} unread`;
-});
 
 const showMessage = (text: string, color: 'success' | 'error' | 'info' | 'warning' = 'info') => {
   snackbarText.value = text;
@@ -438,6 +579,8 @@ const runSearch = async (
 };
 
 const handleHeadlineSelect = async (headline: Headline) => {
+  // Keep the cursor on the clicked row so combined mode expands it.
+  headlinesStore.setCursor(headline.id);
   // loadArticle promotes the loaded headline and persists the read state,
   // updating feed counters itself.
   await headlinesStore.loadArticle(headline.id);
@@ -595,6 +738,35 @@ const toggleCursorRead = async () => {
   await handleHeadlineAction(headline, 'toggle_read');
 };
 
+/** Open the legacy Search... dialog. */
+const openArticleSearch = () => {
+  searchDraft.value = '';
+  searchLanguageDraft.value = headlinesStore.searchLanguage;
+  searchDialogOpen.value = true;
+};
+
+/** Run the dialog's search against the current view. */
+const submitSearch = async () => {
+  const term = searchDraft.value.trim();
+  if (!term) return;
+  searchDialogOpen.value = false;
+  await runSearch(
+    { query: term, language: searchLanguageDraft.value },
+    feedsStore.currentFeedId,
+    feedsStore.currentIsCat
+  );
+};
+
+const openFeedSearch = () => {
+  feedSearchDraft.value = '';
+  feedSearchOpen.value = true;
+};
+
+const selectFeedSearchResult = async (item: { id: number; isCat: boolean }) => {
+  feedSearchOpen.value = false;
+  await handleFeedSelect(item.id, item.isCat);
+};
+
 /** Dispatch a toolbar action (refresh, catchup, search, view mode, sort). */
 const handleToolbarAction = async (action: string, payload?: string | number | object) => {
   const feedId = feedsStore.currentFeedId;
@@ -647,6 +819,26 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
         feedsStore.combinedMode ? 'Combined mode on' : 'Combined mode off',
         'info'
       );
+      break;
+    case 'toggleCdmExpanded':
+      await feedsStore.toggleCdmExpanded();
+      showMessage(
+        feedsStore.cdmExpanded ? 'Expanding all articles' : 'Expanding the selected article only',
+        'info'
+      );
+      break;
+    case 'toggleWideScreen':
+      await feedsStore.toggleWideScreen();
+      showMessage(
+        feedsStore.wideScreen ? 'Widescreen mode on' : 'Widescreen mode off',
+        'info'
+      );
+      break;
+    case 'focusSearch':
+      openArticleSearch();
+      break;
+    case 'searchFeeds':
+      openFeedSearch();
       break;
     case 'hotkeyHelp':
       hotkeyHelpOpen.value = true;
@@ -730,16 +922,46 @@ onUnmounted(stopPolling);
 <style scoped>
 .ttrss-app {
   display: flex;
-  flex-direction: column;
   height: 100vh;
+  overflow: hidden;
   background: rgb(var(--v-theme-background));
+}
+
+.sidebar-splitter {
+  flex: 0 0 4px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.sidebar-splitter:hover {
+  background: rgba(var(--v-theme-primary), 0.25);
+}
+
+.article-splitter {
+  flex: 0 0 4px;
+  cursor: row-resize;
+  background: transparent;
+}
+
+.article-splitter:hover {
+  background: rgba(var(--v-theme-primary), 0.25);
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .app-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0;
   background: rgb(var(--v-theme-background));
 }
 
@@ -751,23 +973,28 @@ onUnmounted(stopPolling);
   background: transparent;
 }
 
-.app-main {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+/* Desktop keeps the tree visible; the toggle is only for the phone drawer. */
+.nav-toggle {
+  display: none;
 }
 
 .sidebar {
-  width: 290px;
+  flex: 0 0 20%;
+  width: 20%;
+  min-width: 200px;
+  max-width: 50vw;
   overflow-y: auto;
-  background: rgb(var(--v-theme-background));
+  border-right: 1px solid rgba(var(--v-theme-on-background), 0.09);
+  background: rgba(var(--v-theme-on-background), 0.03);
 }
 
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   overflow: hidden;
+  background: rgb(var(--v-theme-surface));
 }
 
 /* Status alerts must keep their height; the list below takes the rest. */
@@ -776,23 +1003,21 @@ onUnmounted(stopPolling);
 }
 
 .article-panel {
-  width: 400px;
+  flex: 0 0 50%;
+  min-height: 0;
   overflow-y: auto;
-  margin: 16px 16px 16px 0;
+  border-top: 1px solid rgba(var(--v-theme-on-background), 0.12);
   background: rgb(var(--v-theme-surface));
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.app-footer {
-  padding: 0.5rem 1rem;
-  background: rgb(var(--v-theme-background));
-  color: rgba(var(--v-theme-on-background), 0.6);
-  font-size: 0.8125rem;
+/* WIDESCREEN_MODE: hide the tree and let the list use the full width. */
+.wide-screen .sidebar {
+  display: none;
 }
 
-.status {
-  color: #666;
+.feed-search-counter {
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.75rem;
 }
 
 .sidebar-scrim {
@@ -807,7 +1032,12 @@ onUnmounted(stopPolling);
     padding: 0.125rem 0.25rem;
   }
 
-  .prefs-button {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .sidebar-splitter,
+  .article-splitter {
     display: none;
   }
 
@@ -817,7 +1047,10 @@ onUnmounted(stopPolling);
     bottom: 0;
     left: 0;
     z-index: 1000;
-    width: min(85vw, 320px);
+    width: min(85vw, 320px) !important;
+    flex-basis: auto !important;
+    min-width: 0;
+    max-width: none;
     background: rgb(var(--v-theme-surface));
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
     transform: translateX(-100%);
@@ -845,13 +1078,8 @@ onUnmounted(stopPolling);
     inset: 52px 0 0 0;
     z-index: 1001;
     width: auto;
-    margin: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .app-footer {
-    display: none;
+    max-width: none;
+    border-top: 0;
   }
 }
 </style>

@@ -411,11 +411,12 @@ class RPC extends Handler_Protected {
 			Prefs::CONFIRM_FEED_CATCHUP,  Prefs::CDM_AUTO_CATCHUP,
 			Prefs::FRESH_ARTICLE_MAX_AGE, Prefs::RECENTLY_READ_MAX_AGE, Prefs::HIDE_READ_SHOWS_SPECIAL,
 			Prefs::COMBINED_DISPLAY_MODE, Prefs::DEBUG_HEADLINE_IDS, Prefs::CDM_ENABLE_GRID,
-                        // Surfaced by the Vue preferences dialog; these have no
-                        // other read endpoint, so without them the dialog shows
-                        // blank values for settings the user cannot otherwise see.
-                        Prefs::PURGE_OLD_DAYS, Prefs::PURGE_UNREAD_ARTICLES,
-                        Prefs::SHOW_CONTENT_PREVIEW, Prefs::VFEED_GROUP_BY_FEED] as $param) {
+			Prefs::CDM_EXPANDED,
+			// Surfaced by the Vue preferences dialog; these have no
+			// other read endpoint, so without them the dialog shows
+			// blank values for settings the user cannot otherwise see.
+			Prefs::PURGE_OLD_DAYS, Prefs::PURGE_UNREAD_ARTICLES,
+			Prefs::SHOW_CONTENT_PREVIEW, Prefs::VFEED_GROUP_BY_FEED] as $param) {
 
 			$params[strtolower($param)] = (int) Prefs::get($param, $_SESSION['uid'], $profile);
 		}

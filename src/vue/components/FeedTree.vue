@@ -1,14 +1,5 @@
 <template>
   <div class="feed-tree">
-    <v-text-field
-      v-model="searchQuery"
-      placeholder="Search feeds..."
-      prepend-inner-icon="mdi-magnify"
-      variant="underlined"
-      density="compact"
-      hide-details
-      class="search-input"
-    />
 
     <v-list v-model:opened="openedGroups" nav density="compact" class="feed-list">
       <!-- Special Feeds -->
@@ -32,14 +23,7 @@
             <v-icon>{{ special.icon }}</v-icon>
           </template>
           <template #append>
-            <v-chip
-              v-if="special.unread > 0"
-              size="x-small"
-              color="primary"
-              variant="flat"
-            >
-              {{ special.unread }}
-            </v-chip>
+            <span v-if="special.unread > 0" class="counter">{{ special.unread }}</span>
           </template>
         </v-list-item>
       </v-list-group>
@@ -50,6 +34,9 @@
           <v-list-item v-bind="props" title="Labels">
             <template #prepend>
               <v-icon>mdi-label</v-icon>
+            </template>
+            <template #append>
+              <span v-if="labelsUnread > 0" class="counter">{{ labelsUnread }}</span>
             </template>
           </v-list-item>
         </template>
@@ -68,14 +55,7 @@
             ></div>
           </template>
           <template #append>
-            <v-chip
-              v-if="label.unread > 0"
-              size="x-small"
-              color="primary"
-              variant="flat"
-            >
-              {{ label.unread }}
-            </v-chip>
+            <span v-if="label.unread > 0" class="counter">{{ label.unread }}</span>
           </template>
         </v-list-item>
       </v-list-group>
@@ -98,28 +78,23 @@
               <v-icon>{{ groupIcon('cat-' + category.id) }}</v-icon>
             </template>
             <template #append>
-              <v-chip
-                v-if="category.unread > 0"
-                size="x-small"
-                color="primary"
-                variant="flat"
-              >
-                {{ category.unread }}
-              </v-chip>
-              <v-btn
-                icon="mdi-chevron-up"
-                size="x-small"
-                variant="text"
-                title="Move category up"
-                @click.stop="emit('reorder', 'category', category.id, -1)"
-              />
-              <v-btn
-                icon="mdi-chevron-down"
-                size="x-small"
-                variant="text"
-                title="Move category down"
-                @click.stop="emit('reorder', 'category', category.id, 1)"
-              />
+              <span v-if="category.unread > 0" class="counter">{{ category.unread }}</span>
+              <span class="feed-actions">
+                <v-btn
+                  icon="mdi-chevron-up"
+                  size="x-small"
+                  variant="text"
+                  title="Move category up"
+                  @click.stop="emit('reorder', 'category', category.id, -1)"
+                />
+                <v-btn
+                  icon="mdi-chevron-down"
+                  size="x-small"
+                  variant="text"
+                  title="Move category down"
+                  @click.stop="emit('reorder', 'category', category.id, 1)"
+                />
+              </span>
             </template>
           </v-list-item>
         </template>
@@ -144,42 +119,37 @@
             <v-icon v-else size="16">mdi-rss</v-icon>
           </template>
           <template #append>
-            <v-chip
-              v-if="feed.unread > 0"
-              size="x-small"
-              color="primary"
-              variant="flat"
-            >
-              {{ feed.unread }}
-            </v-chip>
-            <v-btn
-              icon="mdi-check"
-              size="x-small"
-              variant="text"
-              title="Mark feed as read"
-              @click.stop="emit('feed-action', 'mark_read', feed.id)"
-            />
-            <v-btn
-              icon="mdi-pencil"
-              size="x-small"
-              variant="text"
-              title="Edit feed"
-              @click.stop="emit('feed-action', 'edit', feed.id)"
-            />
-            <v-btn
-              icon="mdi-chevron-up"
-              size="x-small"
-              variant="text"
-              title="Move feed up"
-              @click.stop="emit('reorder', 'feed', feed.id, -1)"
-            />
-            <v-btn
-              icon="mdi-chevron-down"
-              size="x-small"
-              variant="text"
-              title="Move feed down"
-              @click.stop="emit('reorder', 'feed', feed.id, 1)"
-            />
+            <span v-if="feed.unread > 0" class="counter">{{ feed.unread }}</span>
+            <span class="feed-actions">
+              <v-btn
+                icon="mdi-check"
+                size="x-small"
+                variant="text"
+                title="Mark feed as read"
+                @click.stop="emit('feed-action', 'mark_read', feed.id)"
+              />
+              <v-btn
+                icon="mdi-pencil"
+                size="x-small"
+                variant="text"
+                title="Edit feed"
+                @click.stop="emit('feed-action', 'edit', feed.id)"
+              />
+              <v-btn
+                icon="mdi-chevron-up"
+                size="x-small"
+                variant="text"
+                title="Move feed up"
+                @click.stop="emit('reorder', 'feed', feed.id, -1)"
+              />
+              <v-btn
+                icon="mdi-chevron-down"
+                size="x-small"
+                variant="text"
+                title="Move feed down"
+                @click.stop="emit('reorder', 'feed', feed.id, 1)"
+              />
+            </span>
           </template>
         </v-list-item>
       </v-list-group>
@@ -192,14 +162,7 @@
               <v-icon>{{ groupIcon('uncategorized') }}</v-icon>
             </template>
             <template #append>
-              <v-chip
-                v-if="uncategorizedUnread > 0"
-                size="x-small"
-                color="primary"
-                variant="flat"
-              >
-                {{ uncategorizedUnread }}
-              </v-chip>
+              <span v-if="uncategorizedUnread > 0" class="counter">{{ uncategorizedUnread }}</span>
             </template>
           </v-list-item>
         </template>
@@ -224,28 +187,23 @@
             <v-icon v-else size="16">mdi-rss</v-icon>
           </template>
           <template #append>
-            <v-chip
-              v-if="feed.unread > 0"
-              size="x-small"
-              color="primary"
-              variant="flat"
-            >
-              {{ feed.unread }}
-            </v-chip>
-            <v-btn
-              icon="mdi-chevron-up"
-              size="x-small"
-              variant="text"
-              title="Move feed up"
-              @click.stop="emit('reorder', 'feed', feed.id, -1)"
-            />
-            <v-btn
-              icon="mdi-chevron-down"
-              size="x-small"
-              variant="text"
-              title="Move feed down"
-              @click.stop="emit('reorder', 'feed', feed.id, 1)"
-            />
+            <span v-if="feed.unread > 0" class="counter">{{ feed.unread }}</span>
+            <span class="feed-actions">
+              <v-btn
+                icon="mdi-chevron-up"
+                size="x-small"
+                variant="text"
+                title="Move feed up"
+                @click.stop="emit('reorder', 'feed', feed.id, -1)"
+              />
+              <v-btn
+                icon="mdi-chevron-down"
+                size="x-small"
+                variant="text"
+                title="Move feed down"
+                @click.stop="emit('reorder', 'feed', feed.id, 1)"
+              />
+            </span>
           </template>
         </v-list-item>
       </v-list-group>
@@ -335,6 +293,11 @@ const specialFeeds = computed(() => {
 });
 
 // Computed
+/** Total unread articles across labels, shown on the Labels group header. */
+const labelsUnread = computed(() =>
+  props.labels.reduce((sum, label) => sum + (label.unread ?? 0), 0)
+);
+
 /**
  * Computes the list of labels filtered by the current search query.
  * @returns The filtered array of labels.
@@ -432,18 +395,39 @@ const handleSelect = (index: string) => {
 
 .search-input {
   flex: 0 0 auto;
-  padding: 0.5rem;
+  padding: 2px 8px;
 }
 
 .feed-list {
   flex: 1;
   overflow-y: auto;
   background: transparent;
+  padding: 0;
+}
+
+.feed-list :deep(.v-list-item) {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 0;
+  font-size: 0.875rem;
+}
+
+.feed-list :deep(.v-list-item-title) {
+  font-size: 0.875rem;
+}
+
+.feed-list :deep(.v-list-group__header) {
+  min-height: 30px;
 }
 
 .feed-list :deep(.v-list-item--active) {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(var(--v-theme-on-background), 0.06);
   color: rgb(var(--v-theme-on-background));
+}
+
+.feed-list :deep(.v-list-item__prepend > .v-icon) {
+  font-size: 18px;
+  opacity: 0.75;
 }
 
 /* The +/- prepend glyph replaces Vuetify's chevron, as in the legacy tree. */
@@ -451,28 +435,50 @@ const handleSelect = (index: string) => {
   display: none;
 }
 
-/* Row actions appear on hover, like the legacy tree icons. */
-.feed-list :deep(.v-btn) {
-  opacity: 0;
-  transition: opacity 0.15s;
+.counter {
+  min-width: 18px;
+  margin-left: auto;
+  padding: 0 4px;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.feed-list :deep(.v-list-item:hover .v-btn),
-.feed-list :deep(.v-list-item:focus-within .v-btn),
-.feed-list :deep(.v-list-item--active .v-btn) {
+/* Row actions appear on hover, like the legacy tree icons. */
+.feed-actions {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.feed-list :deep(.v-list-item:hover .feed-actions),
+.feed-list :deep(.v-list-item:focus-within .feed-actions) {
   opacity: 1;
+}
+
+.feed-actions :deep(.v-btn) {
+  width: 22px;
+  height: 22px;
 }
 
 .label-indicator {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   margin-right: 0.5rem;
+  border-radius: 50%;
 }
 
 .feed-icon {
   width: 16px;
   height: 16px;
   object-fit: contain;
+}
+
+@media (max-width: 900px) {
+  .feed-actions {
+    opacity: 1;
+  }
 }
 </style>

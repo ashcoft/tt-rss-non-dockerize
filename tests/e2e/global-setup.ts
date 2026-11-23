@@ -123,6 +123,7 @@ export default function globalSetup(): void {
     ['CONFIRM_FEED_CATCHUP', '1'],
     ['ENABLE_FEED_CATS', '1'],
     ['USER_CSS_THEME', 'feedly/dist/feedly.css'],
+    ['DEFAULT_SEARCH_LANGUAGE', 'english'],
     ['_ENABLED_PLUGINS', 'note'],
   ];
   const names = pinnedPrefs.map(([name]) => `'${name}'`).join(', ');

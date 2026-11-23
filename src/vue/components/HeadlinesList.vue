@@ -6,56 +6,64 @@
     </div>
 
     <div v-else-if="headlines.length === 0" class="headlines-empty">
-      <v-icon size="64" color="grey">mdi-newspaper-variant-outline</v-icon>
       <p>No headlines to display</p>
     </div>
 
     <div v-else>
       <!-- Bulk actions appear once articles are selected from the top bar. -->
       <div v-if="selectedIds.size > 0" class="bulk-bar">
-        <span class="bulk-count">
-          {{ selectedIds.size }} selected
-        </span>
+        <span class="bulk-count">{{ selectedIds.size }} selected</span>
         <v-spacer />
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'open_original', [...selectedIds])">
-            Open original
-          </v-btn>
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'mark_read', [...selectedIds])">
-            Mark read
-          </v-btn>
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_unread', [...selectedIds])">
-            Toggle unread
-          </v-btn>
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_starred', [...selectedIds])">
-            Toggle starred
-          </v-btn>
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_published', [...selectedIds])">
-            Toggle published
-          </v-btn>
-          <v-btn size="small" variant="text" @click="emit('bulk-action', 'set_score', [...selectedIds])">
-            Set score
-          </v-btn>
-          <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
-            Delete
-          </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'open_original', [...selectedIds])">
+          Open original
+        </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'mark_read', [...selectedIds])">
+          Mark read
+        </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_unread', [...selectedIds])">
+          Toggle unread
+        </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_starred', [...selectedIds])">
+          Toggle starred
+        </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'toggle_published', [...selectedIds])">
+          Toggle published
+        </v-btn>
+        <v-btn size="small" variant="text" @click="emit('bulk-action', 'set_score', [...selectedIds])">
+          Set score
+        </v-btn>
+        <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
+          Delete
+        </v-btn>
       </div>
 
-      <v-list
+      <div
         class="headlines-list-content"
-        :class="{ 'headlines-grid': combined && grid }"
-        lines="three"
+        :class="{ 'headlines-grid': combined && grid, cdm: combined }"
       >
-        <v-list-item
+        <div
           v-for="headline in headlines"
           :key="headline.id"
+          class="v-list-item"
+          :class="[
+            combined ? 'cdm' : 'hl',
+            {
+              Unread: !headline.is_read,
+              'headline-read': headline.is_read,
+              'headline-active': headline.id === activeId,
+              expanded: combined && isExpanded(headline),
+              expandable: combined && !isExpanded(headline),
+              marked: headline.is_marked,
+              published: headline.is_published,
+              'grid-span': gridSpanIds.has(headline.id),
+            },
+          ]"
           :data-headline-id="headline.id"
-          :class="{
-            'headline-read': headline.is_read,
-            'headline-active': headline.id === activeId,
-          }"
-          @click="emit('select', headline)"
+          @click="selectHeadline(headline)"
         >
-          <template #prepend>
+          <!-- Left icon strip: checkbox, star, publish. Mirrors the legacy
+               .hl/.cdm header. -->
+          <div class="hl-left">
             <v-checkbox
               :model-value="selectedIds.has(headline.id)"
               hide-details
@@ -64,95 +72,118 @@
               @click.stop
               @update:model-value="(checked: boolean) => emit('toggle-select', headline.id, checked)"
             />
-            <!-- Star and read state sit in the left icon strip, as in main. -->
-            <v-btn
-              icon
-              variant="text"
-              size="x-small"
-              :color="headline.is_marked ? 'amber' : 'grey'"
+            <button
+              type="button"
+              class="hl-icon"
+              :class="{ active: headline.is_marked }"
               :title="headline.is_marked ? 'Unstar' : 'Star'"
               @click.stop="emit('action', headline, 'toggle_star')"
             >
-              <v-icon>{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
-            </v-btn>
-            <v-btn
-              :icon="headline.is_read ? 'mdi-circle-outline' : 'mdi-circle'"
-              :color="headline.is_read ? 'grey' : 'primary'"
-              size="x-small"
-              variant="text"
-              :title="headline.is_read ? 'Mark as unread' : 'Mark as read'"
-              @click.stop="toggleRead(headline)"
-            />
-          </template>
-
-          <!-- Phone-only meta line: feed, date and score above the title. -->
-          <div class="headline-mobile-meta">
-            <a
-              class="headline-mobile-feed"
-              :style="{ backgroundColor: headline.feed_bg_color || undefined }"
-              :href="headline.link"
-              target="_blank"
-              rel="noopener noreferrer"
+              <v-icon size="18">{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+            </button>
+            <button
+              type="button"
+              class="hl-icon"
+              :class="{ active: headline.is_published }"
+              :title="headline.is_published ? 'Unpublish' : 'Publish'"
+              @click.stop="emit('action', headline, 'toggle_publish')"
             >
-              {{ headline.feed_title }}
-            </a>
-            <span class="headline-mobile-meta-right">
-              <span v-if="headline.updated" class="headline-date">
-                {{ formatDate(headline.updated) }}
-              </span>
-              <v-icon
-                v-if="headline.score !== 0"
-                :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
-                :color="headline.score > 0 ? 'green' : 'red'"
-                size="14"
-                :title="`Score: ${headline.score}`"
-              />
-            </span>
+              <v-icon size="18">mdi-rss</v-icon>
+            </button>
+            <button
+              v-if="headline.is_read"
+              type="button"
+              class="hl-icon"
+              title="Mark as unread"
+              @click.stop="emit('action', headline, 'toggle_read')"
+            >
+              <v-icon size="16">mdi-circle-outline</v-icon>
+            </button>
           </div>
 
-          <v-list-item-title class="headline-title">
-            {{ headline.title }}
+          <!-- Title, author, labels and the inline excerpt. -->
+          <div class="hl-title v-list-item-title headline-title">
+            <a
+              class="hl-title-link"
+              :href="headline.link"
+              :title="headline.title"
+              @click.prevent.stop="selectHeadline(headline)"
+            >{{ headline.title }}</a>
             <span v-if="headline.author" class="headline-author">{{ headline.author }}</span>
-            <!-- Excerpt, as in the legacy row's title preview (an HTML fragment). -->
             <span
-              v-if="headline.excerpt && !combined && showPreview !== false"
+              v-if="headline.excerpt && (!combined || !isExpanded(headline)) && showPreview !== false"
               class="headline-preview"
               v-html="sanitize(headline.excerpt)"
             ></span>
-          </v-list-item-title>
+          </div>
 
-          <!-- Legacy row metadata: tags with the (+) label action, comments link. -->
-          <div class="headline-tags">
+          <!-- Tags sit on their own row below the title, not inline with it. -->
+          <div v-if="headline.tags.length > 0" class="hl-tags">
             <v-icon size="14">mdi-tag-outline</v-icon>
-            <template v-if="headline.tags.length > 0">
-              <v-chip
-                v-for="tag in headline.tags"
-                :key="tag"
-                size="x-small"
-                variant="tonal"
-              >
-                {{ tag }}
-              </v-chip>
-            </template>
-            <span v-else class="headline-no-tags">no tags</span>
+            <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
             <a
               href="#"
               class="headline-label-add"
               title="Assign labels"
               @click.prevent.stop="emit('action', headline, 'label')"
             >(+)</a>
-            <a
-              v-if="headline.comments_link"
-              class="headline-comments-link"
-              :href="headline.comments_link"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click.stop
-            >(comments)</a>
           </div>
 
-          <!-- Combined mode: the article body is shown inline in the list. -->
-          <div v-if="combined" class="headline-content">
+          <!-- Feed pill and date, right-aligned as in the legacy row. -->
+          <a
+            class="hl-feed headline-feed-label"
+            :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+            :href="feedSiteUrl || '#'"
+            :target="feedSiteUrl ? '_blank' : undefined"
+            :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
+            :title="feedSiteUrl ? 'Open site' : 'Open feed'"
+            @click="onFeedPillClick($event, headline)"
+          >{{ headline.feed_title }}</a>
+          <span v-if="headline.updated" class="hl-updated headline-date">
+            {{ formatDate(headline.updated) }}
+          </span>
+
+          <div class="hl-right">
+            <v-icon
+              :icon="headline.score > 0 ? 'mdi-trending-up' : headline.score < 0 ? 'mdi-trending-down' : 'mdi-trending-neutral'"
+              :color="headline.score > 0 ? 'green' : headline.score < 0 ? 'red' : undefined"
+              size="16"
+              :title="`Score: ${headline.score}`"
+            />
+            <button
+              v-if="combined && grid"
+              type="button"
+              class="hl-icon"
+              :class="{ active: gridSpanIds.has(headline.id) }"
+              title="Span all columns"
+              @click.stop="toggleGridSpan(headline.id)"
+            >
+              <v-icon size="16">mdi-arrow-expand-horizontal</v-icon>
+            </button>
+            <button
+              type="button"
+              class="hl-icon"
+              title="Open original"
+              @click.stop="openOriginal(headline)"
+            >
+              <v-icon size="16">mdi-arrow-right</v-icon>
+            </button>
+            <button
+              type="button"
+              class="hl-icon"
+              title="Open feed"
+              @click.stop="emit('action', headline, 'open_feed')"
+            >
+              <v-icon size="16">mdi-rss</v-icon>
+            </button>
+          </div>
+
+          <!-- Combined mode: full body only when the row is expanded. -->
+          <div
+            v-if="combined && isExpanded(headline)"
+            class="headline-content"
+            @click="onContentClick($event, headline)"
+          >
             <img
               v-if="headline.image_preview"
               class="headline-image-preview"
@@ -160,89 +191,36 @@
               alt=""
               loading="lazy"
             />
-            <div v-html="sanitize(headline.content)"></div>
-          </div>
-
-          <template #append>
-            <div class="headline-side">
-              <div class="headline-side-meta">
-                <a
-                  class="headline-feed-label"
-                  :style="{ backgroundColor: headline.feed_bg_color || undefined }"
-                  :href="headline.link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ headline.feed_title }}
-                </a>
-                <span v-if="headline.updated" class="headline-date">
-                  {{ formatDate(headline.updated) }}
-                </span>
-                <!-- Score indicator, matching the legacy icon-score. -->
-                <v-icon
-                  v-if="headline.score !== 0"
-                  :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
-                  :color="headline.score > 0 ? 'green' : 'red'"
-                  size="14"
-                  :title="`Score: ${headline.score}`"
-                />
-              </div>
-              <div class="headline-actions">
-                <v-btn
-                  icon
-                  variant="text"
-                  size="small"
-                  :color="headline.is_published ? 'blue' : 'grey'"
-                  :title="headline.is_published ? 'Unpublish' : 'Publish'"
-                  @click.stop="emit('action', headline, 'toggle_publish')"
-                >
-                  <v-icon>{{ headline.is_published ? 'mdi-share' : 'mdi-share-outline' }}</v-icon>
-                </v-btn>
-                <v-btn
-                  icon
-                  variant="text"
-                  size="small"
-                  color="grey"
-                  :href="headline.link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open original"
-                  @click.stop
-                >
-                  <v-icon>mdi-arrow-right</v-icon>
-                </v-btn>
-                <v-btn
-                  icon
-                  variant="text"
-                  size="small"
-                  color="grey"
-                  title="Open feed"
-                  @click.stop="emit('action', headline, 'open_feed')"
-                >
-                  <v-icon>mdi-rss</v-icon>
-                </v-btn>
-              </div>
+            <div class="cdm-content-inner" v-html="sanitize(headline.content)"></div>
+            <div v-if="headline.comments_link" class="cdm-footer">
+              <a
+                class="headline-comments-link"
+                :href="headline.comments_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click.stop
+              >({{ headline.comments_count }} {{ headline.comments_count === 1 ? 'comment' : 'comments' }})</a>
             </div>
-          </template>
-      </v-list-item>
-        </v-list>
+          </div>
+        </div>
       </div>
 
-    <div v-if="hasMore && !loading" class="load-more">
-      <v-btn
-        color="primary"
-        variant="flat"
-        :loading="loadingMore"
-        @click="emit('load-more')"
-      >
-        Load more
-      </v-btn>
+      <div v-if="hasMore && !loading" class="load-more">
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="loadingMore"
+          @click="emit('load-more')"
+        >
+          Load more
+        </v-btn>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import DOMPurify from 'dompurify';
 import type { Headline } from '@/types';
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
@@ -260,6 +238,10 @@ const props = defineProps<{
   grid?: boolean;
   /** SHOW_CONTENT_PREVIEW: render the content preview under the title. */
   showPreview?: boolean;
+  /** CDM_EXPANDED: expand every combined row instead of only the active one. */
+  cdmExpanded?: boolean;
+  /** The current feed's site URL, for the feed pill link. */
+  feedSiteUrl?: string;
   /** Ids currently checked for bulk actions. */
   selectedIds?: Set<number>;
   /** CDM_AUTO_CATCHUP: mark articles read as they scroll past. */
@@ -279,18 +261,63 @@ const emit = defineEmits<{
 const listRef = ref<HTMLElement | null>(null);
 
 // Legacy CDM_AUTO_CATCHUP: rows that have scrolled above the viewport are
-// marked read. Only applies to the combined (inline) layout.
+// marked read. An IntersectionObserver is more reliable than scroll math and
+// also fires for programmatic scrolling and after new pages are appended.
+let autoCatchupObserver: IntersectionObserver | null = null;
+let observedRows = new WeakSet<Element>();
+const pendingCatchup = new Set<number>();
+
+const emitAutoCatchup = (ids: number[]) => {
+  const fresh = ids.filter(id => !pendingCatchup.has(id));
+  if (fresh.length === 0) return;
+  fresh.forEach(id => pendingCatchup.add(id));
+  emit('auto-catchup', fresh);
+  // Let the store mark the rows read before allowing the same id again.
+  window.setTimeout(() => {
+    fresh.forEach(id => pendingCatchup.delete(id));
+  }, 2000);
+};
+
+const observeAutoCatchupRows = () => {
+  if (!props.autoCatchup || !props.combined) return;
+  const container = listRef.value;
+  if (!container) return;
+
+  if (!autoCatchupObserver) {
+    autoCatchupObserver = new IntersectionObserver((entries) => {
+      if (!props.autoCatchup || !props.combined) return;
+      const rootTop = entries[0]?.rootBounds?.top ?? container.getBoundingClientRect().top;
+      const ids: number[] = [];
+      for (const entry of entries) {
+        if (entry.isIntersecting) continue;
+        if (entry.boundingClientRect.bottom > rootTop) continue;
+        const row = entry.target as HTMLElement;
+        if (row.classList.contains('headline-read')) continue;
+        const id = Number(row.dataset.headlineId);
+        if (Number.isFinite(id)) ids.push(id);
+      }
+      if (ids.length > 0) emitAutoCatchup(ids);
+    }, { root: container, threshold: 0 });
+  }
+
+  container.querySelectorAll<HTMLElement>('.v-list-item[data-headline-id]').forEach((row) => {
+    if (observedRows.has(row)) return;
+    observedRows.add(row);
+    autoCatchupObserver!.observe(row);
+  });
+};
+
+// Scroll fallback: marks rows whose midpoint is already above the viewport.
+// The observer handles rows that leave the viewport, while this catches rows
+// skipped by a fast jump (e.g. Home/End or a large wheel scroll).
 let catchupScheduled = false;
 const autoCatchupOnScroll = () => {
   if (!props.autoCatchup || !props.combined || catchupScheduled) return;
-
   catchupScheduled = true;
   requestAnimationFrame(() => {
     catchupScheduled = false;
-
     const container = listRef.value;
     if (!container) return;
-
     const top = container.getBoundingClientRect().top;
     const ids: number[] = [];
     container
@@ -302,8 +329,7 @@ const autoCatchupOnScroll = () => {
           if (Number.isFinite(id)) ids.push(id);
         }
       });
-
-    if (ids.length > 0) emit('auto-catchup', ids);
+    if (ids.length > 0) emitAutoCatchup(ids);
   });
 };
 
@@ -317,11 +343,67 @@ const { setupScrollListener } = useInfiniteScroll({
 
 onMounted(() => {
   if (listRef.value) setupScrollListener(listRef.value);
+  observeAutoCatchupRows();
+});
+
+watch(
+  () => [props.headlines.length, props.combined, props.autoCatchup] as const,
+  () => {
+    if (!props.autoCatchup || !props.combined) {
+      autoCatchupObserver?.disconnect();
+      autoCatchupObserver = null;
+      observedRows = new WeakSet<Element>();
+      return;
+    }
+    void nextTick(observeAutoCatchupRows);
+  }
+);
+
+onUnmounted(() => {
+  autoCatchupObserver?.disconnect();
+  autoCatchupObserver = null;
 });
 
 
-const toggleRead = (headline: Headline) => {
-  emit('action', headline, 'toggle_read');
+const gridSpanIds = ref<Set<number>>(new Set());
+
+const toggleGridSpan = (id: number) => {
+  const next = new Set(gridSpanIds.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  gridSpanIds.value = next;
+};
+
+/** The feed pill opens the feed site; fall back to selecting the feed. */
+const onFeedPillClick = (event: MouseEvent, headline: Headline) => {
+  event.stopPropagation();
+  if (!props.feedSiteUrl) {
+    event.preventDefault();
+    emit('action', headline, 'open_feed');
+  }
+};
+
+/** Clicking the inline body/image opens the original article, not the row. */
+const onContentClick = (event: MouseEvent, headline: Headline) => {
+  const target = event.target as HTMLElement;
+  if (target.closest('a')) return;
+  if (window.getSelection()?.toString()) return;
+  event.stopPropagation();
+  openOriginal(headline);
+};
+
+/** In combined mode, only the active row is expanded unless CDM_EXPANDED is on. */
+const isExpanded = (headline: Headline): boolean => {
+  return Boolean(props.combined) && (Boolean(props.cdmExpanded) || headline.id === props.activeId);
+};
+
+/** Clicking a row selects it; App marks it read and moves the cursor. */
+const selectHeadline = (headline: Headline) => {
+  emit('select', headline);
+};
+
+const openOriginal = (headline: Headline) => {
+  window.open(headline.link, '_blank', 'noopener,noreferrer');
 };
 
 // Feeds/view returns pre-localised date strings ("14:05", "Mar 03, 9:12",
@@ -341,6 +423,7 @@ const sanitize = (html: string): string =>
 .headlines-list {
   height: 100%;
   overflow-y: auto;
+  background: rgb(var(--v-theme-surface));
 }
 
 .headlines-loading,
@@ -351,88 +434,226 @@ const sanitize = (html: string): string =>
   justify-content: center;
   height: 200px;
   gap: 1rem;
-  color: grey;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.875rem;
 }
 
 .headlines-list-content {
   background: transparent;
-  padding: 8px 24px;
+  padding: 0;
 }
 
-/* Feedly renders each article as a white card on the page background. */
-.headlines-list-content :deep(.v-list-item) {
-  margin: 16px 0;
-  padding: 20px 24px;
-  border-radius: 8px;
+/* Rows mirror the legacy .hl / .cdm header: compact, separated by rules, not
+   cards. */
+.headlines-list-content > .v-list-item {
+  display: grid;
+  grid-template-areas:
+    "left title feed updated right"
+    "left tags tags tags tags";
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  min-height: 32px;
+  margin: 0;
+  padding: 1px 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-background), 0.09);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.headlines-list-content > .v-list-item:hover {
+  background: rgba(var(--v-theme-on-background), 0.035);
+}
+
+.headlines-list-content > .v-list-item.Unread {
   background: rgb(var(--v-theme-surface));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.headline-mobile-meta {
+.headlines-list-content > .v-list-item.headline-active {
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-success));
+}
+
+.hl-left {
+  grid-area: left;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.hl-left :deep(.v-selection-control) {
+  min-height: 20px;
+}
+
+.hl-left :deep(.v-checkbox .v-icon) {
+  font-size: 18px;
+}
+
+.hl-left :deep(.v-input__details) {
   display: none;
 }
 
-.headline-mobile-feed {
-  display: inline-block;
-  padding: 0 0.4rem;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  color: inherit;
-  text-decoration: none;
+.hl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--v-theme-on-background), 0.45);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
 }
 
-.headlines-list-content :deep(.v-list-item__overlay),
-.headlines-list-content :deep(.v-list-item__underlay) {
-  display: none;
+.v-list-item:hover .hl-icon,
+.hl-icon.active,
+.hl-icon:focus-visible {
+  opacity: 1;
 }
 
-.headline-read {
-  opacity: 0.7;
+.hl-icon.active {
+  color: rgb(var(--v-theme-primary));
 }
 
-.headline-read .headline-title {
-  font-weight: 500;
+.hl-title {
+  grid-area: title;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
-/* Keyboard cursor highlight: a ring instead of a tinted row. */
-.headline-active {
-  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.35);
-}
-
-.headline-title {
-  font-size: 1.15rem;
+.hl-title-link {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(var(--v-theme-on-background)) !important;
   font-weight: 600;
-  white-space: normal;
-  line-height: 1.3;
-  color: rgb(var(--v-theme-on-surface));
+  text-decoration: none;
+  text-overflow: ellipsis;
 }
 
-.headline-preview {
-  display: block;
-  margin-top: 0.25rem;
+.hl-title-link:hover {
+  text-decoration: underline;
+}
+
+.headline-read .hl-title-link {
   font-weight: 400;
-  font-size: 0.8125rem;
-  color: rgba(var(--v-theme-on-surface), 0.6);
+  color: rgba(var(--v-theme-on-background), 0.72);
 }
 
 .headline-author {
-  margin-left: 0.5rem;
-  font-size: 0.8rem;
+  flex: 0 0 auto;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.8125rem;
   font-weight: 400;
-  color: #666;
 }
 
-.headline-tags {
+.hl-tags {
+  grid-area: tags;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.5rem;
+  gap: 4px;
+  padding: 0 0 2px;
+  color: rgba(var(--v-theme-on-background), 0.55);
   font-size: 0.75rem;
-  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 
-.headline-no-tags {
-  color: rgba(var(--v-theme-on-surface), 0.4);
+.hl-tag {
+  color: rgba(var(--v-theme-on-background), 0.55);
+}
+
+.headline-preview {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(var(--v-theme-on-background), 0.58);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.headline-preview :deep(img) {
+  display: none;
+}
+
+.hl-feed {
+  grid-area: feed;
+  justify-self: end;
+  max-width: 180px;
+  margin: 0 4px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 99px;
+  color: rgb(var(--v-theme-on-background));
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hl-updated {
+  grid-area: updated;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.hl-right {
+  grid-area: right;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+/* Combined mode: the body spans the full row below the header. */
+.cdm > .headline-content {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  padding: 8px 8px 14px 42px;
+  border-top: 1px solid rgba(var(--v-theme-on-background), 0.09);
+}
+
+.cdm-content-inner {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.cdm-content-inner :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.headline-image-preview {
+  display: block;
+  max-width: min(100%, 480px);
+  max-height: 280px;
+  margin-bottom: 8px;
+  object-fit: contain;
+}
+
+.cdm-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.75rem;
+}
+
+.hl-tag {
+  color: rgb(var(--v-theme-primary));
 }
 
 .headline-label-add,
@@ -441,137 +662,79 @@ const sanitize = (html: string): string =>
   text-decoration: none;
 }
 
-.headline-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
+.headline-label-add:hover,
+.headline-comments-link:hover {
+  text-decoration: underline;
 }
 
-.headline-side-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: #666;
-}
-
-.headline-date {
-  white-space: nowrap;
-}
-
-.headline-actions {
-  display: flex;
-  gap: 0.25rem;
-}
-
-/* Combined mode: the article body rendered inline under the headline. */
-.headline-content {
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  white-space: normal;
-}
-
-.headline-content :deep(img) {
-  max-width: 100%;
-}
-
-.headline-image-preview {
-  display: block;
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  margin-bottom: 0.5rem;
-}
-
-.headline-feed-label {
-  display: inline-block;
-  padding: 0 0.4rem;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  color: inherit;
-  text-decoration: none;
-}
-
-/* Grid view: tile the inline articles on wide screens (combined mode only).
-   Mirrors the legacy #headlines-frame[data-enable-grid] rule. */
+/* Grid view: tile the inline articles on wide screens (combined mode only). */
 .headlines-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
-  gap: 16px;
-  padding: 16px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 12px;
+  padding: 12px;
 }
 
-.headlines-grid :deep(.v-list-item) {
-  margin: 0;
+.headlines-grid > .v-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border: 1px solid rgba(var(--v-theme-on-background), 0.12);
+  border-radius: 4px;
+}
+
+.headlines-grid > .v-list-item.grid-span {
+  grid-column: 1 / -1;
 }
 
 .bulk-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 24px;
-}
-
-.bulk-select-all {
-  flex: 0 0 auto;
+  gap: 0.25rem;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-background), 0.09);
 }
 
 .bulk-count {
   font-size: 0.8125rem;
-  color: #666;
+  color: rgba(var(--v-theme-on-background), 0.65);
 }
 
-/* Phone layout: full-width cards, no left icon strip (as in the legacy
-   client), and horizontal scrolling for the bulk action row. */
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Phone layout: compact rows without the right-hand metadata strip. */
 @media (max-width: 900px) {
-  .headlines-list-content {
-    padding: 8px;
+  .headlines-list-content > .v-list-item {
+    grid-template-areas:
+      "left title"
+      "left tags";
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 4px 6px;
   }
 
-  .headlines-list-content :deep(.v-list-item) {
-    margin: 8px 0;
-    padding: 12px 14px;
-    border-radius: 6px;
+  .hl-title {
+    white-space: normal;
   }
 
-  .headlines-list-content :deep(.v-list-item__prepend) {
+  .hl-feed,
+  .hl-updated,
+  .hl-right {
     display: none;
   }
 
-  .headline-title {
-    font-size: 1rem;
+  .hl-icon {
+    opacity: 1;
   }
 
-  .headline-actions,
-  .headline-side {
-    display: none;
-  }
-
-  .headline-mobile-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.75rem;
-  }
-
-  .headline-mobile-meta-right {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: rgba(var(--v-theme-on-surface), 0.6);
-    white-space: nowrap;
-  }
-
-  .headline-tags {
-    flex-wrap: wrap;
+  .cdm > .headline-content {
+    padding-left: 8px;
   }
 
   .bulk-bar {
-    padding: 0.25rem 8px;
     overflow-x: auto;
   }
 

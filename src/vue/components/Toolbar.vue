@@ -1,13 +1,19 @@
 <template>
   <div class="toolbar">
     <div class="toolbar-left">
-      <v-btn-toggle class="refresh-toggle">
-        <v-btn
-          icon="mdi-refresh"
-          @click="handleAction('refresh')"
-          title="Refresh"
+      <v-icon v-if="feedInfo" icon="mdi-rss" size="18" class="feed-icon" />
+      <span v-if="feedInfo" class="feed-title">{{ feedInfo.title }}</span>
+      <span class="toolbar-center">
+        <!-- Feed update error, mirroring the legacy toolbar's error icon. -->
+        <v-icon
+          v-if="feedError"
+          icon="mdi-alert-circle"
+          color="error"
+          size="18"
+          class="ml-2"
+          :title="feedError"
         />
-      </v-btn-toggle>
+      </span>
 
       <!-- Plugin-provided main toolbar buttons (HOOK_MAIN_TOOLBAR_BUTTON). -->
       <PluginSurface v-if="pluginMainHtml" :html="pluginMainHtml" class="plugin-main-toolbar" />
@@ -29,72 +35,15 @@
         title="Plugin updates are available"
         @click="handleAction('preferences')"
       />
-
-      <!-- Mark as read: the default marks everything; the menu items carry the
-           time window the backend accepts (1day/1week/2week). -->
-      <v-menu>
-        <template #activator="{ props }">
-          <v-btn v-bind="props" class="catchup-button" prepend-icon="mdi-check-all" title="Mark as read">
-            Mark as read
-            <v-icon end>mdi-chevron-down</v-icon>
-          </v-btn>
-        </template>
-        <v-list>
-          <v-list-item
-            v-for="item in catchupOptions"
-            :key="item.value"
-            @click="handleAction('catchup', item.value)"
-          >
-            <v-list-item-title>{{ item.title }}</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-menu>
-
-      <v-text-field
-        v-model="searchQuery"
-        placeholder="Search articles..."
-        prepend-inner-icon="mdi-magnify"
-        variant="outlined"
-        density="compact"
-        hide-details
-        class="search-input"
-        @keyup.enter="handleAction('search', searchQuery)"
-      />
-
-      <!-- Word stemming language. Required by the backend: an empty value
-           makes PostgreSQL reject the query and matches nothing. -->
-      <v-select
-        v-if="searchLanguages.length > 1"
-        v-model="searchLanguage"
-        :items="searchLanguages"
-        aria-label="Language"
-        density="compact"
-        variant="outlined"
-        hide-details
-        class="search-language"
-        title="Used for word stemming"
-        @update:model-value="onLanguageChange"
-      />
-    </div>
-
-    <div class="toolbar-center">
-      <span class="feed-title" v-if="feedInfo">{{ feedInfo.title }}</span>
-      <!-- Feed update error, mirroring the legacy toolbar's error icon. -->
-      <v-icon
-        v-if="feedError"
-        icon="mdi-alert-circle"
-        color="error"
-        size="18"
-        class="ml-2"
-        :title="feedError"
-      />
     </div>
 
     <div class="toolbar-right">
+
+
       <!-- Legacy Select menu; bulk actions appear in the list bar. -->
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" class="select-button">
+          <v-btn v-bind="props" class="select-button" variant="text">
             Select
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
@@ -116,7 +65,7 @@
         :items="viewModeOptions"
         aria-label="Show"
         density="compact"
-        variant="outlined"
+        variant="plain"
         hide-details
         class="view-mode"
         @update:model-value="setViewMode"
@@ -124,7 +73,7 @@
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" class="sort-button" title="Order by">
+          <v-btn v-bind="props" class="sort-button" variant="text" title="Order by">
             {{ sortLabel }}
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
@@ -141,9 +90,29 @@
         </v-list>
       </v-menu>
 
+      <!-- Mark as read: the default marks everything; the menu items carry the
+           time window the backend accepts (1day/1week/2week). -->
       <v-menu>
         <template #activator="{ props }">
-          <v-btn icon="mdi-dots-vertical" v-bind="props" />
+          <v-btn v-bind="props" class="catchup-button" variant="text" prepend-icon="mdi-check-all" title="Mark as read">
+            Mark as read
+            <v-icon end>mdi-chevron-down</v-icon>
+          </v-btn>
+        </template>
+        <v-list>
+          <v-list-item
+            v-for="item in catchupOptions"
+            :key="item.value"
+            @click="handleAction('catchup', item.value)"
+          >
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+
+      <v-menu>
+        <template #activator="{ props }">
+          <v-btn icon="mdi-menu" v-bind="props" title="Actions" />
         </template>
         <v-list>
           <!-- Plugin-provided action-menu buttons (HOOK_TOOLBAR_BUTTON). -->
@@ -179,8 +148,6 @@ interface Props {
   feedInfo: Feed | null;
   /** The current feed's last update error, shown as an icon when set. */
   feedError?: string | null;
-  searchLanguages?: string[];
-  modelSearchLanguage?: string;
   modelViewMode?: string;
   modelOrderBy?: string;
   /** Plugin HTML for HOOK_MAIN_TOOLBAR_BUTTON. */
@@ -191,18 +158,22 @@ interface Props {
   updateUrl?: string;
   /** True when one or more local plugins have updates. */
   pluginUpdates?: boolean;
+  /** CDM_EXPANDED: every combined row is expanded. */
+  cdmExpanded?: boolean;
+  /** WIDESCREEN_MODE: the feed tree is hidden. */
+  wideScreen?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   feedError: null,
-  searchLanguages: () => [],
-  modelSearchLanguage: 'english',
   modelViewMode: 'adaptive',
   modelOrderBy: 'default',
   pluginMainHtml: '',
   pluginToolbarHtml: '',
   updateUrl: '',
   pluginUpdates: false,
+  cdmExpanded: true,
+  wideScreen: false,
 });
 
 const emit = defineEmits<{
@@ -210,8 +181,6 @@ const emit = defineEmits<{
 }>();
 
 // State
-const searchQuery = ref('');
-const searchLanguage = ref(props.modelSearchLanguage);
 // These mirror the <select> values in index.php and the strings Feeds/view
 // understands; arbitrary values are silently ignored by the backend.
 const viewMode = ref(props.modelViewMode);
@@ -240,18 +209,33 @@ const sortOptions = [
   { title: 'Title', value: 'title' },
 ];
 
-const actionOptions = [
-  { title: 'Edit Feed', value: 'edit', icon: 'mdi-pencil' },
-  { title: 'Delete Feed', value: 'delete', icon: 'mdi-delete' },
-  { title: 'Mark All Read', value: 'catchup', icon: 'mdi-check-all' },
-  { title: 'Toggle hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' },
+// Mirrors the legacy actions menu (index.php #toolbar .action-button). Labels
+// that depend on state are computed so they describe the next action.
+const actionOptions = computed(() => [
+  { title: 'Preferences...', value: 'preferences', icon: 'mdi-cog' },
+  { title: 'Refresh', value: 'refresh', icon: 'mdi-refresh' },
+  { title: 'Search...', value: 'focusSearch', icon: 'mdi-magnify' },
+  { title: 'Search feeds...', value: 'searchFeeds', icon: 'mdi-filter-outline' },
+  { title: 'Subscribe to feed...', value: 'manageFeeds', icon: 'mdi-plus-box' },
+  { title: 'Edit this feed...', value: 'edit', icon: 'mdi-pencil' },
+  { title: 'Unsubscribe', value: 'delete', icon: 'mdi-delete' },
+  { title: 'Mark as read', value: 'catchup', icon: 'mdi-check-all' },
+  { title: '(Un)hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' },
   { title: 'Toggle combined mode', value: 'toggleCombinedMode', icon: 'mdi-view-agenda-outline' },
-  { title: 'Manage feeds', value: 'manageFeeds', icon: 'mdi-plus-box' },
-  { title: 'Preferences', value: 'preferences', icon: 'mdi-cog' },
-  { title: 'Keyboard shortcuts', value: 'hotkeyHelp', icon: 'mdi-keyboard' },
+  {
+    title: props.wideScreen ? 'Disable widescreen mode' : 'Enable widescreen mode',
+    value: 'toggleWideScreen',
+    icon: 'mdi-arrow-expand-horizontal',
+  },
+  {
+    title: props.cdmExpanded ? 'Expand selected article only' : 'Expand all articles',
+    value: 'toggleCdmExpanded',
+    icon: 'mdi-unfold-more-horizontal',
+  },
+  { title: 'Keyboard shortcuts help', value: 'hotkeyHelp', icon: 'mdi-keyboard' },
   { title: 'Toggle light/dark theme', value: 'toggleTheme', icon: 'mdi-theme-light-dark' },
-  { title: 'Log out', value: 'logout', icon: 'mdi-logout' }
-];
+  { title: 'Logout', value: 'logout', icon: 'mdi-logout' },
+]);
 
 // Mirrors the legacy #main-catchup-dropdown: the empty value marks everything,
 // the others only articles older than the window.
@@ -291,22 +275,9 @@ const handleSort = (command: string) => {
  * @param command - The action command to emit.
  */
 const handleAction = (command: string, payload?: string | number | object) => {
-  // Searches must carry the stemming language, so pass it alongside the term.
-  if (command === 'search') {
-    emit('action', 'search', { query: payload, language: searchLanguage.value });
-    return;
-  }
   emit('action', command, payload);
 };
 
-/**
- * Notifies the parent when the stemming language changes so it can be stored.
- * @param language - The newly selected language.
- */
-const onLanguageChange = (language: string) => {
-  searchLanguage.value = language;
-  emit('action', 'searchLanguage', language);
-};
 </script>
 
 <style scoped>
@@ -314,37 +285,62 @@ const onLanguageChange = (language: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
-  background: var(--ttrss-toolbar-bg, #fff);
-  border-bottom: 1px solid var(--ttrss-border, #ddd);
-  gap: 1rem;
+  min-height: 44px;
+  padding: 0 8px;
+  background: rgb(var(--v-theme-background));
+  border-bottom: 1px solid rgba(var(--v-theme-on-background), 0.09);
+  gap: 8px;
 }
 
-.toolbar-left,
+.toolbar-left {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 4px;
 }
 
 .toolbar-center {
-  flex: 1;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+}
+
+.feed-icon {
+  margin-left: 4px;
+  color: rgba(var(--v-theme-on-background), 0.55);
+}
+
+.toolbar-right :deep(.v-btn) {
+  font-size: 0.8125rem;
+  text-transform: none;
+}
+
+.view-mode :deep(.v-field__outline) {
+  display: none;
+}
+
+.view-mode :deep(.v-field) {
+  background: transparent;
 }
 
 .feed-title {
-  font-weight: 600;
-  font-size: 15px;
+  overflow: hidden;
   color: rgb(var(--v-theme-on-background));
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.search-input {
-  max-width: 200px;
-}
-
 .view-mode {
-  min-width: 150px;
+  min-width: 130px;
+  max-width: 150px;
 }
 
 /* Phone layout: keep the feed title, view/sort and overflow menu; the rest of
@@ -353,18 +349,15 @@ const onLanguageChange = (language: string) => {
   .toolbar {
     flex: 1 1 auto;
     min-width: 0;
-    gap: 0.25rem;
+    gap: 2px;
     padding: 0;
   }
 
   .toolbar-left {
-    gap: 0.25rem;
+    gap: 2px;
   }
 
-  .refresh-toggle,
   .catchup-button,
-  .search-input,
-  .search-language,
   .update-link,
   .plugin-main-toolbar,
   .select-button {
@@ -372,10 +365,7 @@ const onLanguageChange = (language: string) => {
   }
 
   .toolbar-center {
-    flex: 1;
     min-width: 0;
-    padding-left: 0.25rem;
-    text-align: left;
   }
 
   .feed-title {
@@ -385,12 +375,12 @@ const onLanguageChange = (language: string) => {
   }
 
   .toolbar-right {
-    gap: 0.25rem;
+    gap: 2px;
   }
 
   .view-mode {
     min-width: 112px;
-    width: 112px;
+    max-width: 112px;
   }
 
   .view-mode :deep(.v-field__input) {
@@ -403,8 +393,8 @@ const onLanguageChange = (language: string) => {
   }
 
   .sort-button {
-    padding: 0 6px;
     min-width: 0;
+    padding: 0 6px;
     font-size: 12px;
   }
 }

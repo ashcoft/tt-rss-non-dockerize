@@ -96,6 +96,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const notice = ref<string | null>(null);
   /** The current feed's last update error, from the toolbar payload. */
   const feedError = ref<string | null>(null);
+  /** The current feed's site URL, from the toolbar payload. */
+  const feedSiteUrl = ref('');
   const viewMode = ref<string>('adaptive');
   /** Feeds/view `order_by`; must be one of default/feed_dates/date_reverse/title. */
   const orderBy = ref<string>('default');
@@ -228,6 +230,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         hasMore.value = response.content.headlines.length >= pageSize;
         notice.value = response.content.message;
         feedError.value = response.content.feedError;
+        feedSiteUrl.value = response.content.feedSiteUrl;
       } else {
         error.value = response.error ?? 'Failed to load headlines';
       }
@@ -690,6 +693,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     error,
     notice,
     feedError,
+    feedSiteUrl,
     viewMode,
     searchQuery,
     searchLanguage,

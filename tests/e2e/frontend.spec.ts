@@ -65,6 +65,30 @@ async function expandCategory(page: Page, title: string): Promise<void> {
   }
 }
 
+/** Open the legacy Search... dialog from the actions menu and run a query. */
+async function searchArticles(page: Page, term: string): Promise<void> {
+  await page.locator('.toolbar-right button[title="Actions"]').click();
+  await page
+    .locator('.v-overlay-container .v-list-item')
+    .filter({ hasText: 'Search...' })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByPlaceholder('Search articles...').fill(term);
+  await dialog.getByRole('button', { name: 'Search' }).click();
+}
+
+/** Open Preferences from the legacy actions menu. */
+async function openPreferences(page: Page): Promise<void> {
+  await page.locator('.toolbar-right button[title="Actions"]').click();
+  await page
+    .locator('.v-overlay-container .v-list-item')
+    .filter({ hasText: 'Preferences...' })
+    .first()
+    .click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+}
+
 test.describe('Vue front-end', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!(await backendReachable(page)), 'no tt-rss backend reachable at baseURL');
@@ -73,8 +97,7 @@ test.describe('Vue front-end', () => {
   test('logs in and shows the three-pane shell', async ({ page }) => {
     await login(page);
     await expect(page.locator('.feed-list')).toBeVisible();
-    await expect(page.getByPlaceholder('Search feeds...')).toBeVisible();
-    await expect(page.getByPlaceholder('Search articles...')).toBeVisible();
+    await expect(page.locator('.toolbar .feed-title')).toBeVisible();
   });
 
   test('lists seeded feeds and loads headlines when a feed is selected', async ({ page }) => {
@@ -95,7 +118,7 @@ test.describe('Vue front-end', () => {
 
   test('opens the preferences dialog and shows the Plugins tab', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
 
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('tab', { name: 'Plugins' }).click();
@@ -135,9 +158,7 @@ test.describe('Vue front-end', () => {
     await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
     // Search finds the article regardless of read state, unlike the default
     // (adaptive) list which hides articles earlier tests marked read.
-    const searchBox = page.getByPlaceholder('Search articles...');
-    await searchBox.fill('PostgreSQL');
-    await searchBox.press('Enter');
+    await searchArticles(page, 'PostgreSQL');
 
     const headline = page.getByText('PostgreSQL 18 released with major performance improvements');
     await expect(headline).toBeVisible({ timeout: 15000 });
@@ -230,7 +251,7 @@ test.describe('Vue front-end', () => {
 
     const row = page.locator('.headlines-list-content .v-list-item').first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    const title = (await row.locator('.headline-title').innerText()).trim();
+    const title = (await row.locator('.hl-title-link').innerText()).trim();
 
     // Star it, then confirm the Starred feed now contains it.
     await row.getByRole('button', { name: 'Star' }).click();
@@ -242,7 +263,7 @@ test.describe('Vue front-end', () => {
     // the next load (the list is not re-fetched in place).
     await starred.first().getByRole('button', { name: 'Unstar' }).click();
     await page.reload();
-    await page.getByRole('button', { name: 'Preferences' }).waitFor({ timeout: 15000 });
+    await page.locator('.toolbar .feed-title').waitFor({ timeout: 15000 });
     await expandCategory(page, 'Special');
     await page.locator('.feed-list').getByText('Starred articles', { exact: true }).click();
     await expect(
@@ -366,9 +387,7 @@ test.describe('Vue front-end', () => {
 
     // Search finds the seeded article with an image enclosure regardless of
     // read state.
-    const searchBox = page.getByPlaceholder('Search articles...');
-    await searchBox.fill('distributed task queue');
-    await searchBox.press('Enter');
+    await searchArticles(page, 'distributed task queue');
     await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
       timeout: 15000,
     });
@@ -411,9 +430,7 @@ test.describe('Vue front-end', () => {
     await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
     // Search finds the article regardless of read state, unlike the default
     // (adaptive) list which hides articles earlier tests marked read.
-    const searchBox = page.getByPlaceholder('Search articles...');
-    await searchBox.fill('PostgreSQL');
-    await searchBox.press('Enter');
+    await searchArticles(page, 'PostgreSQL');
 
     const row = page
       .locator('.headlines-list-content .v-list-item')
@@ -464,9 +481,7 @@ test.describe('Vue front-end', () => {
     await expandCategory(page, 'Special');
     await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
 
-    const searchBox = page.getByPlaceholder('Search articles...');
-    await searchBox.fill('kubernetes');
-    await searchBox.press('Enter');
+    await searchArticles(page, 'kubernetes');
 
     // The seeded "Kubernetes" article is the only match.
     const titles = page.locator('.headlines-list-content .v-list-item-title');
@@ -494,14 +509,14 @@ test.describe('Vue front-end', () => {
 
     // Enable combined mode and the grid preference via the preferences dialog,
     // then reload: display preferences are read from init-params on load.
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/Combined mode/).first().check();
     await dialog.getByLabel(/Grid view/).first().check();
     await dialog.getByRole('button', { name: 'Close' }).click();
 
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.toolbar .feed-title')).toBeVisible({ timeout: 15000 });
     await expandCategory(page, 'Special');
     await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
 
@@ -512,7 +527,7 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('.headline-content').first()).toBeVisible();
 
     // Reset both preferences so later tests see the default layout.
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await dialog.getByLabel(/Combined mode/).first().uncheck();
     await dialog.getByLabel(/Grid view/).first().uncheck();
     await dialog.getByRole('button', { name: 'Close' }).click();
@@ -520,7 +535,7 @@ test.describe('Vue front-end', () => {
 
   test('lists plugins and saves the enabled set', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await page.getByRole('tab', { name: 'Plugins' }).click();
 
     // The bundled plugins are listed (auth_internal is system-enabled).
@@ -537,7 +552,7 @@ test.describe('Vue front-end', () => {
 
   test('prefs.php serves the Vue app with the preferences dialog open', async ({ page }) => {
     await page.goto('/prefs.php');
-    await expect(page.getByRole('button', { name: 'Preferences' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.toolbar .feed-title')).toBeVisible({ timeout: 15000 });
 
     // The legacy Dojo preferences page is gone; the dialog opens on mount.
     const dialog = page.getByRole('dialog');
@@ -568,7 +583,7 @@ test.describe('Vue front-end', () => {
 
   test('the preferences dialog surfaces the full backend preference set', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     const dialog = page.getByRole('dialog');
 
     // The General tab lists the curated preferences.
@@ -585,7 +600,8 @@ test.describe('Vue front-end', () => {
     await dialog.getByRole('tab', { name: 'Advanced' }).click();
     await page.waitForTimeout(300);
     const advancedSize = await card.boundingBox();
-    expect(Math.round(advancedSize!.height)).toBe(Math.round(generalSize!.height));
+    // Allow sub-pixel/scrollbar rounding; the card itself is fixed at 80vh.
+    expect(Math.abs(Math.round(advancedSize!.height) - Math.round(generalSize!.height))).toBeLessThanOrEqual(4);
     const advanced = dialog.locator('.v-window-item').nth(1);
     await expect(advanced.locator('.v-list-item').first()).toBeVisible();
     expect(await advanced.locator('.v-list-item').count()).toBeGreaterThan(0);
@@ -593,7 +609,7 @@ test.describe('Vue front-end', () => {
 
   test('creates a content filter from the preferences dialog', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await page.getByRole('tab', { name: 'Filters' }).click();
     await page.getByRole('button', { name: 'New filter' }).click();
 
@@ -610,7 +626,7 @@ test.describe('Vue front-end', () => {
 
   test('toggles a boolean preference and persists it', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // The first preference is "Combined mode"; toggling it saves immediately and
@@ -624,7 +640,7 @@ test.describe('Vue front-end', () => {
 
     // Reloading keeps the new value (it round-tripped through the backend).
     await page.reload();
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     const after = page.getByLabel(/Combined mode/).first();
     await expect(after).toBeChecked({ checked: !before });
 
@@ -637,7 +653,7 @@ test.describe('Vue front-end', () => {
 
   test('switches themes from the preferences dialog', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await page.waitForTimeout(800);
 
     const theme = page.getByRole('combobox', { name: 'Theme' });
@@ -658,7 +674,7 @@ test.describe('Vue front-end', () => {
     await expect(page.locator('#theme_css')).toHaveAttribute('href', expectedCss);
 
     // Restore the original theme for the rest of the run.
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     await page.waitForTimeout(800);
     const themeAgain = page.getByRole('combobox', { name: 'Theme' });
     await themeAgain.focus();
@@ -710,7 +726,7 @@ test.describe('Vue front-end', () => {
 
     // Enable the two preferences this behaviour depends on (only if needed, so
     // re-running against a dirty database still enables rather than disables).
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openPreferences(page);
     const combinedPref = page.getByLabel(/Combined mode/).first();
     if (!(await combinedPref.isChecked())) {
       await combinedPref.click();

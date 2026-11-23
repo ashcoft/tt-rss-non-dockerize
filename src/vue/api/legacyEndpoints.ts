@@ -347,6 +347,8 @@ export interface HeadlinesPage {
   message: string | null;
   /** Feed update error reported by the toolbar payload, or null. */
   feedError: string | null;
+  /** Feed site URL reported by the toolbar payload, or "". */
+  feedSiteUrl: string;
 }
 
 /**
@@ -485,10 +487,11 @@ export async function getHeadlines(
     ? (headlines.toolbar as Record<string, unknown>)
     : {};
   const feedError = asString(toolbar.error).trim() || null;
+  const feedSiteUrl = asString(toolbar.site_url);
 
   if (typeof content === 'string') {
     // A string body is the legacy empty/error marker.
-    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError };
+    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError, feedSiteUrl };
   }
 
   const rows = expectArray(content, 'Feeds/view.headlines.content');
@@ -498,6 +501,7 @@ export async function getHeadlines(
     first_id: firstId,
     message: null,
     feedError,
+    feedSiteUrl,
   };
 }
 

@@ -8,6 +8,8 @@ import ShareDialog from './dialogs/ShareDialog.vue';
 
 const props = defineProps<{
   article: Article;
+  /** The current feed's site URL, for the feed pill link. */
+  feedSiteUrl?: string;
 }>();
 
 const emit = defineEmits<{
@@ -87,6 +89,20 @@ const closeArticle = () => {
   emit('close');
 };
 
+/** Open the article on its original site. */
+const openOriginal = () => {
+  window.open(props.article.link, '_blank', 'noopener,noreferrer');
+};
+
+/** Clicking the body/image opens the original site, but links and text
+ * selections keep their normal behaviour. */
+const onBodyClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (target.closest('a')) return;
+  if (window.getSelection()?.toString()) return;
+  openOriginal();
+};
+
 /** Persist the current tag list when the combobox changes. */
 const saveTags = async (value: unknown) => {
   const tags = (Array.isArray(value) ? value : []).map((t) => String(t).trim()).filter(Boolean);
@@ -141,7 +157,11 @@ const sanitizedContent = computed(() => {
       <header class="article-header">
         <div class="article-header-inner">
           <v-btn icon="mdi-close" variant="text" @click="closeArticle" class="mr-2" />
-          <h1>{{ article.title }}</h1>
+          <h1>
+            <a :href="article.link" target="_blank" rel="noopener noreferrer">
+              {{ article.title }}
+            </a>
+          </h1>
           <!-- Plugin article buttons (HOOK_ARTICLE_BUTTON), dispatched through
                the Vue plugin registry. -->
           <v-btn
@@ -157,7 +177,14 @@ const sanitizedContent = computed(() => {
           </v-btn>
         </div>
         <div class="article-meta">
-          <span class="feed">{{ article.feed_title }}</span>
+          <a
+            v-if="feedSiteUrl"
+            class="feed"
+            :href="feedSiteUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >{{ article.feed_title }}</a>
+          <span v-else class="feed">{{ article.feed_title }}</span>
           <span v-if="article.author" class="author">by {{ article.author }}</span>
           <!-- The legacy header shows the long date here, not the short one. -->
           <time :datetime="article.updated">{{ article.updated_long || article.updated }}</time>
@@ -175,7 +202,7 @@ const sanitizedContent = computed(() => {
       </header>
       
       <!-- Content is sanitized client-side using DOMPurify for XSS prevention -->
-      <div class="article-body" v-html="sanitizedContent"></div>
+      <div class="article-body" v-html="sanitizedContent" @click="onBodyClick"></div>
 
       <!-- Attachments (enclosures): playable audio/video inline, others linked. -->
       <div v-if="attachments.length > 0" class="article-attachments">
@@ -189,49 +216,51 @@ const sanitizedContent = computed(() => {
         </div>
       </div>
       
-      <!-- Tags and score (parity with the Dojo article header) -->
-      <v-divider class="my-3" />
-      <div class="article-tags">
-        <v-combobox
-          v-model="tagDraft"
-          :items="tagSuggestions"
-          label="Tags"
-          chips
-          multiple
-          closable-chips
-          density="compact"
-          variant="outlined"
-          hide-details
-          @update:model-value="saveTags"
-          @update:search="onTagSearch"
-        />
+      <!-- Tags, score and note, compacted to the legacy post footer. -->
+      <div class="article-tools">
+        <div class="article-tags-row">
+          <v-icon size="16">mdi-tag-outline</v-icon>
+          <v-combobox
+            v-model="tagDraft"
+            :items="tagSuggestions"
+            chips
+            multiple
+            closable-chips
+            density="compact"
+            variant="plain"
+            hide-details
+            class="article-tags-input"
+            @update:model-value="saveTags"
+            @update:search="onTagSearch"
+          />
+        </div>
         <div class="score-row">
           <span class="score-label">Score: {{ article.score ?? 0 }}</span>
           <v-btn size="x-small" variant="text" @click="bumpScore(-100)">-100</v-btn>
           <v-btn size="x-small" variant="text" @click="bumpScore(0)">0</v-btn>
           <v-btn size="x-small" variant="text" @click="bumpScore(100)">+100</v-btn>
         </div>
+        <div class="note-row">
+          <v-textarea
+            v-model="noteDraft"
+            placeholder="Note"
+            density="compact"
+            rows="1"
+            auto-grow
+            variant="plain"
+            hide-details
+            @blur="saveNote"
+          />
+          <v-btn
+            size="x-small"
+            variant="text"
+            :loading="saving"
+            @click="saveNote"
+          >
+            Save note
+          </v-btn>
+        </div>
       </div>
-
-      <!-- Note editor (Phase 3) -->
-      <v-divider class="my-3" />
-      <v-textarea
-        v-model="noteDraft"
-        label="Note (double-click to edit)"
-        density="compact"
-        rows="2"
-        variant="outlined"
-        @blur="saveNote"
-      />
-      <v-btn
-        color="primary"
-        size="small"
-        variant="flat"
-        :loading="saving"
-        @click="saveNote"
-      >
-        Save note
-      </v-btn>
 
       <!-- Article metadata footer -->
       <footer class="article-footer">
@@ -274,31 +303,62 @@ const sanitizedContent = computed(() => {
 
 <style scoped>
 .article-view {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
   height: 100%;
+  background: rgb(var(--v-theme-surface));
 }
 
 .article-header {
-  padding: 1rem;
-  border-bottom: 1px solid #eee;
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-background), 0.09);
+  background: rgb(var(--v-theme-surface));
+}
+
+.article-header-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .article-header h1 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
+  flex: 1;
+  margin: 0;
+  color: rgb(var(--v-theme-on-background));
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.article-header h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.article-header h1 a:hover {
+  text-decoration: underline;
 }
 
 .article-meta {
   display: flex;
-  gap: 1rem;
-  color: #666;
-  font-size: 0.875rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+  color: rgba(var(--v-theme-on-background), 0.6);
+  font-size: 0.8125rem;
+}
+
+.article-meta .feed {
+  padding: 0 6px;
+  border: 1px solid rgba(var(--v-theme-on-background), 0.12);
+  border-radius: 99px;
+  color: rgb(var(--v-theme-on-background));
 }
 
 .article-meta .comments {
-  color: #1976d2;
+  color: rgb(var(--v-theme-primary));
   text-decoration: none;
 }
 
@@ -307,23 +367,38 @@ const sanitizedContent = computed(() => {
 }
 
 .article-body {
-  padding: 1rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  padding: 12px 16px;
+  color: rgb(var(--v-theme-on-background));
+  font-size: 0.95rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+  cursor: pointer;
+}
+
+.article-body :deep(img) {
+  cursor: pointer;
+}
+
+.article-body :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.article-body :deep(a) {
+  color: rgb(var(--v-theme-primary));
 }
 
 .article-attachments {
-  padding: 0 1rem;
+  padding: 0 16px;
 }
 
 .article-attachments h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
+  margin: 0 0 6px;
+  font-size: 0.95rem;
 }
 
 .attachment {
-  margin-bottom: 0.5rem;
+  margin-bottom: 6px;
 }
 
 .attachment audio,
@@ -331,36 +406,61 @@ const sanitizedContent = computed(() => {
   max-width: 100%;
 }
 
-.article-tags {
-  padding: 0 1rem;
+.article-tools {
+  padding: 6px 16px 10px;
+  border-top: 1px solid rgba(var(--v-theme-on-background), 0.09);
+}
+
+.article-tags-row,
+.note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.article-tags-row {
+  align-items: center;
+}
+
+.article-tags-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.article-tags-input :deep(.v-field__outline) {
+  display: none;
+}
+
+.article-tags-input :deep(.v-field) {
+  background: transparent;
 }
 
 .score-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
+  gap: 2px;
+  margin-top: 2px;
+  color: rgba(var(--v-theme-on-background), 0.6);
   font-size: 0.8125rem;
-  color: #666;
 }
 
 .score-label {
-  margin-right: 0.5rem;
+  margin-right: 4px;
 }
 
 .article-footer {
-  padding: 1rem;
-  border-top: 1px solid #eee;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(var(--v-theme-on-background), 0.09);
 }
 
 .relative-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .article-footer a {
-  color: #1976d2;
+  color: rgb(var(--v-theme-primary));
   text-decoration: none;
 }
 
