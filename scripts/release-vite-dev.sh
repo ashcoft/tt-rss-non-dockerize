@@ -47,7 +47,7 @@ if [[ -z "${CI:-}" ]]; then
   args+=(--no-ci)
 fi
 
-pnpm exec semantic-release "${args[@]}"
+corepack pnpm exec semantic-release "${args[@]}"
 
 tag=$(git describe --tags --abbrev=0 --match 'vite-dev-*')
 if command -v gh >/dev/null 2>&1 && [[ -n "$tag" ]]; then
