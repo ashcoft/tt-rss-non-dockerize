@@ -9,6 +9,9 @@
 
     <v-window v-model="tab" class="mt-3">
       <v-window-item value="log">
+        <v-alert v-if="!log.enabled" type="info" variant="tonal" density="compact">
+          The event log is not written to SQL on this server, so it cannot be shown here.
+        </v-alert>
         <div class="d-flex align-center ga-2 mb-2">
           <v-select
             v-model="severity"
@@ -137,7 +140,7 @@ import type { ScheduledTask, SystemLog } from '../../api/legacyEndpoints';
 
 const tab = ref('log');
 const severity = ref(512);
-const log = ref<SystemLog>({ entries: [], page: 0, pages: 1, total: 0, severity: 512 });
+const log = ref<SystemLog>({ entries: [], page: 0, pages: 1, total: 0, severity: 512, enabled: true });
 const loadingLog = ref(false);
 const email = ref('');
 const emailResult = ref<{ ok: boolean; error: string } | null>(null);

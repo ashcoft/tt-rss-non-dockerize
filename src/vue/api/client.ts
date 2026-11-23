@@ -528,6 +528,7 @@ class ApiClient {
       pages: 1,
       total: 0,
       severity,
+      enabled: true,
     });
   }
 

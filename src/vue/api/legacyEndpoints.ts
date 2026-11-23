@@ -1516,6 +1516,7 @@ export interface SystemLog {
   pages: number;
   total: number;
   severity: number;
+  enabled: boolean;
 }
 
 export async function getSystemLog(
@@ -1545,6 +1546,7 @@ export async function getSystemLog(
     pages: asNumber(body.pages, 1),
     total: asNumber(body.total),
     severity: asNumber(body.severity, severity),
+    enabled: body.enabled === undefined ? true : asBoolean(body.enabled),
   };
 }
 

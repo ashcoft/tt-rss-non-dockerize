@@ -69,6 +69,18 @@ class Pref_System extends Handler_Administrative {
 		$severity = (int) ($_REQUEST['severity'] ?? E_USER_WARNING);
 		$page = max(0, (int) ($_REQUEST['page'] ?? 0));
 
+		if (Config::get(Config::LOG_DESTINATION) != Logger::LOG_DEST_SQL) {
+			print json_encode([
+				'entries' => [],
+				'page' => 0,
+				'pages' => 1,
+				'total' => 0,
+				'severity' => $severity,
+				'enabled' => false,
+			]);
+			return;
+		}
+
 		$errno_values = match ($severity) {
 			E_USER_ERROR => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR],
 			E_USER_WARNING => [E_ERROR, E_USER_ERROR, E_PARSE, E_COMPILE_ERROR, E_WARNING, E_USER_WARNING, E_DEPRECATED, E_USER_DEPRECATED],
@@ -120,6 +132,7 @@ class Pref_System extends Handler_Administrative {
 			'pages' => $pages,
 			'total' => $total,
 			'severity' => $severity,
+			'enabled' => true,
 		]);
 	}
 
