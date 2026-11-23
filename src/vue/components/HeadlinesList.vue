@@ -11,30 +11,12 @@
     </div>
 
     <div v-else>
-      <!-- Bulk selection bar: shown when at least one article is checked. -->
-      <div class="bulk-bar">
-        <v-menu>
-          <template #activator="{ props }">
-            <v-btn v-bind="props" size="small" variant="text" prepend-icon="mdi-checkbox-multiple-outline">
-              Select
-              <v-icon end>mdi-chevron-down</v-icon>
-            </v-btn>
-          </template>
-          <v-list>
-            <v-list-item
-              v-for="item in selectOptions"
-              :key="item.value"
-              @click="selectBy(item.value)"
-            >
-              <v-list-item-title>{{ item.title }}</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
-        <span v-if="selectedIds.size > 0" class="bulk-count">
+      <!-- Bulk actions appear once articles are selected from the top bar. -->
+      <div v-if="selectedIds.size > 0" class="bulk-bar">
+        <span class="bulk-count">
           {{ selectedIds.size }} selected
         </span>
         <v-spacer />
-        <template v-if="selectedIds.size > 0">
           <v-btn size="small" variant="text" @click="emit('bulk-action', 'open_original', [...selectedIds])">
             Open original
           </v-btn>
@@ -56,7 +38,6 @@
           <v-btn size="small" variant="text" color="error" @click="emit('bulk-action', 'delete', [...selectedIds])">
             Delete
           </v-btn>
-        </template>
       </div>
 
       <v-list
@@ -67,6 +48,7 @@
         <v-list-item
           v-for="headline in headlines"
           :key="headline.id"
+          :data-headline-id="headline.id"
           :class="{
             'headline-read': headline.is_read,
             'headline-active': headline.id === activeId,
@@ -80,7 +62,7 @@
               density="compact"
               title="Select article"
               @click.stop
-              @update:model-value="(checked: boolean) => toggleSelected(headline.id, checked)"
+              @update:model-value="(checked: boolean) => emit('toggle-select', headline.id, checked)"
             />
             <!-- Star and read state sit in the left icon strip, as in main. -->
             <v-btn
@@ -103,12 +85,37 @@
             />
           </template>
 
+          <!-- Phone-only meta line: feed, date and score above the title. -->
+          <div class="headline-mobile-meta">
+            <a
+              class="headline-mobile-feed"
+              :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+              :href="headline.link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ headline.feed_title }}
+            </a>
+            <span class="headline-mobile-meta-right">
+              <span v-if="headline.updated" class="headline-date">
+                {{ formatDate(headline.updated) }}
+              </span>
+              <v-icon
+                v-if="headline.score !== 0"
+                :icon="headline.score > 0 ? 'mdi-trending-up' : 'mdi-trending-down'"
+                :color="headline.score > 0 ? 'green' : 'red'"
+                size="14"
+                :title="`Score: ${headline.score}`"
+              />
+            </span>
+          </div>
+
           <v-list-item-title class="headline-title">
             {{ headline.title }}
             <span v-if="headline.author" class="headline-author">{{ headline.author }}</span>
             <!-- Excerpt, as in the legacy row's title preview (an HTML fragment). -->
             <span
-              v-if="headline.excerpt"
+              v-if="headline.excerpt && !combined && showPreview !== false"
               class="headline-preview"
               v-html="sanitize(headline.excerpt)"
             ></span>
@@ -196,10 +203,23 @@
                   variant="text"
                   size="small"
                   color="grey"
-                  @click.stop="emit('action', headline, 'label')"
-                  title="Assign labels"
+                  :href="headline.link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open original"
+                  @click.stop
                 >
-                  <v-icon>mdi-label</v-icon>
+                  <v-icon>mdi-arrow-right</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  variant="text"
+                  size="small"
+                  color="grey"
+                  title="Open feed"
+                  @click.stop="emit('action', headline, 'open_feed')"
+                >
+                  <v-icon>mdi-rss</v-icon>
                 </v-btn>
               </div>
             </div>
@@ -238,58 +258,58 @@ const props = defineProps<{
   combined?: boolean;
   /** Grid: tile the inline articles on wide screens (only meaningful with combined). */
   grid?: boolean;
+  /** SHOW_CONTENT_PREVIEW: render the content preview under the title. */
+  showPreview?: boolean;
+  /** Ids currently checked for bulk actions. */
+  selectedIds?: Set<number>;
+  /** CDM_AUTO_CATCHUP: mark articles read as they scroll past. */
+  autoCatchup?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [headline: Headline];
   action: [headline: Headline, action: string];
+  'toggle-select': [id: number, checked: boolean];
+  'auto-catchup': [ids: number[]];
   'load-more': [];
   'bulk-action': [action: string, ids: number[]];
 }>();
 
-// Bulk selection: a set of headline ids checked via the selection checkbox.
-const selectedIds = ref(new Set<number>());
-
-// Mirrors the legacy headline toolbar's Select menu.
-const selectOptions = [
-  { title: 'All', value: 'all' },
-  { title: 'Unread', value: 'unread' },
-  { title: 'Invert', value: 'invert' },
-  { title: 'None', value: 'none' },
-];
-
-// Reassign so the ref triggers reactivity when the set mutates.
-const toggleSelected = (id: number, checked: boolean) => {
-  const next = new Set(selectedIds.value);
-  if (checked) {
-    next.add(id);
-  } else {
-    next.delete(id);
-  }
-  selectedIds.value = next;
-};
-
-/** Apply one of the Select-menu operations to the current list. */
-const selectBy = (mode: string) => {
-  if (mode === 'all') {
-    selectedIds.value = new Set(props.headlines.map(h => h.id));
-  } else if (mode === 'none') {
-    selectedIds.value = new Set();
-  } else if (mode === 'unread') {
-    selectedIds.value = new Set(props.headlines.filter(h => !h.is_read).map(h => h.id));
-  } else if (mode === 'invert') {
-    const next = new Set<number>();
-    for (const h of props.headlines) {
-      if (!selectedIds.value.has(h.id)) next.add(h.id);
-    }
-    selectedIds.value = next;
-  }
-};
-
 // Infinite scroll wiring (Phase 5)
 const listRef = ref<HTMLElement | null>(null);
+
+// Legacy CDM_AUTO_CATCHUP: rows that have scrolled above the viewport are
+// marked read. Only applies to the combined (inline) layout.
+let catchupScheduled = false;
+const autoCatchupOnScroll = () => {
+  if (!props.autoCatchup || !props.combined || catchupScheduled) return;
+
+  catchupScheduled = true;
+  requestAnimationFrame(() => {
+    catchupScheduled = false;
+
+    const container = listRef.value;
+    if (!container) return;
+
+    const top = container.getBoundingClientRect().top;
+    const ids: number[] = [];
+    container
+      .querySelectorAll<HTMLElement>('.v-list-item[data-headline-id]:not(.headline-read)')
+      .forEach((row) => {
+        const rect = row.getBoundingClientRect();
+        if (rect.top + rect.height / 2 < top) {
+          const id = Number(row.dataset.headlineId);
+          if (Number.isFinite(id)) ids.push(id);
+        }
+      });
+
+    if (ids.length > 0) emit('auto-catchup', ids);
+  });
+};
+
 const { setupScrollListener } = useInfiniteScroll({
   enabled: computed(() => Boolean(props.hasMore) && !props.loading && !props.loadingMore),
+  onScroll: autoCatchupOnScroll,
   onLoadMore: () => {
     emit('load-more');
   },
@@ -348,6 +368,19 @@ const sanitize = (html: string): string =>
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
+.headline-mobile-meta {
+  display: none;
+}
+
+.headline-mobile-feed {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
 .headlines-list-content :deep(.v-list-item__overlay),
 .headlines-list-content :deep(.v-list-item__underlay) {
   display: none;
@@ -355,6 +388,10 @@ const sanitize = (html: string): string =>
 
 .headline-read {
   opacity: 0.7;
+}
+
+.headline-read .headline-title {
+  font-weight: 500;
 }
 
 /* Keyboard cursor highlight: a ring instead of a tinted row. */
@@ -484,5 +521,62 @@ const sanitize = (html: string): string =>
 .bulk-count {
   font-size: 0.8125rem;
   color: #666;
+}
+
+/* Phone layout: full-width cards, no left icon strip (as in the legacy
+   client), and horizontal scrolling for the bulk action row. */
+@media (max-width: 900px) {
+  .headlines-list-content {
+    padding: 8px;
+  }
+
+  .headlines-list-content :deep(.v-list-item) {
+    margin: 8px 0;
+    padding: 12px 14px;
+    border-radius: 6px;
+  }
+
+  .headlines-list-content :deep(.v-list-item__prepend) {
+    display: none;
+  }
+
+  .headline-title {
+    font-size: 1rem;
+  }
+
+  .headline-actions,
+  .headline-side {
+    display: none;
+  }
+
+  .headline-mobile-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .headline-mobile-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    white-space: nowrap;
+  }
+
+  .headline-tags {
+    flex-wrap: wrap;
+  }
+
+  .bulk-bar {
+    padding: 0.25rem 8px;
+    overflow-x: auto;
+  }
+
+  .bulk-bar .v-btn {
+    flex: 0 0 auto;
+  }
 }
 </style>

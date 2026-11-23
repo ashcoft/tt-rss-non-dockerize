@@ -21,10 +21,11 @@
         />
         <!-- Kept visible for quick access; the rest of the account actions live
              in the toolbar's overflow menu, as in the legacy shell. -->
-        <v-btn icon="mdi-cog" variant="text" @click="prefsOpen = true" title="Preferences" />
+        <v-btn icon="mdi-cog" class="prefs-button" variant="text" @click="prefsOpen = true" title="Preferences" />
       </header>
 
       <main class="app-main">
+        <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
                 <aside class="sidebar" :class="{ open: sidebarOpen }">
           <FeedTree
             :feeds="feedsStore.feeds"
@@ -35,6 +36,7 @@
             :icons-url="feedsStore.iconsUrl"
             :special-counters="feedsStore.specialCounters"
             :hide-read-shows-special="feedsStore.hideReadShowsSpecial"
+            :sort-by-unread="feedsStore.feedsSortByUnread"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
             @reorder="handleFeedReorder"
@@ -72,6 +74,11 @@
             :active-id="headlinesStore.cursorId"
             :combined="feedsStore.combinedMode"
             :grid="feedsStore.gridEnabled"
+            :show-preview="feedsStore.showContentPreview"
+            :selected-ids="headlinesStore.selectedHeadlineIds"
+            :auto-catchup="feedsStore.cdmAutoCatchup"
+            @toggle-select="headlinesStore.toggleHeadlineSelected"
+            @auto-catchup="handleAutoCatchup"
             @select="handleHeadlineSelect"
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
@@ -91,6 +98,17 @@
           />
         </aside>
       </main>
+
+      <!-- Feedly-style floating feed-tree button on phones. -->
+      <v-btn
+        class="mobile-fab"
+        icon="mdi-rss"
+        color="primary"
+        size="large"
+        elevation="6"
+        title="Toggle feed tree"
+        @click="sidebarOpen = !sidebarOpen"
+      />
 
       <footer class="app-footer">
         <span class="status">{{ statusMessage }}</span>
@@ -304,6 +322,10 @@ const onLogout = async () => {
  * -1 starred, -2 published, -3 fresh, -4 all, -6 recently read, 0 archived.
  */
 const markFeedRead = async (feedId: number) => {
+  if (feedId > 0 && feedsStore.confirmFeedCatchup && !window.confirm('Mark this feed as read?')) {
+    return;
+  }
+
   if (feedId === -4 || feedId === -3) {
     // "All articles" / "Fresh": there is no per-feed catchup for virtual
     // feeds, so use the global mark-all-read handler.
@@ -370,6 +392,11 @@ function asSearchPayload(payload: unknown): SearchPayload {
 
 /** Mark the current feed (or category) as read and refresh the list. */
 const catchupCurrentFeed = async (feedId: number | string, isCat: boolean, mode = 'all') => {
+  const numericId = typeof feedId === 'number' ? feedId : Number(feedId);
+  if (feedsStore.confirmFeedCatchup && (isCat || numericId > 0) && !window.confirm('Mark this feed as read?')) {
+    return;
+  }
+
   showMessage('Marking feed as read...', 'info');
 
   if (!(await feedsStore.catchupFeed(feedId, isCat, mode))) {
@@ -437,6 +464,9 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
       labelArticleId.value = headline.id;
       labelsDialogOpen.value = true;
       break;
+    case 'open_feed':
+      await handleFeedSelect(headline.feed_id, false);
+      break;
     case 'delete':
       try {
         await headlinesStore.deleteArticle(headline.id);
@@ -463,6 +493,12 @@ const handleMarkRelative = async (articleId: number, above: boolean) => {
   }
   await headlinesStore.markAsRead(ids);
   showMessage(`Marked ${ids.length} article(s) as read`, 'success');
+};
+
+/** Mark articles that scrolled past the viewport read (CDM_AUTO_CATCHUP). */
+const handleAutoCatchup = async (ids: number[]) => {
+  if (ids.length === 0) return;
+  await headlinesStore.markAsRead(ids);
 };
 
 /** Bulk actions from the headlines selection bar. */
@@ -511,6 +547,8 @@ const handleBulkAction = async (action: string, ids: number[]) => {
     default:
       showMessage(`Unknown bulk action: ${action}`, 'warning');
   }
+
+  headlinesStore.clearHeadlineSelection();
 };
 
 const handleLoadMore = async () => {
@@ -563,6 +601,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
         headlinesStore.setOrderBy(payload);
         await headlinesStore.loadHeadlines(feedId, isCat);
       }
+      break;
+    case 'selectBy':
+      if (typeof payload === 'string') headlinesStore.selectHeadlinesBy(payload);
       break;
     case 'edit':
     case 'delete':
@@ -726,5 +767,77 @@ onUnmounted(stopPolling);
 
 .status {
   color: #666;
+}
+
+.sidebar-scrim {
+  display: none;
+}
+
+.mobile-fab {
+  display: none;
+}
+
+/* Phone layout, mirroring the legacy client: the feed tree is a drawer and
+   the reading pane covers the screen instead of sitting beside the list. */
+@media (max-width: 900px) {
+  .app-header {
+    min-height: 52px;
+    padding: 0.125rem 0.25rem;
+  }
+
+  .prefs-button {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 52px;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    width: min(85vw, 320px);
+    background: rgb(var(--v-theme-surface));
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 52px 0 0 0;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .content {
+    width: 100%;
+  }
+
+  .article-panel {
+    position: fixed;
+    inset: 52px 0 0 0;
+    z-index: 1001;
+    width: auto;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .app-footer {
+    display: none;
+  }
+
+  .mobile-fab {
+    display: inline-flex;
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 998;
+  }
 }
 </style>

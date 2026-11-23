@@ -51,6 +51,14 @@ export const useFeedsStore = defineStore('feeds', () => {
   const combinedMode = ref(false);
   /** CDM_ENABLE_GRID: tile the inline articles in a grid on wide screens. */
   const gridEnabled = ref(false);
+  /** SHOW_CONTENT_PREVIEW: show the content preview in headline rows. */
+  const showContentPreview = ref(true);
+  /** FEEDS_SORT_BY_UNREAD: sort feeds by unread count. */
+  const feedsSortByUnread = ref(false);
+  /** CONFIRM_FEED_CATCHUP: ask before marking a feed/category read. */
+  const confirmFeedCatchup = ref(true);
+  /** CDM_AUTO_CATCHUP: mark combined-mode articles read as they scroll past. */
+  const cdmAutoCatchup = ref(false);
   /** Base URL of public.php, from init-params; used for feed icons. */
   const iconsUrl = ref('/public.php');
   /** Unread counters for the virtual ("special") feeds, keyed by feed id. */
@@ -400,6 +408,10 @@ export const useFeedsStore = defineStore('feeds', () => {
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
       combinedMode.value = Number(params.combined_display_mode) === 1;
       gridEnabled.value = Number(params.cdm_enable_grid) === 1;
+      showContentPreview.value = Number(params.show_content_preview) !== 0;
+      feedsSortByUnread.value = Number(params.feeds_sort_by_unread) === 1;
+      confirmFeedCatchup.value = Number(params.confirm_feed_catchup) !== 0;
+      cdmAutoCatchup.value = Number(params.cdm_auto_catchup) === 1;
       // public.php streams a feed's icon; the backend tells us the base URL so
       // the app works behind a sub-path install.
       if (typeof params.icons_url === 'string' && params.icons_url !== '') {
@@ -476,6 +488,10 @@ export const useFeedsStore = defineStore('feeds', () => {
     hideReadShowsSpecial,
     combinedMode,
     gridEnabled,
+    showContentPreview,
+    feedsSortByUnread,
+    confirmFeedCatchup,
+    cdmAutoCatchup,
     iconsUrl,
     specialCounters,
     

@@ -256,6 +256,7 @@ import ManageFeedsPanel from './ManageFeedsPanel.vue';
 import LabelsPanel from './LabelsPanel.vue';
 import UsersPanel from './UsersPanel.vue';
 import SystemPanel from './SystemPanel.vue';
+import { useFeedsStore } from '../../stores';
 import type { PluginPrefsTab } from '../../api/legacyEndpoints';
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -317,6 +318,7 @@ const prefDefinitions: Array<{ name: string; type: EditablePref['type']; label: 
 
 /** Map a UI pref key back to the Prefs::* name `RPC/setpref` expects. */
 const prefConstant = (name: string) => name.toUpperCase();
+const feedsStore = useFeedsStore();
 
 const editablePrefs = ref<EditablePref[]>([]);
 // Preferences the backend exposes that have no curated label; shown on the
@@ -388,10 +390,23 @@ async function loadPrefs() {
 async function savePref(name: string, value: string) {
   try {
     const response = await api.setPref(prefConstant(name), value);
-    notify(
-      response.status === 0 ? 'Preference saved' : response.error ?? 'Failed to save preference',
-      response.status === 0 ? 'success' : 'error'
+
+    if (response.status !== 0) {
+      notify(response.error ?? 'Failed to save preference', 'error');
+      return;
+    }
+
+    // Keep the controlled checkbox/text field in sync with what was saved.
+    const pref = [...editablePrefs.value, ...advancedPrefs.value].find(
+      entry => entry.name.toLowerCase() === name.toLowerCase()
     );
+    if (pref) pref.value = value;
+
+    notify('Preference saved', 'success');
+
+    // Display preferences change the live layout, so refresh the store and the
+    // feed tree instead of making the user reload the page.
+    await Promise.all([feedsStore.loadDisplayPrefs(), feedsStore.loadFeeds()]);
   } catch (err) {
     console.error('Failed to save preference:', err);
     notify('Failed to save preference', 'error');

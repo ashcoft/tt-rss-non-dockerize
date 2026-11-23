@@ -1,7 +1,7 @@
 <template>
   <div class="toolbar">
     <div class="toolbar-left">
-      <v-btn-toggle>
+      <v-btn-toggle class="refresh-toggle">
         <v-btn
           icon="mdi-refresh"
           @click="handleAction('refresh')"
@@ -34,7 +34,7 @@
            time window the backend accepts (1day/1week/2week). -->
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" prepend-icon="mdi-check-all" title="Mark as read">
+          <v-btn v-bind="props" class="catchup-button" prepend-icon="mdi-check-all" title="Mark as read">
             Mark as read
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
@@ -91,6 +91,25 @@
     </div>
 
     <div class="toolbar-right">
+      <!-- Legacy Select menu; bulk actions appear in the list bar. -->
+      <v-menu>
+        <template #activator="{ props }">
+          <v-btn v-bind="props" class="select-button">
+            Select
+            <v-icon end>mdi-chevron-down</v-icon>
+          </v-btn>
+        </template>
+        <v-list>
+          <v-list-item
+            v-for="item in selectOptions"
+            :key="item.value"
+            @click="handleAction('selectBy', item.value)"
+          >
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+
       <!-- Values must match the backend's accepted view_mode set. -->
       <v-select
         v-model="viewMode"
@@ -105,7 +124,7 @@
 
       <v-menu>
         <template #activator="{ props }">
-          <v-btn v-bind="props" title="Order by">
+          <v-btn v-bind="props" class="sort-button" title="Order by">
             {{ sortLabel }}
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
@@ -205,6 +224,13 @@ const viewModeOptions = [
   { title: 'Published', value: 'published' },
   { title: 'Unread', value: 'unread' },
   { title: 'With Note', value: 'has_note' },
+];
+
+const selectOptions = [
+  { title: 'All', value: 'all' },
+  { title: 'Unread', value: 'unread' },
+  { title: 'Invert', value: 'invert' },
+  { title: 'None', value: 'none' },
 ];
 
 const sortOptions = [
@@ -308,7 +334,8 @@ const onLanguageChange = (language: string) => {
 
 .feed-title {
   font-weight: 600;
-  color: var(--ttrss-primary, #1976d2);
+  font-size: 15px;
+  color: rgb(var(--v-theme-on-background));
   white-space: nowrap;
 }
 
@@ -318,5 +345,67 @@ const onLanguageChange = (language: string) => {
 
 .view-mode {
   min-width: 150px;
+}
+
+/* Phone layout: keep the feed title, view/sort and overflow menu; the rest of
+   the toolbar lives behind the menu, as in the legacy client. */
+@media (max-width: 900px) {
+  .toolbar {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.25rem;
+    padding: 0;
+  }
+
+  .toolbar-left {
+    gap: 0.25rem;
+  }
+
+  .refresh-toggle,
+  .catchup-button,
+  .search-input,
+  .search-language,
+  .update-link,
+  .plugin-main-toolbar,
+  .select-button {
+    display: none;
+  }
+
+  .toolbar-center {
+    flex: 1;
+    min-width: 0;
+    padding-left: 0.25rem;
+    text-align: left;
+  }
+
+  .feed-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .toolbar-right {
+    gap: 0.25rem;
+  }
+
+  .view-mode {
+    min-width: 112px;
+    width: 112px;
+  }
+
+  .view-mode :deep(.v-field__input) {
+    padding-left: 4px;
+    padding-right: 0;
+  }
+
+  .view-mode :deep(.v-select__selection-text) {
+    font-size: 13px;
+  }
+
+  .sort-button {
+    padding: 0 6px;
+    min-width: 0;
+    font-size: 12px;
+  }
 }
 </style>

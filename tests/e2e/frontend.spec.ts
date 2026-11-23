@@ -28,7 +28,7 @@ async function backendReachable(page: Page): Promise<boolean> {
 async function login(page: Page): Promise<void> {
   await page.goto('/index.php');
 
-  const shell = page.getByRole('button', { name: 'Preferences' });
+  const shell = page.locator('.feed-list');
 
   // In single-user mode the shell is served to an already-authenticated
   // session. Wait for it; fall back to the login form only if it never appears
@@ -176,6 +176,8 @@ test.describe('Vue front-end', () => {
     // backend catchup and reports through the snackbar.
     const row = page.locator('.feed-list .v-list-item').filter({ hasText: 'The Register' }).first();
     await expect(row).toBeVisible({ timeout: 15000 });
+    // CONFIRM_FEED_CATCHUP defaults to on, like the legacy client.
+    page.once('dialog', (dialog) => dialog.accept());
     await row.getByRole('button', { name: 'Mark feed as read' }).click();
 
     await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
@@ -203,12 +205,12 @@ test.describe('Vue front-end', () => {
 
   test('bulk-sets a score on the selected headlines', async ({ page }) => {
     await login(page);
-    // Ars Technica's articles are not read by other tests.
-    await expandCategory(page, 'Technology');
-    await page.getByText('Ars Technica', { exact: true }).click();
-    await expect(
-      page.getByText('Apple announces new M5 chip with 40% faster neural engine')
-    ).toBeVisible({ timeout: 15000 });
+    // Use All articles so earlier tests marking articles read cannot hide them.
+    await expandCategory(page, 'Special');
+    await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
+    await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
 
     await page.getByRole('button', { name: 'Select' }).click();
     await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'All' }).first().click();
@@ -612,5 +614,115 @@ test.describe('Vue front-end', () => {
     await page.getByRole('button', { name: 'Preferences' }).click();
     const after = page.getByLabel(/Combined mode/).first();
     await expect(after).toBeChecked({ checked: !before });
+
+    // Put the preference back so the run leaves the database as it found it.
+    await after.click();
+    await expect(page.getByRole('dialog').locator('.v-alert')).toContainText(/saved/i, {
+      timeout: 10000,
+    });
+  });
+
+  test('mobile layout uses a drawer and fits the viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page);
+
+    // No horizontal scrolling on a phone-sized viewport.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+    // The feed tree is off-canvas until the header toggle opens it.
+    const sidebar = page.locator('.sidebar');
+    await expect(sidebar).not.toHaveClass(/open/);
+    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+    await expect(sidebar).toHaveClass(/open/);
+
+    await sidebar.getByText('All articles', { exact: true }).click();
+    await expect(sidebar).not.toHaveClass(/open/);
+    await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // The Feedly-style floating button opens the same drawer.
+    await page.getByRole('button', { name: 'Toggle feed tree' }).click();
+    await expect(sidebar).toHaveClass(/open/);
+    await page.locator('.sidebar-scrim').click();
+    await expect(sidebar).not.toHaveClass(/open/);
+
+    // Preferences remains reachable through the toolbar overflow menu.
+    await page.locator('.toolbar-right button').last().click();
+    await page
+      .locator('.v-overlay-container .v-list-item')
+      .filter({ hasText: 'Preferences' })
+      .first()
+      .click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  });
+
+  test('marks articles read while scrolling in combined mode', async ({ page }) => {
+    // A short viewport makes even a few combined-mode cards overflow the list.
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await login(page);
+
+    // Enable the two preferences this behaviour depends on (only if needed, so
+    // re-running against a dirty database still enables rather than disables).
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    const combinedPref = page.getByLabel(/Combined mode/).first();
+    if (!(await combinedPref.isChecked())) {
+      await combinedPref.click();
+      await page.waitForTimeout(800);
+    }
+    const autoCatchupPref = page.getByLabel(/Automatically mark articles as read in combined mode/).first();
+    if (!(await autoCatchupPref.isChecked())) {
+      await autoCatchupPref.click();
+      await page.waitForTimeout(800);
+    }
+    await expect(combinedPref).toBeChecked();
+    await expect(autoCatchupPref).toBeChecked();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+
+    await expandCategory(page, 'Special');
+    await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
+    await expect(page.locator('.headlines-list-content .v-list-item').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Adaptive hides read articles; switch to the All Articles view so there
+    // are enough rows to scroll a full card past the top. Vuetify's option is
+    // animated, so dispatch the click directly on the option element.
+    const show = page.getByRole('combobox', { name: 'Show' });
+    await show.focus();
+    await page.keyboard.press('ArrowDown');
+    const allArticlesView = page.getByRole('option', { name: 'All Articles', exact: true });
+    await expect(allArticlesView).toBeVisible({ timeout: 5000 });
+    await allArticlesView.evaluate((el) => (el as HTMLElement).click());
+    await expect(page.locator('.headlines-list-content .v-list-item')).toHaveCount(11, {
+      timeout: 15000,
+    });
+
+    // Use a row in the middle of the list: the last row cannot scroll far
+    // enough for its midpoint to pass the top. Make it unread first so the
+    // scroll must flip it back to read.
+    const rows = page.locator('.headlines-list-content .v-list-item');
+    const row = rows.nth(4);
+    await expect(row).toBeVisible({ timeout: 15000 });
+    if (await row.evaluate((el) => el.classList.contains('headline-read'))) {
+      await row.getByRole('button', { name: 'Mark as unread' }).click();
+    }
+    await expect(row).not.toHaveClass(/headline-read/);
+    const articleId = await row.getAttribute('data-headline-id');
+
+    // Scroll so that row's midpoint passes above the viewport top.
+    await page.locator('.headlines-list').evaluate((el, id) => {
+      const target = el.querySelector(`[data-headline-id="${id}"]`);
+      if (!target) return;
+      const rowRect = target.getBoundingClientRect();
+      const containerRect = el.getBoundingClientRect();
+      el.scrollTo(
+        0,
+        el.scrollTop + (rowRect.top - containerRect.top) + rowRect.height / 2 + 10
+      );
+    }, articleId);
+
+    await expect(row).toHaveClass(/headline-read/, { timeout: 15000 });
   });
 });

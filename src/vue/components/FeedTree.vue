@@ -271,6 +271,8 @@ interface Props {
   specialCounters?: Record<number, number>;
   /** HIDE_READ_SHOWS_SPECIAL: keep virtual feeds visible while hiding read ones. */
   hideReadShowsSpecial?: boolean;
+  /** FEEDS_SORT_BY_UNREAD: order feeds by their unread count. */
+  sortByUnread?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -279,7 +281,8 @@ const props = withDefaults(defineProps<Props>(), {
   activeFeedId: null,
   iconsUrl: '/public.php',
   specialCounters: () => ({}),
-  hideReadShowsSpecial: true
+  hideReadShowsSpecial: true,
+  sortByUnread: false
 });
 
 const emit = defineEmits<{
@@ -369,9 +372,13 @@ const uncategorizedUnread = computed(() =>
  */
 const filteredUncategorizedFeeds = computed(() => {
   const feeds = props.feeds.filter(f => !f.cat_id && visible(f));
-  if (!searchQuery.value) return feeds;
-  const query = searchQuery.value.toLowerCase();
-  return feeds.filter(feed => feed.title.toLowerCase().includes(query));
+  const matched = !searchQuery.value
+    ? feeds
+    : feeds.filter(feed => feed.title.toLowerCase().includes(searchQuery.value.toLowerCase()));
+
+  return props.sortByUnread
+    ? [...matched].sort((a, b) => (b.unread ?? 0) - (a.unread ?? 0))
+    : matched;
 });
 
 /**
@@ -381,9 +388,13 @@ const filteredUncategorizedFeeds = computed(() => {
  */
 const getFeedsByCategory = (categoryId: number) => {
   const feeds = props.feeds.filter(f => f.cat_id === categoryId && visible(f));
-  if (!searchQuery.value) return feeds;
-  const query = searchQuery.value.toLowerCase();
-  return feeds.filter(feed => feed.title.toLowerCase().includes(query));
+  const matched = !searchQuery.value
+    ? feeds
+    : feeds.filter(feed => feed.title.toLowerCase().includes(searchQuery.value.toLowerCase()));
+
+  return props.sortByUnread
+    ? [...matched].sort((a, b) => (b.unread ?? 0) - (a.unread ?? 0))
+    : matched;
 };
 
 // Handlers

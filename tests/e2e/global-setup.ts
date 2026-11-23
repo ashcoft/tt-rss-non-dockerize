@@ -105,15 +105,34 @@ export default function globalSetup(): void {
     console.warn('[e2e] could not clear leftover E2E tags:', (err as Error).message);
   }
 
-  // Pin the display preferences the E2E tests depend on so a run starts from a
+  // Pin every display preference the tests depend on so a run starts from a
   // known layout. COMBINED_DISPLAY_MODE defaults to *on* in tt-rss; the tests
   // assume the three-pane layout, so set it off (and grid off) explicitly. The
   // `note` plugin is enabled so the plugin article-button surface is testable.
+  const pinnedPrefs: Array<[string, string]> = [
+    ['COMBINED_DISPLAY_MODE', '0'],
+    ['CDM_ENABLE_GRID', '0'],
+    ['SHOW_CONTENT_PREVIEW', '1'],
+    ['STRIP_IMAGES', '0'],
+    ['REVERSE_HEADLINES', '0'],
+    ['HEADLINES_NO_DISTINCT', '0'],
+    ['HIDE_READ_FEEDS', '0'],
+    ['FEEDS_SORT_BY_UNREAD', '0'],
+    ['CDM_AUTO_CATCHUP', '0'],
+    ['HIDE_READ_SHOWS_SPECIAL', '1'],
+    ['CONFIRM_FEED_CATCHUP', '1'],
+    ['ENABLE_FEED_CATS', '1'],
+    ['_ENABLED_PLUGINS', 'note'],
+  ];
+  const names = pinnedPrefs.map(([name]) => `'${name}'`).join(', ');
+  const values = pinnedPrefs
+    .map(([name, value]) => `(1, '${name}', '${value}', NULL)`)
+    .join(', ');
+
   try {
+    runSql(psql, db, ['-c', `DELETE FROM ttrss_user_prefs2 WHERE pref_name IN (${names})`]);
     runSql(psql, db, ['-c',
-      "DELETE FROM ttrss_user_prefs2 WHERE pref_name IN ('CDM_ENABLE_GRID', 'COMBINED_DISPLAY_MODE', '_ENABLED_PLUGINS')"]);
-    runSql(psql, db, ['-c',
-      "INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES (1, 'COMBINED_DISPLAY_MODE', '0', NULL), (1, '_ENABLED_PLUGINS', 'note', NULL)"]);
+      `INSERT INTO ttrss_user_prefs2 (owner_uid, pref_name, value, profile) VALUES ${values}`]);
   } catch (err) {
     console.warn('[e2e] could not reset display preferences:', (err as Error).message);
   }

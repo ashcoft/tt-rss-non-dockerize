@@ -108,11 +108,15 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const pageSize = 30;
   /** Id of the headline under the keyboard cursor, if any. */
   const cursorId = ref<number | null>(null);
+  /** Ids checked via the per-row selection checkbox. */
+  const selectedHeadlineIds = ref<Set<number>>(new Set());
 
   // Getters
   const unreadCount = computed(() => {
     return headlines.value.filter(h => !h.is_read).length;
   });
+
+  const selectionCount = computed(() => selectedHeadlineIds.value.size);
 
   const selectedHeadline = computed(() => {
     return headlines.value.find(h => h.id === selectedArticle.value?.id);
@@ -159,6 +163,39 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   }
 
   // Actions
+  function toggleHeadlineSelected(id: number, checked: boolean): void {
+    const next = new Set(selectedHeadlineIds.value);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    selectedHeadlineIds.value = next;
+  }
+
+  /** Apply the legacy Select menu's All/Unread/Invert/None modes. */
+  function selectHeadlinesBy(mode: string): void {
+    if (mode === 'all') {
+      selectedHeadlineIds.value = new Set(headlines.value.map(h => h.id));
+    } else if (mode === 'none') {
+      selectedHeadlineIds.value = new Set();
+    } else if (mode === 'unread') {
+      selectedHeadlineIds.value = new Set(
+        headlines.value.filter(h => !h.is_read).map(h => h.id)
+      );
+    } else if (mode === 'invert') {
+      const next = new Set<number>();
+      for (const headline of headlines.value) {
+        if (!selectedHeadlineIds.value.has(headline.id)) next.add(headline.id);
+      }
+      selectedHeadlineIds.value = next;
+    }
+  }
+
+  function clearHeadlineSelection(): void {
+    selectedHeadlineIds.value = new Set();
+  }
+
   // Selecting feeds quickly can leave an older Feeds/view request in flight;
   // only the newest request may write the list.
   let loadSequence = 0;
@@ -184,8 +221,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
       if (response.status === 0) {
         headlines.value = response.content.headlines;
-        // A fresh page invalidates any previous cursor position.
+        // A fresh page invalidates any previous cursor position and selection.
         cursorId.value = headlines.value[0]?.id ?? null;
+        selectedHeadlineIds.value = new Set();
         // Feeds/view hardcodes a page size of 30 and does not accept `limit`.
         hasMore.value = response.content.headlines.length >= pageSize;
         notice.value = response.content.message;
@@ -631,6 +669,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     hasMore.value = false;
     skip.value = 0;
     cursorId.value = null;
+    selectedHeadlineIds.value = new Set();
   }
 
   return {
@@ -648,9 +687,11 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     orderBy,
     hasMore,
     cursorId,
+    selectedHeadlineIds,
 
     // Getters
     unreadCount,
+    selectionCount,
     selectedHeadline,
     cursorIndex,
     cursorHeadline,
@@ -680,6 +721,9 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     setOrderBy,
     setSearchQuery,
     clearSelection,
+    toggleHeadlineSelected,
+    selectHeadlinesBy,
+    clearHeadlineSelection,
     catchupAll,
     search,
     loadSearchOptions,
