@@ -31,7 +31,8 @@
     "lint:css": "stylelint 'lib/flat-ttrss/**/*.css' 'plugins/**/*.css' 'themes/**/*.less'",
     "lint:js": "eslint js src",
     "phpunit": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
-    "phpunit:integration": "./tests_integration/run.sh"
+    "phpunit:integration": "./tests_integration/run.sh",
+    "release:vite-dev": "semantic-release --extends ./.releaserc.vite-dev.json"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
