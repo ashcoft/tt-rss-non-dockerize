@@ -18,6 +18,8 @@
 /.rector-tmp
 /.tools/
 /version_static.txt
+/tt-rss.tar.gz
+/tt-rss.zip
 
 # Playwright artifacts
 /test-results
