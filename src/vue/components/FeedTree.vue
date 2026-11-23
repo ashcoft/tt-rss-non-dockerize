@@ -73,7 +73,21 @@
             v-bind="props"
             :title="category.title"
             @click="handleSelect('cat-' + category.id)"
+            @contextmenu.prevent="contextMenuKey = 'cat-' + category.id"
           >
+            <v-menu
+              :model-value="contextMenuKey === 'cat-' + category.id"
+              activator="parent"
+              :open-on-click="false"
+              location="cursor"
+              @update:model-value="(open: boolean) => { if (!open && contextMenuKey === 'cat-' + category.id) contextMenuKey = null; }"
+            >
+              <v-list density="compact">
+                <v-list-item @click="emit('category-action', 'mark_read', category.id)">Mark category as read</v-list-item>
+                <v-list-item @click="emit('reorder', 'category', category.id, -1)">Move up</v-list-item>
+                <v-list-item @click="emit('reorder', 'category', category.id, 1)">Move down</v-list-item>
+              </v-list>
+            </v-menu>
             <template #prepend>
               <v-icon>{{ groupIcon('cat-' + category.id) }}</v-icon>
             </template>
@@ -124,6 +138,7 @@
             <v-list density="compact">
               <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
               <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed</v-list-item>
+              <v-list-item @click="emit('feed-action', 'delete', feed.id)">Unsubscribe</v-list-item>
               <v-list-item @click="emit('reorder', 'feed', feed.id, -1)">Move up</v-list-item>
               <v-list-item @click="emit('reorder', 'feed', feed.id, 1)">Move down</v-list-item>
             </v-list>
@@ -214,6 +229,7 @@
             <v-list density="compact">
               <v-list-item @click="emit('feed-action', 'mark_read', feed.id)">Mark as read</v-list-item>
               <v-list-item @click="emit('feed-action', 'edit', feed.id)">Edit feed</v-list-item>
+              <v-list-item @click="emit('feed-action', 'delete', feed.id)">Unsubscribe</v-list-item>
               <v-list-item @click="emit('reorder', 'feed', feed.id, -1)">Move up</v-list-item>
               <v-list-item @click="emit('reorder', 'feed', feed.id, 1)">Move down</v-list-item>
             </v-list>

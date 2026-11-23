@@ -17,11 +17,15 @@ export const useAuthStore = defineStore('auth', () => {
    * client then re-reads the session CSRF token, so `status !== 0` means the
    * credentials were rejected or the session could not be established.
    */
-  async function login(user: string, password: string): Promise<boolean> {
+  async function login(
+    user: string,
+    password: string,
+    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean } = {}
+  ): Promise<boolean> {
     loggingIn.value = true;
     error.value = null;
     try {
-      const response = await api.login(user, password);
+      const response = await api.login(user, password, options);
       if (response.status === 0) {
         loggedIn.value = true;
         username.value = user;

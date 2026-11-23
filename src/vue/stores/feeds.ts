@@ -57,6 +57,10 @@ export const useFeedsStore = defineStore('feeds', () => {
   const wideScreen = ref(false);
   /** SHOW_CONTENT_PREVIEW: show the content preview in headline rows. */
   const showContentPreview = ref(true);
+  /** VFEED_GROUP_BY_FEED: insert feed headings in virtual-feed lists. */
+  const vfeedGroupByFeed = ref(false);
+  /** DEBUG_HEADLINE_IDS: show article/feed ids in the headline row. */
+  const debugHeadlineIds = ref(false);
   /** FEEDS_SORT_BY_UNREAD: sort feeds by unread count. */
   const feedsSortByUnread = ref(false);
   /** CONFIRM_FEED_CATCHUP: ask before marking a feed/category read. */
@@ -416,9 +420,14 @@ export const useFeedsStore = defineStore('feeds', () => {
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
       combinedMode.value = Number(params.combined_display_mode) === 1;
       gridEnabled.value = Number(params.cdm_enable_grid) === 1;
-      cdmExpanded.value = Number(params.cdm_expanded) !== 0;
+      cdmExpanded.value =
+        params.cdm_expanded === undefined ||
+        params.cdm_expanded === '' ||
+        Number(params.cdm_expanded) !== 0;
       wideScreen.value = Number(params.widescreen) === 1;
       showContentPreview.value = Number(params.show_content_preview) !== 0;
+      vfeedGroupByFeed.value = Number(params.vfeed_group_by_feed) === 1;
+      debugHeadlineIds.value = Number(params.debug_headline_ids) === 1;
       feedsSortByUnread.value = Number(params.feeds_sort_by_unread) === 1;
       confirmFeedCatchup.value = Number(params.confirm_feed_catchup) !== 0;
       cdmAutoCatchup.value = Number(params.cdm_auto_catchup) === 1;
@@ -511,10 +520,9 @@ export const useFeedsStore = defineStore('feeds', () => {
     return saveOrder();
   }
 
-  /** Next feed/category with unread articles, wrapping around the tree. */
-  function nextUnreadFeed(): { id: number; isCat: boolean } | null {
+  /** Sidebar order: special feeds, categories, then feeds. */
+  function navigationEntries(): Array<{ id: number; isCat: boolean; unread: number }> {
     const entries: Array<{ id: number; isCat: boolean; unread: number }> = [];
-
     for (const id of [-4, -3, -1, -2, 0, -6]) {
       entries.push({ id, isCat: false, unread: specialCounters.value[id] ?? 0 });
     }
@@ -524,16 +532,36 @@ export const useFeedsStore = defineStore('feeds', () => {
     for (const feed of feeds.value) {
       entries.push({ id: feed.id, isCat: false, unread: feed.unread ?? 0 });
     }
+    return entries;
+  }
 
+  /** Next/previous feed or category in sidebar order, wrapping around. */
+  function nextFeed(direction: 1 | -1 = 1): { id: number; isCat: boolean } | null {
+    const entries = navigationEntries();
     if (entries.length === 0) return null;
-
     const currentIndex = entries.findIndex(
       entry => entry.id === currentFeedId.value && entry.isCat === currentIsCat.value
     );
-    const start = currentIndex >= 0 ? currentIndex + 1 : 0;
+    const start = currentIndex >= 0 ? currentIndex : direction > 0 ? -1 : 0;
+    for (let step = 1; step <= entries.length; step++) {
+      const entry = entries[(start + direction * step + entries.length * 2) % entries.length];
+      if (!(entry.id === currentFeedId.value && entry.isCat === currentIsCat.value)) {
+        return { id: entry.id, isCat: entry.isCat };
+      }
+    }
+    return null;
+  }
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[(start + i) % entries.length];
+  /** Next feed/category with unread articles in the requested direction. */
+  function nextUnreadFeed(direction: 1 | -1 = 1): { id: number; isCat: boolean } | null {
+    const entries = navigationEntries();
+    if (entries.length === 0) return null;
+    const currentIndex = entries.findIndex(
+      entry => entry.id === currentFeedId.value && entry.isCat === currentIsCat.value
+    );
+    const start = currentIndex >= 0 ? currentIndex : direction > 0 ? -1 : 0;
+    for (let step = 1; step <= entries.length; step++) {
+      const entry = entries[(start + direction * step + entries.length * 2) % entries.length];
       if (
         entry.unread > 0 &&
         !(entry.id === currentFeedId.value && entry.isCat === currentIsCat.value)
@@ -541,8 +569,41 @@ export const useFeedsStore = defineStore('feeds', () => {
         return { id: entry.id, isCat: entry.isCat };
       }
     }
-
     return null;
+  }
+
+  /** Toggle VFEED_GROUP_BY_FEED and persist it. */
+  async function toggleVfeedGroup(): Promise<boolean> {
+    const next = !vfeedGroupByFeed.value;
+    try {
+      const response = await api.setPref('VFEED_GROUP_BY_FEED', next ? '1' : '0');
+      if (response.status === 0) {
+        vfeedGroupByFeed.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
+    }
+  }
+
+  /** Toggle CDM_ENABLE_GRID and persist it. */
+  async function toggleGrid(): Promise<boolean> {
+    const next = !gridEnabled.value;
+    try {
+      const response = await api.setPref('CDM_ENABLE_GRID', next ? '1' : '0');
+      if (response.status === 0) {
+        gridEnabled.value = next;
+        return true;
+      }
+      error.value = response.error ?? 'Failed to save preference';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to save preference';
+      return false;
+    }
   }
 
   /** Move a feed next to another feed in the same category, then persist. */
@@ -589,6 +650,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     cdmExpanded,
     wideScreen,
     showContentPreview,
+    vfeedGroupByFeed,
+    debugHeadlineIds,
     feedsSortByUnread,
     confirmFeedCatchup,
     cdmAutoCatchup,
@@ -620,7 +683,10 @@ export const useFeedsStore = defineStore('feeds', () => {
     saveOrder,
     moveFeed,
     moveFeedTo,
+    nextFeed,
     nextUnreadFeed,
+    toggleVfeedGroup,
+    toggleGrid,
     moveCategory,
     toggleCdmExpanded,
     toggleWideScreen,

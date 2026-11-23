@@ -185,6 +185,14 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       selectedHeadlineIds.value = new Set(
         headlines.value.filter(h => !h.is_read).map(h => h.id)
       );
+    } else if (mode === 'marked') {
+      selectedHeadlineIds.value = new Set(
+        headlines.value.filter(h => h.is_marked).map(h => h.id)
+      );
+    } else if (mode === 'published') {
+      selectedHeadlineIds.value = new Set(
+        headlines.value.filter(h => h.is_published).map(h => h.id)
+      );
     } else if (mode === 'invert') {
       const next = new Set<number>();
       for (const headline of headlines.value) {

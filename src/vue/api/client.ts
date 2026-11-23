@@ -68,8 +68,15 @@ class ApiClient {
    * redirect rather than JSON, so success is inferred from the resulting
    * session: the CSRF token is re-read from the shell afterwards.
    */
-  async login(username: string, password: string): Promise<ApiResponse<boolean>> {
+  async login(
+    username: string,
+    password: string,
+    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean } = {}
+  ): Promise<ApiResponse<boolean>> {
     const body = new URLSearchParams({ login: username, password });
+    if (options.rememberMe) body.set('remember_me', '1');
+    if (options.safeMode) body.set('safe_mode', '1');
+    if (options.bwLimit) body.set('bw_limit', '1');
     const response = await fetch('/public.php?op=login', {
       method: 'POST',
       credentials: 'include',

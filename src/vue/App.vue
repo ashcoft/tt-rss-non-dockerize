@@ -20,6 +20,7 @@
           @feed-action="handleFeedAction"
           @reorder="handleFeedReorder"
           @move-feed="handleFeedMove"
+          @category-action="handleCategoryAction"
         />
       </aside>
       <div class="sidebar-splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
@@ -74,6 +75,8 @@
             :combined="feedsStore.combinedMode"
             :grid="feedsStore.gridEnabled"
             :show-preview="feedsStore.showContentPreview"
+            :group-by-feed="feedsStore.vfeedGroupByFeed"
+            :debug-ids="feedsStore.debugHeadlineIds"
             :selected-ids="headlinesStore.selectedHeadlineIds"
             :cdm-expanded="feedsStore.cdmExpanded"
             :auto-catchup="feedsStore.cdmAutoCatchup"
@@ -138,6 +141,12 @@
             hide-details
             class="mt-3"
           />
+          <a
+            class="search-syntax-link"
+            href="https://tt-rss.org/wiki/SearchSyntax"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Search syntax help</a>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -497,8 +506,24 @@ const markFeedRead = async (feedId: number) => {
 const handleFeedAction = async (action: string, feedId: number) => {
   if (action === 'mark_read') {
     await markFeedRead(feedId);
-  } else if (action === 'edit' || action === 'delete') {
+  } else if (action === 'edit') {
     feedsDialogOpen.value = true;
+  } else if (action === 'delete') {
+    if (!window.confirm('Unsubscribe from this feed?')) return;
+    const ok = await feedsStore.removeFeed(feedId);
+    if (ok) {
+      await feedsStore.loadFeeds();
+      await headlinesStore.loadHeadlines(feedsStore.currentFeedId ?? FEED_ALL, feedsStore.currentIsCat);
+    } else {
+      showMessage(feedsStore.error ?? 'Failed to unsubscribe', 'error');
+    }
+  }
+};
+
+/** Category context actions. */
+const handleCategoryAction = async (action: string, categoryId: number) => {
+  if (action === 'mark_read') {
+    await catchupCurrentFeed(categoryId, true);
   }
 };
 
@@ -888,36 +913,170 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
 // three-pane layout (see js/App.js get_hotkeys_map): j/k or arrows move the
 // cursor, o/Enter opens, r toggles read, s stars, f publishes, g then u
 // refreshes the current feed.
-useKeyboard({
-  onNext: () => headlinesStore.moveCursor(1),
-  onPrevious: () => headlinesStore.moveCursor(-1),
-  onSelect: () => {
-    runDetached(openCursorHeadline(), 'open headline');
-  },
-  onOpenArticle: () => {
-    runDetached(openCursorHeadline(), 'open headline');
-  },
-  onToggleRead: () => {
-    runDetached(toggleCursorRead(), 'toggle read');
-  },
-  onToggleStar: () => {
-    const headline = headlinesStore.cursorHeadline;
-    if (headline) runDetached(headlinesStore.toggleStar(headline.id), 'toggle star');
-  },
-  onTogglePublish: () => {
-    const headline = headlinesStore.cursorHeadline;
-    if (headline) runDetached(headlinesStore.togglePublish(headline.id), 'toggle publish');
-  },
-  onRefresh: () => {
-    runDetached(handleToolbarAction('refresh'), 'refresh');
-  },
-  onCatchup: () => {
-    runDetached(handleToolbarAction('catchup'), 'catchup');
-  },
-  onHelp: () => {
-    hotkeyHelpOpen.value = true;
-  },
-});
+/** Dispatch a legacy hotkey action. */
+const handleHotkey = (action: string): void => {
+  const cursor = headlinesStore.cursorHeadline;
+  const currentFeed = feedsStore.currentFeedId ?? FEED_ALL;
+  const currentIsCat = feedsStore.currentIsCat;
+
+  switch (action) {
+    case 'next_feed':
+    case 'prev_feed': {
+      const next = feedsStore.nextFeed(action === 'next_feed' ? 1 : -1);
+      if (next) runDetached(handleFeedSelect(next.id, next.isCat), 'feed navigation');
+      break;
+    }
+    case 'next_unread_feed':
+    case 'prev_unread_feed': {
+      const next = feedsStore.nextUnreadFeed(action === 'next_unread_feed' ? 1 : -1);
+      if (next) runDetached(handleFeedSelect(next.id, next.isCat), 'unread feed navigation');
+      break;
+    }
+    case 'open_article':
+      runDetached(openCursorHeadline(), 'open article');
+      break;
+    case 'next_article':
+    case 'next_article_noscroll':
+      headlinesStore.moveCursor(1);
+      break;
+    case 'prev_article':
+    case 'prev_article_noscroll':
+      headlinesStore.moveCursor(-1);
+      break;
+    case 'article_page_down':
+      document.querySelector('.headlines-list')?.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
+      break;
+    case 'article_page_up':
+      document.querySelector('.headlines-list')?.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+      break;
+    case 'search_dialog':
+      openArticleSearch();
+      break;
+    case 'cancel_search':
+      headlinesStore.setSearchQuery('');
+      runDetached(headlinesStore.loadHeadlines(currentFeed, currentIsCat), 'cancel search');
+      break;
+    case 'toggle_mark':
+      if (cursor) runDetached(headlinesStore.toggleStar(cursor.id), 'toggle star');
+      break;
+    case 'toggle_publ':
+      if (cursor) runDetached(headlinesStore.togglePublish(cursor.id), 'toggle publish');
+      break;
+    case 'toggle_unread':
+      if (cursor) runDetached(toggleCursorRead(), 'toggle unread');
+      break;
+    case 'edit_tags':
+    case 'create_label':
+      if (cursor) labelArticleId.value = cursor.id;
+      labelsDialogOpen.value = true;
+      break;
+    case 'open_in_new_window':
+      if (cursor?.link) window.open(cursor.link, '_blank', 'noopener,noreferrer');
+      break;
+    case 'catchup_below':
+      if (cursor) runDetached(handleMarkRelative(cursor.id, false), 'catchup below');
+      break;
+    case 'catchup_above':
+      if (cursor) runDetached(handleMarkRelative(cursor.id, true), 'catchup above');
+      break;
+    case 'toggle_widescreen':
+      runDetached(handleToolbarAction('toggleWideScreen'), 'toggle widescreen');
+      break;
+    case 'toggle_full_text':
+    case 'toggle_cdm_expanded':
+      runDetached(handleToolbarAction('toggleCdmExpanded'), 'toggle expanded');
+      break;
+    case 'email_article':
+      if (cursor) {
+        window.location.href = `mailto:?subject=${encodeURIComponent(cursor.title)}&body=${encodeURIComponent(cursor.link)}`;
+      }
+      break;
+    case 'close_article':
+      handleArticleClose();
+      break;
+    case 'article_span_grid':
+    case 'cat_toggle_collapse':
+      break;
+    case 'select_all':
+    case 'select_unread':
+    case 'select_marked':
+    case 'select_published':
+    case 'select_invert':
+    case 'select_none':
+      headlinesStore.selectHeadlinesBy(action.replace('select_', ''));
+      break;
+    case 'feed_refresh':
+      runDetached(handleToolbarAction('refresh'), 'refresh');
+      break;
+    case 'feed_unhide_read':
+      runDetached(handleToolbarAction('toggleHideRead'), 'toggle hide read');
+      break;
+    case 'feed_subscribe':
+    case 'feed_edit':
+      feedsDialogOpen.value = true;
+      break;
+    case 'feed_catchup':
+      runDetached(handleToolbarAction('catchup'), 'catchup');
+      break;
+    case 'feed_reverse':
+      runDetached(
+        handleToolbarAction(
+          'orderBy',
+          headlinesStore.orderBy === 'date_reverse' ? 'feed_dates' : 'date_reverse'
+        ),
+        'reverse order'
+      );
+      break;
+    case 'feed_toggle_vgroup':
+      runDetached(feedsStore.toggleVfeedGroup(), 'toggle group by feed');
+      break;
+    case 'feed_toggle_grid':
+      runDetached(feedsStore.toggleGrid(), 'toggle grid');
+      break;
+    case 'toggle_combined_mode':
+      runDetached(handleToolbarAction('toggleCombinedMode'), 'toggle combined');
+      break;
+    case 'catchup_all':
+      runDetached(handleToolbarAction('catchup'), 'catchup all');
+      break;
+    case 'goto_all':
+      runDetached(handleFeedSelect(FEED_ALL, false), 'goto all');
+      break;
+    case 'goto_fresh':
+      runDetached(handleFeedSelect(FEED_FRESH, false), 'goto fresh');
+      break;
+    case 'goto_marked':
+      runDetached(handleFeedSelect(-1, false), 'goto starred');
+      break;
+    case 'goto_published':
+      runDetached(handleFeedSelect(-2, false), 'goto published');
+      break;
+    case 'goto_read':
+      runDetached(handleFeedSelect(-6, false), 'goto recently read');
+      break;
+    case 'goto_prefs':
+      prefsOpen.value = true;
+      break;
+    case 'select_article_cursor':
+      if (headlinesStore.cursorId === null && headlinesStore.headlines.length > 0) {
+        headlinesStore.setCursor(headlinesStore.headlines[0].id);
+      }
+      break;
+    case 'create_filter':
+      prefsOpen.value = true;
+      break;
+    case 'collapse_sidebar':
+      sidebarOpen.value = false;
+      break;
+    case 'help_dialog':
+      hotkeyHelpOpen.value = true;
+      break;
+    default:
+      break;
+  }
+};
+
+useKeyboard({ onAction: handleHotkey });
 
 // Lifecycle
 onMounted(async () => {
@@ -1068,6 +1227,18 @@ onUnmounted(stopPolling);
     z-index: 999;
     background: rgba(0, 0, 0, 0.35);
   }
+}
+
+.search-syntax-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: rgb(var(--v-theme-primary));
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.search-syntax-link:hover {
+  text-decoration: underline;
 }
 
 .feed-search-counter {

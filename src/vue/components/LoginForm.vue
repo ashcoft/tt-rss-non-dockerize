@@ -26,6 +26,12 @@
             :disabled="authStore.loggingIn"
             required
           />
+          <div class="login-options">
+            <v-checkbox v-model="rememberMe" label="Remember me" density="compact" hide-details />
+            <v-checkbox v-model="safeMode" label="Safe mode" density="compact" hide-details />
+            <v-checkbox v-model="bwLimit" label="Use less traffic" density="compact" hide-details />
+          </div>
+          <a class="forgot-link" href="public.php?op=forgotpass">I forgot my password</a>
           <v-alert
             v-if="authStore.error"
             type="error"
@@ -58,10 +64,17 @@ const emit = defineEmits<{ (e: 'loggedIn'): void }>();
 
 const user = ref('');
 const password = ref('');
+const rememberMe = ref(false);
+const safeMode = ref(false);
+const bwLimit = ref(false);
 
 const submit = async () => {
   if (!user.value || !password.value) return;
-  const ok = await authStore.login(user.value, password.value);
+  const ok = await authStore.login(user.value, password.value, {
+    rememberMe: rememberMe.value,
+    safeMode: safeMode.value,
+    bwLimit: bwLimit.value,
+  });
   if (ok) {
     emit('loggedIn');
   }
@@ -84,5 +97,24 @@ const submit = async () => {
 .login-title {
   display: flex;
   align-items: center;
+}
+
+.login-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin-bottom: 4px;
+}
+
+.forgot-link {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: rgb(var(--v-theme-primary));
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
 }
 </style>

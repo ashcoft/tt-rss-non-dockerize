@@ -41,9 +41,14 @@
         class="headlines-list-content"
         :class="{ 'headlines-grid': combined && grid, cdm: combined }"
       >
+        <template v-for="(headline, headlineIndex) in displayHeadlines" :key="headline.id">
         <div
-          v-for="headline in headlines"
-          :key="headline.id"
+          v-if="groupByFeed && (headlineIndex === 0 || displayHeadlines[headlineIndex - 1].feed_id !== headline.feed_id)"
+          class="feed-title"
+        >
+          <span class="title">{{ headline.feed_title }}</span>
+        </div>
+        <div
           class="v-list-item"
           :class="[
             combined ? 'cdm' : 'hl',
@@ -135,6 +140,7 @@
               :title="headline.title"
               @click.prevent.stop="selectHeadline(headline)"
             >{{ headline.title }}</a>
+            <span v-if="debugIds" class="hl-debug">{{ headline.id }}/{{ headline.feed_id }}</span>
             <span v-if="headline.author" class="headline-author">{{ headline.author }}</span>
             <span
               v-if="headline.excerpt && (!combined || !isExpanded(headline)) && showPreview !== false"
@@ -229,6 +235,7 @@
             </div>
           </div>
         </div>
+        </template>
       </div>
 
       <div v-if="!hasMore && !loading && headlines.length > 0" class="headlines-end">
@@ -268,6 +275,10 @@ const props = defineProps<{
   grid?: boolean;
   /** SHOW_CONTENT_PREVIEW: render the content preview under the title. */
   showPreview?: boolean;
+  /** VFEED_GROUP_BY_FEED: insert feed headings in virtual-feed lists. */
+  groupByFeed?: boolean;
+  /** DEBUG_HEADLINE_IDS: show article/feed ids in the row. */
+  debugIds?: boolean;
   /** CDM_EXPANDED: expand every combined row instead of only the active one. */
   cdmExpanded?: boolean;
   /** The current feed's site URL, for the feed pill link. */
@@ -397,6 +408,18 @@ onUnmounted(() => {
 
 
 const contextMenuId = ref<number | null>(null);
+/** VFEED_GROUP_BY_FEED groups all rows of a feed together under one heading. */
+const displayHeadlines = computed(() => {
+  if (!props.groupByFeed) return props.headlines;
+  const groups = new Map<number, Headline[]>();
+  for (const headline of props.headlines) {
+    const group = groups.get(headline.feed_id) ?? [];
+    group.push(headline);
+    groups.set(headline.feed_id, group);
+  }
+  return [...groups.values()].flat();
+});
+
 const gridSpanIds = ref<Set<number>>(new Set());
 
 const toggleGridSpan = (id: number) => {
@@ -585,6 +608,24 @@ const sanitize = (html: string): string =>
   flex: 0 0 auto;
   color: rgba(var(--v-theme-on-background), 0.55);
   font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.feed-title {
+  display: flex;
+  align-items: center;
+  padding: 12px 8px 4px;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.hl-debug {
+  color: rgba(var(--v-theme-on-background), 0.35);
+  font-family: monospace;
+  font-size: 0.6875rem;
   font-weight: 400;
 }
 
