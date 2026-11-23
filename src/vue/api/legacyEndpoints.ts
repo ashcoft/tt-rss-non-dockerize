@@ -2011,3 +2011,29 @@ export async function testFilter(
 
   return { pre_filtering_count: asNumber(body.pre_filtering_count), items };
 }
+
+export interface UpdateInfo {
+  changeset: { id: string; timestamp: number; compare_url: string } | null;
+  plugins: unknown[];
+}
+
+/** Check for a newer core release and updated local plugins (admins only). */
+export async function checkForUpdates(backend: LegacyBackend): Promise<UpdateInfo> {
+  const response = await backend.call('RPC', 'checkforupdates');
+  const body = requireBody(response, 'RPC/checkforupdates');
+
+  const raw = body.changeset;
+  const changeset =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? {
+          id: asString((raw as Record<string, unknown>).id),
+          timestamp: asNumber((raw as Record<string, unknown>).timestamp),
+          compare_url: asString((raw as Record<string, unknown>).compare_url),
+        }
+      : null;
+
+  return {
+    changeset,
+    plugins: Array.isArray(body.plugins) ? body.plugins : [],
+  };
+}

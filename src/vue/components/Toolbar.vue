@@ -12,6 +12,24 @@
       <!-- Plugin-provided main toolbar buttons (HOOK_MAIN_TOOLBAR_BUTTON). -->
       <PluginSurface v-if="pluginMainHtml" :html="pluginMainHtml" class="plugin-main-toolbar" />
 
+      <a
+        v-if="updateUrl"
+        :href="updateUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="update-link"
+        title="A newer release is available"
+      >
+        <v-icon icon="mdi-new-releases" color="primary" />
+      </a>
+      <v-btn
+        v-if="pluginUpdates"
+        icon="mdi-puzzle"
+        variant="text"
+        title="Plugin updates are available"
+        @click="handleAction('preferences')"
+      />
+
       <!-- Mark as read: the default marks everything; the menu items carry the
            time window the backend accepts (1day/1week/2week). -->
       <v-menu>
@@ -150,6 +168,10 @@ interface Props {
   pluginMainHtml?: string;
   /** Plugin HTML for HOOK_TOOLBAR_BUTTON. */
   pluginToolbarHtml?: string;
+  /** Link to a newer core release, when one is available. */
+  updateUrl?: string;
+  /** True when one or more local plugins have updates. */
+  pluginUpdates?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -160,6 +182,8 @@ const props = withDefaults(defineProps<Props>(), {
   modelOrderBy: 'default',
   pluginMainHtml: '',
   pluginToolbarHtml: '',
+  updateUrl: '',
+  pluginUpdates: false,
 });
 
 const emit = defineEmits<{

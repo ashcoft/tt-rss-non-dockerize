@@ -41,6 +41,8 @@
             :model-order-by="headlinesStore.orderBy"
             :plugin-main-html="pluginMainHtml"
             :plugin-toolbar-html="pluginToolbarHtml"
+            :update-url="updateUrl"
+            :plugin-updates="pluginUpdatesAvailable"
             @action="handleToolbarAction"
           />
 
@@ -155,6 +157,8 @@ const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
 const pluginMainHtml = ref('');
 const pluginToolbarHtml = ref('');
+const updateUrl = ref('');
+const pluginUpdatesAvailable = ref(false);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -216,6 +220,7 @@ const onLoggedIn = async () => {
     labelsStore.loadLabels(),
     loadSearchLanguages(),
     loadPluginButtons(),
+    loadUpdates(),
   ]);
   startPolling();
 };
@@ -226,6 +231,15 @@ const loadPluginButtons = async () => {
   if (response.status === 0) {
     pluginMainHtml.value = response.content.mainToolbar;
     pluginToolbarHtml.value = response.content.toolbar;
+  }
+};
+
+/** Check for a newer core release and updated local plugins (admins only). */
+const loadUpdates = async () => {
+  const response = await api.checkForUpdates();
+  if (response.status === 0) {
+    updateUrl.value = response.content.changeset?.compare_url ?? '';
+    pluginUpdatesAvailable.value = response.content.plugins.length > 0;
   }
 };
 
@@ -529,6 +543,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     case 'hotkeyHelp':
       hotkeyHelpOpen.value = true;
       break;
+    case 'preferences':
+      prefsOpen.value = true;
+      break;
     default:
       showMessage(`Unknown action: ${action}`, 'warning');
   }
@@ -582,6 +599,7 @@ onMounted(async () => {
       labelsStore.loadLabels(),
       loadSearchLanguages(),
       loadPluginButtons(),
+      loadUpdates(),
     ]);
     startPolling();
   }

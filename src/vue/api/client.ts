@@ -787,6 +787,13 @@ class ApiClient {
     });
   }
 
+  async checkForUpdates(): Promise<ApiResponse<endpoints.UpdateInfo>> {
+    return this.wrap(() => endpoints.checkForUpdates(legacyBackend), {
+      changeset: null,
+      plugins: [],
+    });
+  }
+
   // ============================================
   // Internal
   // ============================================
