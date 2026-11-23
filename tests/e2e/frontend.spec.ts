@@ -689,11 +689,8 @@ test.describe('Vue front-end', () => {
       timeout: 15000,
     });
 
-    // The Feedly-style floating button opens the same drawer.
-    await page.getByRole('button', { name: 'Toggle feed tree' }).click();
-    await expect(sidebar).toHaveClass(/open/);
-    await page.locator('.sidebar-scrim').click();
-    await expect(sidebar).not.toHaveClass(/open/);
+    // No floating feed-tree button on phones; the header toggle is the only entry point.
+    await expect(page.locator('.mobile-fab')).toHaveCount(0);
 
     // Preferences remains reachable through the toolbar overflow menu.
     await page.locator('.toolbar-right button').last().click();

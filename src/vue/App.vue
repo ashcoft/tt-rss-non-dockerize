@@ -99,17 +99,6 @@
         </aside>
       </main>
 
-      <!-- Feedly-style floating feed-tree button on phones. -->
-      <v-btn
-        class="mobile-fab"
-        icon="mdi-rss"
-        color="primary"
-        size="large"
-        elevation="6"
-        title="Toggle feed tree"
-        @click="sidebarOpen = !sidebarOpen"
-      />
-
       <footer class="app-footer">
         <span class="status">{{ statusMessage }}</span>
         <v-spacer />
@@ -810,10 +799,6 @@ onUnmounted(stopPolling);
   display: none;
 }
 
-.mobile-fab {
-  display: none;
-}
-
 /* Phone layout, mirroring the legacy client: the feed tree is a drawer and
    the reading pane covers the screen instead of sitting beside the list. */
 @media (max-width: 900px) {
@@ -867,14 +852,6 @@ onUnmounted(stopPolling);
 
   .app-footer {
     display: none;
-  }
-
-  .mobile-fab {
-    display: inline-flex;
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    z-index: 998;
   }
 }
 </style>
