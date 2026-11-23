@@ -25,6 +25,8 @@
             :hide-read="feedsStore.hideReadFeeds"
             :active-feed-id="feedsStore.currentFeedId"
             :icons-url="feedsStore.iconsUrl"
+            :special-counters="feedsStore.specialCounters"
+            :hide-read-shows-special="feedsStore.hideReadShowsSpecial"
             @select="handleFeedSelect"
             @feed-action="handleFeedAction"
             @reorder="handleFeedReorder"
@@ -45,6 +47,16 @@
             :plugin-updates="pluginUpdatesAvailable"
             @action="handleToolbarAction"
           />
+
+          <v-alert
+            v-if="headlinesStore.notice && headlinesStore.headlines.length === 0"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mx-2"
+          >
+            {{ headlinesStore.notice }}
+          </v-alert>
 
           <v-alert
             v-if="headlinesStore.error || feedsStore.error"
@@ -131,7 +143,7 @@ import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
 import HotkeyHelpDialog from './components/dialogs/HotkeyHelpDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
 import { runDetached } from './utils/runDetached';
-import { FEED_ALL } from './api/legacyEndpoints';
+import { FEED_ALL, FEED_FRESH } from './api/legacyEndpoints';
 
 const feedsStore = useFeedsStore();
 const headlinesStore = useHeadlinesStore();
@@ -211,6 +223,40 @@ const stopPolling = () => {
   }
 };
 
+/**
+ * The legacy client opens the "Fresh articles" view when the URL has no
+ * selection; the hash is `#f=<id>&c=<0|1>`, the same format Dojo used.
+ */
+const DEFAULT_FEED_ID = FEED_FRESH;
+
+const parseFeedHash = (): { feedId: number; isCat: boolean } | null => {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const raw = params.get('f');
+  if (raw === null) return null;
+
+  const feedId = Number.parseInt(raw, 10);
+  if (!Number.isFinite(feedId)) return null;
+
+  return { feedId, isCat: params.get('c') === '1' };
+};
+
+const syncFeedHash = (feedId: number | string, isCat: boolean) => {
+  const hash = `#f=${feedId}&c=${isCat ? 1 : 0}`;
+  if (window.location.hash !== hash) {
+    window.history.replaceState(null, '', hash);
+  }
+};
+
+/** Open the hash-selected view, falling back to Fresh articles. */
+const openInitialFeed = async () => {
+  if (feedsStore.currentFeedId !== null) return;
+
+  const target = parseFeedHash() ?? { feedId: DEFAULT_FEED_ID, isCat: false };
+  feedsStore.selectFeed(target.feedId, target.isCat);
+  syncFeedHash(target.feedId, target.isCat);
+  await headlinesStore.loadHeadlines(target.feedId, target.isCat);
+};
+
 // Auth flow (Phase 3)
 const onLoggedIn = async () => {
   showMessage('Welcome back!', 'success');
@@ -222,6 +268,7 @@ const onLoggedIn = async () => {
     loadPluginButtons(),
     loadUpdates(),
   ]);
+  await openInitialFeed();
   startPolling();
 };
 
@@ -297,6 +344,7 @@ const handleFeedAction = async (action: string, feedId: number) => {
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
   feedsStore.selectFeed(feedId, isCat);
+  syncFeedHash(feedId, isCat);
   await headlinesStore.loadHeadlines(feedId, isCat);
 };
 
@@ -601,6 +649,7 @@ onMounted(async () => {
       loadPluginButtons(),
       loadUpdates(),
     ]);
+    await openInitialFeed();
     startPolling();
   }
 });
@@ -617,20 +666,24 @@ onUnmounted(stopPolling);
 }
 
 .app-header {
-  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
   background: var(--ttrss-header-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   color: var(--ttrss-primary, #1976d2);
+  white-space: nowrap;
 }
 
 .app-header .subtitle {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
+  margin: 0 0 0 0.5rem;
+  font-size: 0.8rem;
   color: #666;
 }
 
@@ -641,7 +694,7 @@ onUnmounted(stopPolling);
 }
 
 .sidebar {
-  width: 250px;
+  width: 290px;
   overflow-y: auto;
   background: var(--ttrss-sidebar-bg, #fff);
   border-right: 1px solid var(--ttrss-border, #ddd);
@@ -652,6 +705,11 @@ onUnmounted(stopPolling);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Status alerts must keep their height; the list below takes the rest. */
+.content > .v-alert {
+  flex: 0 0 auto;
 }
 
 .article-panel {

@@ -175,6 +175,35 @@ async function loadCounters(backend: LegacyBackend): Promise<LegacyCounters> {
   return { feeds, categories };
 }
 
+/** The unread counters for the virtual ("special") feeds. */
+function specialCounters(counters: LegacyCounters): Record<number, number> {
+  const special: Record<number, number> = {};
+
+  for (const id of [FEED_ALL, FEED_FRESH, FEED_STARRED, FEED_PUBLISHED, FEED_ARCHIVED]) {
+    special[id] = counters.feeds.get(id) ?? 0;
+  }
+
+  return special;
+}
+
+export interface AdaptedCounters {
+  /** Unread counters keyed by virtual feed id (negative ids and 0). */
+  special: Record<number, number>;
+  feeds: Record<number, number>;
+  categories: Record<number, number>;
+}
+
+/** Read the authoritative counters, e.g. after an article action. */
+export async function getCounters(backend: LegacyBackend): Promise<AdaptedCounters> {
+  const counters = await loadCounters(backend);
+
+  return {
+    special: specialCounters(counters),
+    feeds: Object.fromEntries(counters.feeds),
+    categories: Object.fromEntries(counters.categories),
+  };
+}
+
 /**
  * `Pref_Feeds/getfeedtree` with `mode=2` returns the root's `items` array: one
  * entry per category (Special `-1`, Labels `-2`, user categories, and
@@ -289,7 +318,11 @@ function collectTree(
  */
 export async function getFeedTree(
   backend: LegacyBackend
-): Promise<{ feeds: AdaptedFeed[]; categories: AdaptedCategory[] }> {
+): Promise<{
+  feeds: AdaptedFeed[];
+  categories: AdaptedCategory[];
+  special: Record<number, number>;
+}> {
   const [treeResponse, counters] = await Promise.all([
     backend.call('Pref_Feeds', 'getfeedtree', { mode: 2 }),
     loadCounters(backend),
@@ -303,7 +336,7 @@ export async function getFeedTree(
 
   collectTree(rootItems, null, counters, feeds, categories);
 
-  return { feeds, categories };
+  return { feeds, categories, special: specialCounters(counters) };
 }
 
 export interface HeadlinesPage {

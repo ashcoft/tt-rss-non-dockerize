@@ -20,7 +20,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // The PHP shell serves the build from dist/, so asset URLs emitted inside
+  // the bundled CSS (fonts, images) must point there too.
+  base: command === 'build' ? '/dist/' : '/',
+
   // Project root (where index.html is located)
   root: '.',
 
@@ -238,4 +242,4 @@ export default defineConfig({
       'top-level-await': true,
     },
   },
-});
+}));

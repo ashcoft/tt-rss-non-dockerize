@@ -24,6 +24,16 @@ export interface Category {
 
 export type FeedsByCategoryMap = Map<string, Feed[]>;
 
+/** Titles of the virtual feeds, matching the legacy sidebar. */
+const SPECIAL_FEED_TITLES: Record<number, string> = {
+  [-4]: 'All articles',
+  [-3]: 'Fresh articles',
+  [-1]: 'Starred articles',
+  [-2]: 'Published articles',
+  [0]: 'Archived articles',
+  [-6]: 'Recently read',
+};
+
 export const useFeedsStore = defineStore('feeds', () => {
   // State
   const feeds = ref<Feed[]>([]);
@@ -43,6 +53,8 @@ export const useFeedsStore = defineStore('feeds', () => {
   const gridEnabled = ref(false);
   /** Base URL of public.php, from init-params; used for feed icons. */
   const iconsUrl = ref('/public.php');
+  /** Unread counters for the virtual ("special") feeds, keyed by feed id. */
+  const specialCounters = ref<Record<number, number>>({});
 
   // Getters
   const feedsByCategory = computed((): FeedsByCategoryMap => {
@@ -74,13 +86,28 @@ export const useFeedsStore = defineStore('feeds', () => {
   });
 
   const currentFeed = computed(() => {
-    if (typeof currentFeedId.value === 'number' && currentFeedId.value > 0) {
-      if (currentIsCat.value) {
-        return categories.value.find(c => c.id === currentFeedId.value);
-      }
-      return feeds.value.find(f => f.id === currentFeedId.value);
+    const id = currentFeedId.value;
+
+    if (typeof id !== 'number') return null;
+
+    if (id <= 0) {
+      const title = SPECIAL_FEED_TITLES[id];
+      if (!title) return null;
+
+      return {
+        id,
+        title,
+        unread: specialCounters.value[id] ?? 0,
+        cat_id: null,
+        feed_url: '',
+        site_url: '',
+      };
     }
-    return null;
+
+    if (currentIsCat.value) {
+      return categories.value.find(c => c.id === id);
+    }
+    return feeds.value.find(f => f.id === id);
   });
 
   // Actions
@@ -94,6 +121,7 @@ export const useFeedsStore = defineStore('feeds', () => {
       if (response.status === 0) {
         feeds.value = response.content.feeds;
         categories.value = response.content.categories;
+        specialCounters.value = response.content.special ?? {};
       } else {
         error.value = response.error ?? 'Failed to load feeds';
       }
@@ -126,6 +154,29 @@ export const useFeedsStore = defineStore('feeds', () => {
     }
   }
 
+  /** Re-read every counter, e.g. after an article action changed unread state. */
+  async function refreshCounters(): Promise<void> {
+    try {
+      const response = await api.getCounters();
+
+      if (response.status !== 0) return;
+
+      specialCounters.value = response.content.special;
+
+      for (const feed of feeds.value) {
+        const unread = response.content.feeds[feed.id];
+        if (typeof unread === 'number') feed.unread = unread;
+      }
+
+      for (const category of categories.value) {
+        const unread = response.content.categories[category.id];
+        if (typeof unread === 'number') category.unread = unread;
+      }
+    } catch (err) {
+      console.error('Failed to refresh counters:', err);
+    }
+  }
+
   function updateCategoryUnread(catId: number, delta: number) {
     const cat = categories.value.find(c => c.id === catId);
     if (cat) {
@@ -138,6 +189,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     categories.value = [];
     currentFeedId.value = null;
     currentIsCat.value = false;
+    specialCounters.value = {};
     error.value = null;
   }
 
@@ -425,6 +477,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     combinedMode,
     gridEnabled,
     iconsUrl,
+    specialCounters,
     
     // Getters
     feedsByCategory,
@@ -436,6 +489,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     selectFeed,
     updateFeedUnread,
     updateCategoryUnread,
+    refreshCounters,
     addFeed,
     loadFeedDetails,
     saveFeed,

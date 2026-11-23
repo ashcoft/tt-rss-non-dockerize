@@ -92,6 +92,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const loading = ref(false);
   const loadingMore = ref(false);
   const error = ref<string | null>(null);
+  /** Empty-state text from Feeds/view (not an error, e.g. "No articles found"). */
+  const notice = ref<string | null>(null);
   /** The current feed's last update error, from the toolbar payload. */
   const feedError = ref<string | null>(null);
   const viewMode = ref<string>('adaptive');
@@ -157,9 +159,15 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   }
 
   // Actions
+  // Selecting feeds quickly can leave an older Feeds/view request in flight;
+  // only the newest request may write the list.
+  let loadSequence = 0;
+
   async function loadHeadlines(feedId: number | string, isCat: boolean = false) {
+    const sequence = ++loadSequence;
     loading.value = true;
     error.value = null;
+    notice.value = null;
     skip.value = 0;
 
     try {
@@ -172,28 +180,32 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         orderBy: orderBy.value,
       });
 
+      if (sequence !== loadSequence) return;
+
       if (response.status === 0) {
         headlines.value = response.content.headlines;
         // A fresh page invalidates any previous cursor position.
         cursorId.value = headlines.value[0]?.id ?? null;
         // Feeds/view hardcodes a page size of 30 and does not accept `limit`.
         hasMore.value = response.content.headlines.length >= pageSize;
-        if (response.content.message) error.value = response.content.message;
+        notice.value = response.content.message;
         feedError.value = response.content.feedError;
       } else {
         error.value = response.error ?? 'Failed to load headlines';
       }
     } catch (err) {
+      if (sequence !== loadSequence) return;
       error.value = err instanceof Error ? err.message : 'Unknown error';
       console.error('Failed to load headlines:', err);
     } finally {
-      loading.value = false;
+      if (sequence === loadSequence) loading.value = false;
     }
   }
 
   async function loadMore(feedId: number | string, isCat: boolean = false) {
     if (loadingMore.value || !hasMore.value) return;
 
+    const sequence = loadSequence;
     loadingMore.value = true;
     skip.value += pageSize;
 
@@ -206,6 +218,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         searchLanguage: searchLanguage.value,
         orderBy: orderBy.value,
       });
+
+      if (sequence !== loadSequence) return;
 
       if (response.status === 0) {
         const newHeadlines = response.content.headlines;
@@ -221,7 +235,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       console.error('Failed to load more headlines:', err);
       skip.value -= pageSize; // Revert skip on error
     } finally {
-      loadingMore.value = false;
+      if (sequence === loadSequence) loadingMore.value = false;
     }
   }
 
@@ -290,6 +304,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       feedUnreadDeltas.forEach((delta, feedId) => {
         feedsStore.updateFeedUnread(feedId, delta);
       });
+      void feedsStore.refreshCounters();
     } catch (err) {
       console.error('Failed to mark as read:', err);
       throw err;
@@ -316,6 +331,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       feedUnreadDeltas.forEach((delta, feedId) => {
         feedsStore.updateFeedUnread(feedId, delta);
       });
+      void feedsStore.refreshCounters();
     } catch (err) {
       console.error('Failed to mark as unread:', err);
       throw err;
@@ -335,6 +351,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value?.id === articleId) {
         selectedArticle.value.is_marked = newValue;
       }
+      void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to toggle star:', err);
     }
@@ -353,6 +370,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value?.id === articleId) {
         selectedArticle.value.is_published = newValue;
       }
+      void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to toggle publish:', err);
     }
@@ -380,6 +398,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value?.id === articleId) {
         selectedArticle.value = null;
       }
+      void feedsStore.refreshCounters();
     } catch (err) {
       console.error('Failed to delete article:', err);
       throw err;
@@ -405,6 +424,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
         selectedArticle.value.is_marked = !selectedArticle.value.is_marked;
       }
+      void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to toggle starred:', err);
       throw err;
@@ -425,6 +445,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
         selectedArticle.value.is_published = !selectedArticle.value.is_published;
       }
+      void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to toggle published:', err);
       throw err;
@@ -465,6 +486,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       if (selectedArticle.value && ids.has(selectedArticle.value.id)) {
         selectedArticle.value = null;
       }
+      void feedsStore.refreshCounters();
     } catch (err) {
       console.error('Failed to delete articles:', err);
       throw err;
@@ -516,6 +538,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       }
       for (const h of headlines.value) h.is_read = true;
       if (selectedArticle.value) selectedArticle.value.is_read = true;
+      void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to catch up all:', err);
       throw err;
@@ -603,6 +626,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     headlines.value = [];
     selectedArticle.value = null;
     error.value = null;
+    notice.value = null;
     searchQuery.value = '';
     hasMore.value = false;
     skip.value = 0;
@@ -616,6 +640,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     loading,
     loadingMore,
     error,
+    notice,
     feedError,
     viewMode,
     searchQuery,

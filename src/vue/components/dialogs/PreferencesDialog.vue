@@ -14,6 +14,8 @@
           <v-tab value="filters">Filters</v-tab>
           <v-tab value="password">Password</v-tab>
           <v-tab value="plugins">Plugins</v-tab>
+          <v-tab value="feeds">Feeds</v-tab>
+          <v-tab value="labels">Labels</v-tab>
           <v-tab v-if="isAdmin" value="users">Users</v-tab>
           <v-tab v-if="isAdmin" value="system">System</v-tab>
         </v-tabs>
@@ -45,6 +47,9 @@
             <p class="text-caption text-grey mt-4">
               Changes are saved immediately to the backend.
             </p>
+            <!-- HOOK_PREFS_TAB_SECTION content for the legacy preferences tab. -->
+            <PluginSurface section="prefPrefsPrefsInside" />
+            <PluginSurface section="prefPrefsPrefsOutside" />
           </v-window-item>
 
           <v-window-item value="advanced">
@@ -189,14 +194,6 @@
           <v-window-item value="plugins">
             <PluginManagerPanel v-if="tab === 'plugins'" />
 
-            <!-- Plugin-provided preference sections (HOOK_PREFS_TAB_SECTION).
-                 The legacy shell hosted these inside the feeds and preferences
-                 tabs; the Vue dialog has no such tabs, so they live with the
-                 plugin controls. -->
-            <PluginSurface section="prefPrefsPrefsInside" />
-            <PluginSurface section="prefPrefsPrefsOutside" />
-            <PluginSurface section="prefFeedsPublishedGenerated" />
-
             <v-expansion-panels v-if="pluginTabs.length" variant="accordion" class="mt-4">
               <v-expansion-panel
                 v-for="pluginTab in pluginTabs"
@@ -208,6 +205,16 @@
                 </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
+          </v-window-item>
+
+          <v-window-item value="feeds">
+            <ManageFeedsPanel v-if="tab === 'feeds'" />
+            <!-- HOOK_PREFS_TAB_SECTION content for the legacy feeds tab. -->
+            <PluginSurface section="prefFeedsPublishedGenerated" />
+          </v-window-item>
+
+          <v-window-item value="labels">
+            <LabelsPanel v-if="tab === 'labels'" />
           </v-window-item>
 
           <v-window-item v-if="isAdmin" value="users">
@@ -245,6 +252,8 @@ import FilterEditorDialog from './FilterEditorDialog.vue';
 import PluginManagerPanel from './PluginManagerDialog.vue';
 import PluginSurface from '../PluginSurface.vue';
 import AccountPanel from './AccountPanel.vue';
+import ManageFeedsPanel from './ManageFeedsPanel.vue';
+import LabelsPanel from './LabelsPanel.vue';
 import UsersPanel from './UsersPanel.vue';
 import SystemPanel from './SystemPanel.vue';
 import type { PluginPrefsTab } from '../../api/legacyEndpoints';

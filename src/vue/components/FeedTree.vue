@@ -10,7 +10,7 @@
       class="search-input"
     />
 
-    <v-list nav density="compact" class="feed-list">
+    <v-list v-model:opened="openedGroups" nav density="compact" class="feed-list">
       <!-- Special Feeds -->
       <v-list-group value="special">
         <template #activator="{ props }">
@@ -187,9 +187,19 @@
       <!-- Uncategorized Feeds -->
       <v-list-group value="uncategorized" v-if="filteredUncategorizedFeeds.length > 0">
         <template #activator="{ props }">
-          <v-list-item v-bind="props" title="Feeds">
+          <v-list-item v-bind="props" title="Uncategorized">
             <template #prepend>
               <v-icon>mdi-rss</v-icon>
+            </template>
+            <template #append>
+              <v-chip
+                v-if="uncategorizedUnread > 0"
+                size="x-small"
+                color="primary"
+                variant="flat"
+              >
+                {{ uncategorizedUnread }}
+              </v-chip>
             </template>
           </v-list-item>
         </template>
@@ -257,13 +267,19 @@ interface Props {
   activeFeedId?: number | string | null;
   /** Base URL of public.php, which streams each feed's icon. */
   iconsUrl?: string;
+  /** Unread counters for the virtual feeds, keyed by feed id. */
+  specialCounters?: Record<number, number>;
+  /** HIDE_READ_SHOWS_SPECIAL: keep virtual feeds visible while hiding read ones. */
+  hideReadShowsSpecial?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   labels: () => [],
   hideRead: false,
   activeFeedId: null,
-  iconsUrl: '/public.php'
+  iconsUrl: '/public.php',
+  specialCounters: () => ({}),
+  hideReadShowsSpecial: true
 });
 
 const emit = defineEmits<{
@@ -278,6 +294,8 @@ const LABEL_BASE_INDEX = -1024;
 
 // State
 const searchQuery = ref('');
+// The virtual feed group starts expanded, like the legacy tree.
+const openedGroups = ref<string[]>(['special']);
 // Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
 // broken icon does not hide the rest.
 const iconFailed = ref(new Set<number>());
@@ -287,15 +305,31 @@ const feedIconUrl = (feedId: number): string =>
   `${props.iconsUrl}?op=feed_icon&id=${feedId}`;
 
 // Special feeds (built-in). IDs mirror the Feeds::FEED_* constants in
-// classes/Feeds.php and must not be renumbered.
-const specialFeeds = [
-  { id: -4, name: 'All Articles', icon: 'mdi-newspaper', unread: 0 },
-  { id: -3, name: 'Fresh Articles', icon: 'mdi-weather-sunny', unread: 0 },
-  { id: -1, name: 'Starred', icon: 'mdi-star', unread: 0 },
-  { id: -2, name: 'Published', icon: 'mdi-publish', unread: 0 },
-  { id: -6, name: 'Recently Read', icon: 'mdi-history', unread: 0 },
-  { id: 0, name: 'Archived', icon: 'mdi-archive', unread: 0 },
+// classes/Feeds.php and must not be renumbered. Order and icons match the
+// legacy sidebar.
+const SPECIAL_FEEDS = [
+  { id: -4, name: 'All articles', icon: 'mdi-inbox' },
+  { id: -3, name: 'Fresh articles', icon: 'mdi-whatshot' },
+  { id: -1, name: 'Starred articles', icon: 'mdi-star' },
+  { id: -2, name: 'Published articles', icon: 'mdi-rss' },
+  { id: 0, name: 'Archived articles', icon: 'mdi-archive' },
+  { id: -6, name: 'Recently read', icon: 'mdi-restore' },
 ];
+
+/**
+ * Special feeds with their unread counters. HIDE_READ_FEEDS hides empty
+ * virtual feeds unless HIDE_READ_SHOWS_SPECIAL keeps them visible; the active
+ * one always stays so the selection is not lost.
+ */
+const specialFeeds = computed(() => {
+  return SPECIAL_FEEDS.map(feed => ({
+    ...feed,
+    unread: props.specialCounters[feed.id] ?? 0,
+  })).filter(feed => {
+    if (!props.hideRead || props.hideReadShowsSpecial) return true;
+    return feed.unread > 0 || feed.id === props.activeFeedId;
+  });
+});
 
 // Computed
 /**
@@ -319,6 +353,11 @@ const visible = (feed: Feed): boolean => {
   if (!props.hideRead) return true;
   return (feed.unread ?? 0) > 0 || feed.id === props.activeFeedId;
 };
+
+/** Unread articles across all uncategorized feeds, shown on the group row. */
+const uncategorizedUnread = computed(() =>
+  props.feeds.filter(feed => !feed.cat_id).reduce((sum, feed) => sum + (feed.unread ?? 0), 0)
+);
 
 /**
  * Computes the list of uncategorized feeds filtered by the current search query.

@@ -82,13 +82,14 @@
               @click.stop
               @update:model-value="(checked: boolean) => toggleSelected(headline.id, checked)"
             />
-            <v-checkbox
-              :model-value="headline.is_read"
-              hide-details
-              density="compact"
-              title="Mark as read"
-              @click.stop
-              @update:model-value="toggleRead(headline)"
+            <!-- Read state is shown as an indicator, as in the legacy row. -->
+            <v-btn
+              :icon="headline.is_read ? 'mdi-circle-outline' : 'mdi-circle'"
+              :color="headline.is_read ? 'grey' : 'primary'"
+              size="x-small"
+              variant="text"
+              :title="headline.is_read ? 'Mark as unread' : 'Mark as read'"
+              @click.stop="toggleRead(headline)"
             />
           </template>
 

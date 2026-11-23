@@ -37,6 +37,7 @@ export type {
   FilterAction,
   PluginInfo,
   PluginsList,
+  AdaptedCounters,
 } from './legacyEndpoints';
 
 class ApiClient {
@@ -106,9 +107,25 @@ class ApiClient {
   // ============================================
 
   async getFeedTree(): Promise<
-    ApiResponse<{ feeds: endpoints.AdaptedFeed[]; categories: endpoints.AdaptedCategory[] }>
+    ApiResponse<{
+      feeds: endpoints.AdaptedFeed[];
+      categories: endpoints.AdaptedCategory[];
+      special: Record<number, number>;
+    }>
   > {
-    return this.wrap(() => endpoints.getFeedTree(legacyBackend), { feeds: [], categories: [] });
+    return this.wrap(() => endpoints.getFeedTree(legacyBackend), {
+      feeds: [],
+      categories: [],
+      special: {},
+    });
+  }
+
+  async getCounters(): Promise<ApiResponse<endpoints.AdaptedCounters>> {
+    return this.wrap(() => endpoints.getCounters(legacyBackend), {
+      special: {},
+      feeds: {},
+      categories: {},
+    });
   }
 
   async addFeed(feedUrl: string, categoryId = 0): Promise<ApiResponse<{ code: number }>> {

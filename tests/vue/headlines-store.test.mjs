@@ -152,8 +152,12 @@ test('toggleStarred splits a mixed selection into star and unstar calls', async 
 
   await store.toggleStarred([10, 20]);
 
-  const modes = calls.map((body) => /cmode=(\d+)/.exec(body)?.[1]);
-  assert.equal(calls.length, 2, `expected two markSelected calls, got ${calls.length}`);
+  // The store also refreshes counters after the mutation, so filter to the
+  // markSelected requests before asserting the split.
+  const modes = calls
+    .map((body) => /cmode=(\d+)/.exec(body)?.[1])
+    .filter((mode) => mode !== undefined);
+  assert.equal(modes.length, 2, `expected two markSelected calls, got ${modes.length}`);
   assert.deepEqual(modes.sort(), ['0', '2']);
   assert.equal(store.headlines.value[0].is_marked, true);
   assert.equal(store.headlines.value[1].is_marked, false);

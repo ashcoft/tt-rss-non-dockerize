@@ -35,7 +35,7 @@
       <v-menu>
         <template #activator="{ props }">
           <v-btn v-bind="props" prepend-icon="mdi-check-all" title="Mark as read">
-            Read
+            Mark as read
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
         </template>
@@ -305,9 +305,14 @@ const onLanguageChange = (language: string) => {
 .feed-title {
   font-weight: 600;
   color: var(--ttrss-primary, #1976d2);
+  white-space: nowrap;
 }
 
 .search-input {
   max-width: 200px;
+}
+
+.view-mode {
+  min-width: 150px;
 }
 </style>
