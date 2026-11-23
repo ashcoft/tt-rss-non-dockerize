@@ -39,6 +39,8 @@
             :model-search-language="headlinesStore.searchLanguage"
             :model-view-mode="headlinesStore.viewMode"
             :model-order-by="headlinesStore.orderBy"
+            :plugin-main-html="pluginMainHtml"
+            :plugin-toolbar-html="pluginToolbarHtml"
             @action="handleToolbarAction"
           />
 
@@ -151,6 +153,8 @@ const prefsOpen = ref(
 const hotkeyHelpOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
+const pluginMainHtml = ref('');
+const pluginToolbarHtml = ref('');
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -211,8 +215,18 @@ const onLoggedIn = async () => {
     feedsStore.loadDisplayPrefs(),
     labelsStore.loadLabels(),
     loadSearchLanguages(),
+    loadPluginButtons(),
   ]);
   startPolling();
+};
+
+/** Load the plugin-provided toolbar button fragments for this session. */
+const loadPluginButtons = async () => {
+  const response = await api.getPluginButtons();
+  if (response.status === 0) {
+    pluginMainHtml.value = response.content.mainToolbar;
+    pluginToolbarHtml.value = response.content.toolbar;
+  }
 };
 
 /** Fetch the search stemming languages once the session is available. */
@@ -567,6 +581,7 @@ onMounted(async () => {
       feedsStore.loadDisplayPrefs(),
       labelsStore.loadLabels(),
       loadSearchLanguages(),
+      loadPluginButtons(),
     ]);
     startPolling();
   }

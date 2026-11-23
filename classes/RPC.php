@@ -798,4 +798,57 @@ class RPC extends Handler_Protected {
 	</footer>
 	<?php
 	}
+
+	/**
+	 * Render the HTML a plugin hook produces. Some hooks return a string
+	 * (HOOK_TOOLBAR_BUTTON) while others print directly (the main toolbar
+	 * and preferences-section hooks), so both are collected.
+	 *
+	 * @param PluginHost::HOOK_* $hook
+	 */
+	private function _render_plugin_hook(string $hook, ?string $section = null): string {
+		$html = '';
+		$host = PluginHost::getInstance();
+		$method = strtolower($hook);
+
+		foreach ($host->get_hooks($hook) as $plugin) {
+			if (!$host->implements_hook($plugin, $hook)) {
+				continue;
+			}
+
+			ob_start();
+
+			try {
+				$result = $section === null ? $plugin->$method() : $plugin->$method($section);
+				$html .= (string) ob_get_clean();
+
+				if (is_string($result)) {
+					$html .= $result;
+				}
+			} catch (\Throwable $err) {
+				ob_end_clean();
+				Debug::log("plugin hook $hook failed: " . $err->getMessage());
+			}
+		}
+
+		return $html;
+	}
+
+	/** HTML for the plugin-provided main and action toolbar buttons. */
+	function getPluginButtons(): void {
+		print json_encode([
+			'main_toolbar' => $this->_render_plugin_hook(PluginHost::HOOK_MAIN_TOOLBAR_BUTTON),
+			'toolbar' => $this->_render_plugin_hook(PluginHost::HOOK_TOOLBAR_BUTTON),
+		]);
+	}
+
+	/** HTML for one plugin-provided preferences section. */
+	function getPluginPrefsSection(): void {
+		$section = clean((string) ($_REQUEST['section'] ?? ''));
+
+		print json_encode([
+			'html' => $this->_render_plugin_hook(PluginHost::HOOK_PREFS_TAB_SECTION, $section),
+		]);
+	}
+
 }

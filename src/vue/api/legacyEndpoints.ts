@@ -1316,3 +1316,57 @@ export async function changePassword(
   });
   return parsePrefsResult(response.raw);
 }
+
+export interface PluginSurfaces {
+  /** HTML for HOOK_MAIN_TOOLBAR_BUTTON (left side of the main toolbar). */
+  mainToolbar: string;
+  /** HTML for HOOK_TOOLBAR_BUTTON (the toolbar action menu). */
+  toolbar: string;
+}
+
+/**
+ * Fetch the HTML fragments plugins provide for the main toolbar.
+ *
+ * The legacy shell rendered this markup directly and let the plugin's own JS
+ * run. The Vue app cannot execute that JS, so the fragments are only useful
+ * for handlers that follow the `Plugins.<Class>.<method>()` convention; see
+ * `preparePluginSurfaceHtml`.
+ */
+export async function getPluginButtons(backend: LegacyBackend): Promise<PluginSurfaces> {
+  const response = await backend.call('RPC', 'getPluginButtons');
+  const body = requireBody(response, 'RPC/getPluginButtons');
+
+  return {
+    mainToolbar: asString(body.main_toolbar),
+    toolbar: asString(body.toolbar),
+  };
+}
+
+/** Fetch one plugin-provided preferences section (`HOOK_PREFS_TAB_SECTION`). */
+export async function getPluginPrefsSection(
+  backend: LegacyBackend,
+  section: string
+): Promise<string> {
+  const response = await backend.call('RPC', 'getPluginPrefsSection', { section });
+  const body = requireBody(response, 'RPC/getPluginPrefsSection');
+  return asString(body.html);
+}
+
+const PLUGIN_HANDLER_ATTR =
+  /onclick=(["'])\s*(?:return\s+)?Plugins\.(\w+)\.(\w+)\(\s*\)\s*;?\s*\1/gi;
+
+/**
+ * Rewrite a plugin's inline handler into data attributes the Vue host can
+ * dispatch, and strip every other inline event handler.
+ *
+ * Only no-argument `Plugins.<Class>.<method>()` calls can be forwarded to
+ * `PluginHandler`; calls that need arguments relied on the plugin's deleted JS
+ * to build the request, so their onclick is removed rather than run.
+ */
+export function preparePluginSurfaceHtml(html: string): string {
+  if (!html) return '';
+
+  return html
+    .replace(PLUGIN_HANDLER_ATTR, 'data-plugin="$2" data-method="$3"')
+    .replace(/\son[a-z]+=("[^"]*"|'[^']*')/gi, '');
+}

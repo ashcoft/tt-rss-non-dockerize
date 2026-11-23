@@ -42,7 +42,19 @@ function compileComponent(relativePath) {
   });
   const module = { exports: {} };
   const localRequire = (id) => {
-    if (id.includes('api/client')) return { default: {} };
+    if (id.includes('api/client')) {
+      return {
+        __esModule: true,
+        default: {
+          getPluginPrefsSection: async () => ({ status: 1, content: '' }),
+          invokePluginHandler: async () => ({ status: 1, content: '' }),
+        },
+      };
+    }
+    // PluginSurface imports this helper; the render tests do not exercise it.
+    if (id.includes('api/legacyEndpoints')) {
+      return { preparePluginSurfaceHtml: (value) => value };
+    }
     // DOMPurify needs a DOM; a passthrough stub is enough for the render tests.
     // __esModule makes the transpiled `import DOMPurify from 'dompurify'` read
     // our `default` rather than double-wrapping it.
@@ -124,7 +136,7 @@ function mount(Component, extraProps = {}) {
   for (const name of ['VCard', 'VCardTitle', 'VCardText', 'VCardActions', 'VTabs', 'VTab',
     'VWindow', 'VWindowItem', 'VList', 'VListItem', 'VListItemTitle', 'VListItemSubtitle',
     'VCheckbox', 'VTextField', 'VTextarea', 'VSelect', 'VBtn', 'VSpacer', 'VDivider', 'VIcon',
-    'VChip', 'VAlert', 'VProgressCircular']) app.component(name, passthrough);
+    'VChip', 'VAlert', 'VProgressCircular', 'VSnackbar']) app.component(name, passthrough);
   const root = { children: [] };
   app.mount(root);
   return { app, root, updates, dialog: () => dialogProps };

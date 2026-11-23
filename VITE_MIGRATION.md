@@ -182,10 +182,23 @@ The preferences dialog now renders the **full backend preference set** (an
 Advanced tab covers the ones without a curated label), so the legacy
 `Pref_Prefs` screen is no longer needed.
 
+Plugin UI surfaces now have a Vue host. `RPC/getPluginButtons` returns the
+HTML from `HOOK_MAIN_TOOLBAR_BUTTON` and `HOOK_TOOLBAR_BUTTON`, and
+`RPC/getPluginPrefsSection` returns one `HOOK_PREFS_TAB_SECTION` fragment.
+`PluginSurface.vue` renders those fragments after rewriting
+`onclick="Plugins.<Class>.<method>()"` into `data-plugin`/`data-method`
+attributes and stripping every other inline handler; a click is dispatched
+through `PluginHandler`. The toolbar shows the main and action-menu buttons,
+and the preferences Plugins tab hosts the feed/preference sections (the share
+plugin's "Unshare all articles" button is the bundled example).
+
+The host deliberately supports only no-argument handlers. Calls that needed
+arguments relied on the plugin's own JS (deleted with the Dojo stack) to build
+the request; their `onclick` is removed rather than executed, so such plugins
+need a small Vue handler before their buttons work.
+
 What this does not yet cover, and which the legacy shell used to provide:
 
-- **Other plugin UI surfaces** (`HOOK_TOOLBAR_BUTTON`, `HOOK_MAIN_TOOLBAR_BUTTON`,
-  `HOOK_PREFS_TAB_SECTION`) have no Vue host yet.
 - **Some `Pref_*` screens** (feed-level preferences, users, system) are not yet
   fully represented in the Vue dialog.
 

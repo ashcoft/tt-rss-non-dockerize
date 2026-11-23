@@ -32,7 +32,7 @@ class Share extends Plugin {
 
 			<?= format_notice("You can disable all articles shared by unique URLs here.") ?></h2>
 
-			<button class='alt-danger' onclick="return Plugins.Share.clearKeys()">
+			<button class='alt-danger' onclick="return Plugins.Share.clearArticleKeys()">
 				<?= \Controls\icon('delete') ?>
 				<?= __('Unshare all articles') ?></button>
 			<?php

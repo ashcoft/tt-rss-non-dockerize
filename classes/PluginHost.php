@@ -402,6 +402,22 @@ class PluginHost {
 	}
 
 	/**
+	 * Whether a plugin implements a hook itself instead of inheriting the
+	 * base Plugin method, which only raises a dummy-method error.
+	 *
+	 * @param PluginHost::HOOK_* $hook
+	 */
+	function implements_hook(Plugin $plugin, string $hook): bool {
+		$method = strtolower($hook);
+
+		if (!method_exists($plugin, $method)) {
+			return false;
+		}
+
+		return (new \ReflectionMethod($plugin, $method))->getDeclaringClass()->getName() !== Plugin::class;
+	}
+
+	/**
 	 * @param PluginHost::HOOK_* $type
 	 * @return array<int, Plugin>
 	 */

@@ -9,6 +9,9 @@
         />
       </v-btn-toggle>
 
+      <!-- Plugin-provided main toolbar buttons (HOOK_MAIN_TOOLBAR_BUTTON). -->
+      <PluginSurface v-if="pluginMainHtml" :html="pluginMainHtml" class="plugin-main-toolbar" />
+
       <!-- Mark as read: the default marks everything; the menu items carry the
            time window the backend accepts (1day/1week/2week). -->
       <v-menu>
@@ -106,6 +109,13 @@
           <v-btn icon="mdi-dots-vertical" v-bind="props" />
         </template>
         <v-list>
+          <!-- Plugin-provided action-menu buttons (HOOK_TOOLBAR_BUTTON). -->
+          <PluginSurface
+            v-if="pluginToolbarHtml"
+            :html="pluginToolbarHtml"
+            class="plugin-toolbar-buttons"
+          />
+          <v-divider v-if="pluginToolbarHtml" />
           <v-list-item
             v-for="item in actionOptions"
             :key="item.value"
@@ -126,6 +136,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { Feed } from '../types';
+import PluginSurface from './PluginSurface.vue';
 
 interface Props {
   feedInfo: Feed | null;
@@ -135,6 +146,10 @@ interface Props {
   modelSearchLanguage?: string;
   modelViewMode?: string;
   modelOrderBy?: string;
+  /** Plugin HTML for HOOK_MAIN_TOOLBAR_BUTTON. */
+  pluginMainHtml?: string;
+  /** Plugin HTML for HOOK_TOOLBAR_BUTTON. */
+  pluginToolbarHtml?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -143,6 +158,8 @@ const props = withDefaults(defineProps<Props>(), {
   modelSearchLanguage: 'english',
   modelViewMode: 'adaptive',
   modelOrderBy: 'default',
+  pluginMainHtml: '',
+  pluginToolbarHtml: '',
 });
 
 const emit = defineEmits<{

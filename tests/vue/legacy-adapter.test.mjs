@@ -1425,3 +1425,56 @@ test('setEnabledPlugins posts the plugin names as plugins[]', async () => {
   assert.ok(body.includes('plugins%5B%5D=note'));
   assert.ok(body.includes('plugins%5B%5D=share'));
 });
+
+test('getPluginButtons maps the toolbar HTML fragments', async () => {
+  installGlobals();
+  const payload = {
+    main_toolbar: '<i onclick="Plugins.Toggle_Sidebar.toggle()">menu</i>',
+    toolbar: '<button onclick="Plugins.Foo.bar()">Bar</button>',
+  };
+  const calls = stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const surfaces = await endpoints.getPluginButtons(backend);
+
+  assert.ok(calls[0].body.includes('op=RPC'));
+  assert.ok(calls[0].body.includes('method=getPluginButtons'));
+  assert.deepEqual(surfaces, {
+    mainToolbar: payload.main_toolbar,
+    toolbar: payload.toolbar,
+  });
+});
+
+test('getPluginPrefsSection posts the section id', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: JSON.stringify({ html: '<button>Clear</button>' }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const html = await endpoints.getPluginPrefsSection(backend, 'prefFeedsPublishedGenerated');
+
+  assert.ok(calls[0].body.includes('method=getPluginPrefsSection'));
+  assert.ok(calls[0].body.includes('section=prefFeedsPublishedGenerated'));
+  assert.equal(html, '<button>Clear</button>');
+});
+
+test('preparePluginSurfaceHtml forwards no-argument handlers as data attributes', () => {
+  const html = '<button onclick="return Plugins.Share.clearArticleKeys()">Unshare</button>';
+
+  assert.equal(
+    endpoints.preparePluginSurfaceHtml(html),
+    '<button data-plugin="Share" data-method="clearArticleKeys">Unshare</button>'
+  );
+});
+
+test('preparePluginSurfaceHtml strips handlers that need arguments and other inline events', () => {
+  const html = [
+    '<i onclick="Plugins.Note.edit(7)">note</i>',
+    '<img src="x.png" onerror="alert(1)">',
+  ].join('');
+
+  const prepared = endpoints.preparePluginSurfaceHtml(html);
+
+  assert.equal(prepared, '<i>note</i><img src="x.png">');
+});

@@ -150,6 +150,14 @@
 
           <v-window-item value="plugins">
             <PluginManagerPanel v-if="tab === 'plugins'" />
+
+            <!-- Plugin-provided preference sections (HOOK_PREFS_TAB_SECTION).
+                 The legacy shell hosted these inside the feeds and preferences
+                 tabs; the Vue dialog has no such tabs, so they live with the
+                 plugin controls. -->
+            <PluginSurface section="prefPrefsPrefsInside" />
+            <PluginSurface section="prefPrefsPrefsOutside" />
+            <PluginSurface section="prefFeedsPublishedGenerated" />
           </v-window-item>
         </v-window>
 
@@ -177,6 +185,7 @@ import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 import FilterEditorDialog from './FilterEditorDialog.vue';
 import PluginManagerPanel from './PluginManagerDialog.vue';
+import PluginSurface from '../PluginSurface.vue';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();

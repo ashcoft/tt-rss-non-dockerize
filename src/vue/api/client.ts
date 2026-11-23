@@ -430,6 +430,19 @@ class ApiClient {
     return this.wrap(() => endpoints.getHotkeyHelp(legacyBackend), '');
   }
 
+  /** Plugin-provided toolbar button HTML (main and action toolbar). */
+  async getPluginButtons(): Promise<ApiResponse<endpoints.PluginSurfaces>> {
+    return this.wrap(() => endpoints.getPluginButtons(legacyBackend), {
+      mainToolbar: '',
+      toolbar: '',
+    });
+  }
+
+  /** Plugin-provided preferences section HTML. */
+  async getPluginPrefsSection(section: string): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.getPluginPrefsSection(legacyBackend, section), '');
+  }
+
   // ============================================
   // Plugins
   // ============================================
