@@ -231,6 +231,10 @@
         </div>
       </div>
 
+      <div v-if="!hasMore && !loading && headlines.length > 0" class="headlines-end">
+        <a href="#" @click.prevent="emit('next-unread')">Click to open next unread feed.</a>
+      </div>
+
       <div v-if="hasMore && !loading" class="load-more">
         <v-btn
           color="primary"
@@ -281,6 +285,7 @@ const emit = defineEmits<{
   'auto-catchup': [ids: number[]];
   'load-more': [];
   'bulk-action': [action: string, ids: number[]];
+  'next-unread': [];
 }>();
 
 // Infinite scroll wiring (Phase 5)
@@ -731,6 +736,26 @@ const sanitize = (html: string): string =>
   display: flex;
   justify-content: center;
   padding: 16px;
+}
+
+.headlines-end {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: calc(100vh - 44px);
+  padding: 24px 16px;
+  color: rgba(var(--v-theme-on-background), 0.55);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.headlines-end a {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+.headlines-end a:hover {
+  text-decoration: underline;
 }
 
 /* Phone layout: compact rows without the right-hand metadata strip. */

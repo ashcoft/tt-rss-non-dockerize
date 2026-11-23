@@ -511,6 +511,40 @@ export const useFeedsStore = defineStore('feeds', () => {
     return saveOrder();
   }
 
+  /** Next feed/category with unread articles, wrapping around the tree. */
+  function nextUnreadFeed(): { id: number; isCat: boolean } | null {
+    const entries: Array<{ id: number; isCat: boolean; unread: number }> = [];
+
+    for (const id of [-4, -3, -1, -2, 0, -6]) {
+      entries.push({ id, isCat: false, unread: specialCounters.value[id] ?? 0 });
+    }
+    for (const category of categories.value) {
+      entries.push({ id: category.id, isCat: true, unread: category.unread ?? 0 });
+    }
+    for (const feed of feeds.value) {
+      entries.push({ id: feed.id, isCat: false, unread: feed.unread ?? 0 });
+    }
+
+    if (entries.length === 0) return null;
+
+    const currentIndex = entries.findIndex(
+      entry => entry.id === currentFeedId.value && entry.isCat === currentIsCat.value
+    );
+    const start = currentIndex >= 0 ? currentIndex + 1 : 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[(start + i) % entries.length];
+      if (
+        entry.unread > 0 &&
+        !(entry.id === currentFeedId.value && entry.isCat === currentIsCat.value)
+      ) {
+        return { id: entry.id, isCat: entry.isCat };
+      }
+    }
+
+    return null;
+  }
+
   /** Move a feed next to another feed in the same category, then persist. */
   async function moveFeedTo(feedId: number, targetFeedId: number): Promise<boolean> {
     if (feedId === targetFeedId) return false;
@@ -586,6 +620,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     saveOrder,
     moveFeed,
     moveFeedTo,
+    nextUnreadFeed,
     moveCategory,
     toggleCdmExpanded,
     toggleWideScreen,

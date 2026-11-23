@@ -84,6 +84,7 @@
             @action="handleHeadlineAction"
             @load-more="handleLoadMore"
             @bulk-action="handleBulkAction"
+            @next-unread="handleNextUnread"
           />
         </section>
 
@@ -736,6 +737,16 @@ const handleLoadMore = async () => {
   const isCat = feedsStore.currentIsCat;
   await headlinesStore.loadMore(feedId, isCat);
   await flushPendingAutoCatchup();
+};
+
+/** Open the next feed/category with unread articles, as the legacy end link does. */
+const handleNextUnread = async () => {
+  const next = feedsStore.nextUnreadFeed();
+  if (!next) {
+    showMessage('No unread feed found', 'info');
+    return;
+  }
+  await handleFeedSelect(next.id, next.isCat);
 };
 
 /** Open the headline under the cursor, if there is one. */
