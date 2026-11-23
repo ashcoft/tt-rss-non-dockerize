@@ -103,7 +103,7 @@ import 'altcha';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
-const emit = defineEmits<{ (e: 'loggedIn'): void }>();
+const emit = defineEmits<{ (e: 'logged-in'): void }>();
 
 const user = ref('');
 const password = ref('');
@@ -132,14 +132,18 @@ const submit = async () => {
     altcha: altchaPayload.value || undefined,
   });
   if (ok) {
-    emit('loggedIn');
+    emit('logged-in');
+    authStore.setLoggedIn(true);
   }
 };
 
 const submitOtp = async () => {
   if (!otp.value) return;
   const ok = await authStore.loginWithOtp(otp.value);
-  if (ok) emit('loggedIn');
+  if (ok) {
+    emit('logged-in');
+    authStore.setLoggedIn(true);
+  }
 };
 </script>
 
@@ -149,16 +153,24 @@ const submitOtp = async () => {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--v-theme-background, #f5f5f5);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(51, 153, 204, 0.1), transparent 38%),
+    radial-gradient(circle at 82% 82%, rgba(102, 187, 85, 0.1), transparent 38%),
+    #f4f4f4;
 }
 
 .login-card {
-  width: 360px;
+  width: 380px;
+  border-top: 3px solid #3399cc;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .login-title {
   display: flex;
   align-items: center;
+  color: #257aa7;
+  font-weight: 600;
 }
 
 .login-options {

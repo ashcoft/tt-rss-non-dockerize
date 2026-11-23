@@ -433,8 +433,12 @@ const openInitialFeed = async () => {
 
 // Auth flow (Phase 3)
 const onLoggedIn = async () => {
+  authStore.setLoggedIn(true);
   showMessage('Welcome back!', 'success');
-  await Promise.all([
+
+  // A failing secondary request (plugin hooks, update check) must not prevent
+  // the initial feed from opening.
+  const results = await Promise.allSettled([
     feedsStore.loadFeeds(),
     feedsStore.loadDisplayPrefs(),
     labelsStore.loadLabels(),
@@ -442,8 +446,22 @@ const onLoggedIn = async () => {
     loadPluginButtons(),
     loadUpdates(),
   ]);
+
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error('Startup load failed:', result.reason);
+    }
+  }
+
   applyThemePalette();
-  await openInitialFeed();
+
+  try {
+    await openInitialFeed();
+  } catch (err) {
+    console.error('Could not open the initial feed:', err);
+    showMessage('Could not load headlines', 'error');
+  }
+
   startPolling();
 };
 
@@ -1097,7 +1115,8 @@ onMounted(async () => {
   const authenticated = await api.checkSession();
   if (authenticated) {
     authStore.setLoggedIn(true);
-    await Promise.all([
+
+    const results = await Promise.allSettled([
       feedsStore.loadFeeds(),
       feedsStore.loadDisplayPrefs(),
       labelsStore.loadLabels(),
@@ -1105,8 +1124,22 @@ onMounted(async () => {
       loadPluginButtons(),
       loadUpdates(),
     ]);
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Startup load failed:', result.reason);
+      }
+    }
+
     applyThemePalette();
-    await openInitialFeed();
+
+    try {
+      await openInitialFeed();
+    } catch (err) {
+      console.error('Could not open the initial feed:', err);
+      showMessage('Could not load headlines', 'error');
+    }
+
     startPolling();
   }
 });

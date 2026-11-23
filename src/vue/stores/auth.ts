@@ -39,7 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
         return false;
       }
       if (response.status === 0) {
-        loggedIn.value = true;
         username.value = user;
         pendingCredentials.value = null;
         return true;
@@ -71,7 +70,6 @@ export const useAuthStore = defineStore('auth', () => {
         otp,
       });
       if (response.status === 0) {
-        loggedIn.value = true;
         username.value = pending.user;
         otpRequired.value = false;
         pendingCredentials.value = null;

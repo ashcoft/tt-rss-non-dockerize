@@ -127,7 +127,7 @@ export default function globalSetup(): void {
     ['CDM_EXPANDED', '1'],
     ['VFEED_GROUP_BY_FEED', '0'],
     ['DEBUG_HEADLINE_IDS', '0'],
-    ['_ENABLED_PLUGINS', 'note'],
+    ['_ENABLED_PLUGINS', 'auth_internal,note'],
   ];
   const names = pinnedPrefs.map(([name]) => `'${name}'`).join(', ');
   const values = pinnedPrefs

@@ -130,6 +130,7 @@
             >
               <v-icon size="16">mdi-circle-outline</v-icon>
             </button>
+            <span v-if="!headline.is_read" class="unread-dot" title="Unread"></span>
           </div>
 
           <!-- Title, author, labels and the inline excerpt. -->
@@ -589,7 +590,7 @@ const sanitize = (html: string): string =>
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: rgb(var(--v-theme-on-background)) !important;
+  color: rgb(var(--v-theme-on-background));
   font-weight: 600;
   text-decoration: none;
   text-overflow: ellipsis;
@@ -599,9 +600,28 @@ const sanitize = (html: string): string =>
   text-decoration: underline;
 }
 
-.headline-read .hl-title-link {
+/* The legacy theme styles `.hl div.title a` directly; this selector has
+   enough specificity to keep read rows visibly muted. */
+.headlines-list-content .hl-title .hl-title-link {
+  color: rgb(var(--v-theme-on-background));
+}
+
+.headlines-list-content .headline-read .hl-title .hl-title-link {
+  color: rgba(var(--v-theme-on-background), 0.5);
   font-weight: 400;
-  color: rgba(var(--v-theme-on-background), 0.72);
+}
+
+.headlines-list-content > .v-list-item.headline-read {
+  background: rgba(var(--v-theme-on-background), 0.035);
+}
+
+.unread-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
 }
 
 .headline-author {
