@@ -1943,3 +1943,71 @@ export async function getPluginPrefsTabs(backend: LegacyBackend): Promise<Plugin
     };
   });
 }
+
+/** Clone one or more filters. */
+export async function cloneFilter(
+  backend: LegacyBackend,
+  ids: number[],
+  newTitle: string
+): Promise<void> {
+  await backend.call('Pref_Filters', 'clone', {
+    ids: ids.join(','),
+    new_filter_title: newTitle,
+  });
+}
+
+/** Persist the filter order; the handler expects the legacy tree payload. */
+export async function saveFilterOrder(backend: LegacyBackend, ids: number[]): Promise<void> {
+  const payload = JSON.stringify({
+    items: [{ items: ids.map((id) => ({ _reference: `FILTER:${id}` })) }],
+  });
+  await backend.call('Pref_Filters', 'savefilterorder', { payload });
+}
+
+export async function resetFilterOrder(backend: LegacyBackend): Promise<void> {
+  await backend.call('Pref_Filters', 'filtersortreset');
+}
+
+export interface FilterTestItem {
+  title: string;
+  feed_title: string;
+  date: string;
+  content_preview: string;
+  rules: string[];
+}
+
+export interface FilterTestResult {
+  pre_filtering_count: number;
+  items: FilterTestItem[];
+}
+
+/** Run a filter against recent articles without saving it. */
+export async function testFilter(
+  backend: LegacyBackend,
+  rules: Array<Record<string, unknown>>,
+  matchAny: boolean,
+  inverse: boolean,
+  offset = 0,
+  limit = 100
+): Promise<FilterTestResult> {
+  const response = await backend.call('Pref_Filters', 'testFilterDo', {
+    offset,
+    limit,
+    match_any_rule: checkboxValue(matchAny),
+    inverse: checkboxValue(inverse),
+    rule: rules.map((rule) => JSON.stringify(rule)),
+  });
+  const body = requireBody(response, 'Pref_Filters/testFilterDo');
+  const items = expectArray(body.items, 'Pref_Filters/testFilterDo.items').map((raw) => {
+    const item = expectObject(raw, 'Pref_Filters/testFilterDo.item');
+    return {
+      title: asString(item.title),
+      feed_title: asString(item.feed_title),
+      date: asString(item.date),
+      content_preview: asString(item.content_preview),
+      rules: Array.isArray(item.rules) ? item.rules.map((rule) => asString(rule)) : [],
+    };
+  });
+
+  return { pre_filtering_count: asNumber(body.pre_filtering_count), items };
+}

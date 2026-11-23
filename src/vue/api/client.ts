@@ -755,6 +755,38 @@ class ApiClient {
     return this.wrap(() => endpoints.getPluginPrefsTabs(legacyBackend), []);
   }
 
+  async cloneFilter(ids: number[], newTitle: string): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.cloneFilter(legacyBackend, ids, newTitle);
+      return true;
+    }, false);
+  }
+
+  async saveFilterOrder(ids: number[]): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.saveFilterOrder(legacyBackend, ids);
+      return true;
+    }, false);
+  }
+
+  async resetFilterOrder(): Promise<ApiResponse<boolean>> {
+    return this.wrap(async () => {
+      await endpoints.resetFilterOrder(legacyBackend);
+      return true;
+    }, false);
+  }
+
+  async testFilter(
+    rules: Array<Record<string, unknown>>,
+    matchAny: boolean,
+    inverse: boolean
+  ): Promise<ApiResponse<endpoints.FilterTestResult>> {
+    return this.wrap(() => endpoints.testFilter(legacyBackend, rules, matchAny, inverse), {
+      pre_filtering_count: 0,
+      items: [],
+    });
+  }
+
   // ============================================
   // Internal
   // ============================================

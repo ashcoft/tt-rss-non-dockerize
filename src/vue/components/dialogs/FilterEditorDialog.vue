@@ -159,9 +159,43 @@
         </v-alert>
       </v-card-text>
       <v-card-actions>
+        <v-btn variant="tonal" :loading="testLoading" :disabled="!details" @click="runTest">
+          Test
+        </v-btn>
         <v-spacer />
         <v-btn @click="closeDialog">Cancel</v-btn>
         <v-btn color="primary" :loading="busy" :disabled="!canSave" @click="save">Save</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="testOpen" max-width="760">
+    <v-card>
+      <v-card-title>Test filter</v-card-title>
+      <v-card-text>
+        <p class="text-caption text-grey">
+          Scanned {{ testResult.pre_filtering_count }} recent article(s) and found
+          {{ testResult.items.length }} match(es).
+        </p>
+        <v-list density="compact" class="filter-test-results">
+          <v-list-item v-for="(item, index) in testResult.items" :key="index">
+            <v-list-item-title>
+              <span v-html="sanitizeHtml(item.title)" />
+            </v-list-item-title>
+            <v-list-item-subtitle>{{ item.feed_title }} · {{ item.date }}</v-list-item-subtitle>
+            <div class="text-caption" v-html="sanitizeHtml(item.content_preview)" />
+            <div v-if="item.rules.length" class="text-caption text-grey">
+              {{ item.rules.join('; ') }}
+            </div>
+          </v-list-item>
+          <v-list-item v-if="testResult.items.length === 0">
+            <v-list-item-title>No recent articles match this filter.</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn @click="testOpen = false">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -169,8 +203,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import DOMPurify from 'dompurify';
 import api from '../../api/client';
 import type { FilterAction, FilterDetails, FilterRule } from '../../api/client';
+import type { FilterTestResult } from '../../api/legacyEndpoints';
 import { useFeedsStore } from '../../stores';
 import { runDetached } from '../../utils/runDetached';
 
@@ -195,6 +231,10 @@ const busy = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
 const details = ref<FilterDetails | null>(null);
+
+const testOpen = ref(false);
+const testLoading = ref(false);
+const testResult = ref<FilterTestResult>({ pre_filtering_count: 0, items: [] });
 
 const isNew = computed(() => !props.filterId);
 const canSave = computed(() => (details.value?.title.trim().length ?? 0) > 0);
@@ -291,6 +331,30 @@ function changeAction(action: FilterAction, actionId: number): void {
   action.action_id = actionId;
   action.action_param = '';
   action.action_param_label = '';
+}
+
+function sanitizeHtml(value: string): string {
+  return DOMPurify.sanitize(value);
+}
+
+async function runTest(): Promise<void> {
+  if (!details.value) return;
+  testLoading.value = true;
+  try {
+    const response = await api.testFilter(
+      details.value.rules as unknown as Array<Record<string, unknown>>,
+      details.value.match_any_rule,
+      details.value.inverse
+    );
+    if (response.status === 0) {
+      testResult.value = response.content;
+      testOpen.value = true;
+    } else {
+      notify(response.error ?? 'Failed to test the filter', 'error');
+    }
+  } finally {
+    testLoading.value = false;
+  }
 }
 
 async function save(): Promise<void> {

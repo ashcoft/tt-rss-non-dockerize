@@ -77,7 +77,15 @@
           </v-window-item>
 
           <v-window-item value="filters">
-            <div class="d-flex justify-end mb-2">
+            <div class="d-flex justify-end ga-2 mb-2">
+              <v-btn
+                size="small"
+                variant="text"
+                prepend-icon="mdi-sort-variant"
+                @click="runDetached(resetFilterOrder(), 'reset filter order')"
+              >
+                Reset order
+              </v-btn>
               <v-btn
                 size="small"
                 prepend-icon="mdi-plus"
@@ -91,12 +99,35 @@
               <v-progress-circular indeterminate color="primary" />
             </div>
             <v-list v-else lines="two">
-              <v-list-item v-for="filter in filters" :key="filterId(filter)">
+              <v-list-item v-for="(filter, index) in filters" :key="filterId(filter)">
                 <v-list-item-title>{{ filterTitle(filter) }}</v-list-item-title>
                 <v-list-item-subtitle>
                   {{ filter.enabled !== false ? 'Enabled' : 'Disabled' }}
                 </v-list-item-subtitle>
                 <template #append>
+                  <v-btn
+                    icon="mdi-arrow-up"
+                    size="small"
+                    variant="text"
+                    title="Move filter up"
+                    :disabled="index === 0"
+                    @click="moveFilter(index, -1)"
+                  />
+                  <v-btn
+                    icon="mdi-arrow-down"
+                    size="small"
+                    variant="text"
+                    title="Move filter down"
+                    :disabled="index === filters.length - 1"
+                    @click="moveFilter(index, 1)"
+                  />
+                  <v-btn
+                    icon="mdi-content-copy"
+                    size="small"
+                    variant="text"
+                    title="Clone filter"
+                    @click="cloneFilter(filter)"
+                  />
                   <v-btn
                     icon="mdi-pencil"
                     size="small"
@@ -397,6 +428,45 @@ function openFilterEditor(id: number | null): void {
 function onFilterSaved(): void {
   notify('Filter saved');
   runDetached(loadFilters(), 'reload filters');
+}
+
+async function moveFilter(index: number, delta: number): Promise<void> {
+  const target = index + delta;
+  if (target < 0 || target >= filters.value.length) return;
+
+  const next = [...filters.value];
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  filters.value = next;
+
+  const response = await api.saveFilterOrder(next.map(filterId));
+  if (response.status !== 0) {
+    notify(response.error ?? 'Failed to save the filter order', 'error');
+    await loadFilters();
+  }
+}
+
+async function cloneFilter(filter: Record<string, unknown>): Promise<void> {
+  const title = window.prompt('New filter name', `Clone of ${filterTitle(filter)}`);
+  if (!title) return;
+
+  const response = await api.cloneFilter([filterId(filter)], title);
+  if (response.status === 0) {
+    notify('Filter cloned');
+    await loadFilters();
+  } else {
+    notify(response.error ?? 'Failed to clone the filter', 'error');
+  }
+}
+
+async function resetFilterOrder(): Promise<void> {
+  const response = await api.resetFilterOrder();
+  if (response.status === 0) {
+    notify('Filter order reset');
+    await loadFilters();
+  } else {
+    notify(response.error ?? 'Failed to reset the filter order', 'error');
+  }
 }
 
 async function changePassword(): Promise<void> {
