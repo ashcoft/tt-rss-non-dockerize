@@ -4,7 +4,7 @@
 
 Tiny Tiny RSS (tt-rss), a self-hosted web feed reader. PHP backend
 (`backend.php` dispatches `op`/`method` to `classes/*.php` handlers) with a
-frontend that is mid-migration from Dojo 1.x to Vue 3 + Vuetify + Pinia.
+Vue 3 + Vuetify + Pinia frontend; the Dojo 1.x client has been removed.
 
 ## Frontend build and checks
 
@@ -110,3 +110,8 @@ Two behaviours of the SDK are easy to get wrong:
 libraries (`lib/dojo`, `lib/dijit`, `lib/dojox`, `js/*.js` AMD modules) have
 been **deleted**: `index.php` and `prefs.php` serve the Vue shell only, and a
 production build (`pnpm run build`) is required.
+
+All legacy `Pref_*` screens have Vue hosts (account, users, system, feed
+batch/sharing/maintenance and plugin settings), and the plugin toolbar/prefs
+surfaces render through `PluginSurface`. See `VITE_MIGRATION.md` for the
+remaining plugin-specific limitations.
