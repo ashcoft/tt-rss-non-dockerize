@@ -109,9 +109,14 @@ async function unshare(): Promise<void> {
 
 async function copyUrl(): Promise<void> {
   if (!url.value) return;
-  await navigator.clipboard.writeText(url.value);
-  message.value = 'Copied to the clipboard.';
-  messageType.value = 'success';
+  try {
+    await navigator.clipboard.writeText(url.value);
+    message.value = 'Copied to the clipboard.';
+    messageType.value = 'success';
+  } catch {
+    message.value = 'Could not copy the URL; select it manually.';
+    messageType.value = 'error';
+  }
 }
 
 function close(): void {
