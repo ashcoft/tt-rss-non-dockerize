@@ -122,6 +122,12 @@
             class="plugin-toolbar-buttons"
           />
           <v-divider v-if="pluginToolbarHtml" />
+          <PluginSurface
+            v-if="pluginActionHtml"
+            :html="pluginActionHtml"
+            class="plugin-action-items"
+          />
+          <v-divider v-if="pluginActionHtml" />
           <v-list-item
             v-for="item in actionOptions"
             :key="item.value"
@@ -154,6 +160,10 @@ interface Props {
   pluginMainHtml?: string;
   /** Plugin HTML for HOOK_TOOLBAR_BUTTON. */
   pluginToolbarHtml?: string;
+  /** Plugin HTML for HOOK_ACTION_ITEM. */
+  pluginActionHtml?: string;
+  /** Extra sort options from HOOK_HEADLINES_CUSTOM_SORT_MAP. */
+  customSortMap?: Record<string, string>;
   /** Link to a newer core release, when one is available. */
   updateUrl?: string;
   /** True when one or more local plugins have updates. */
@@ -170,6 +180,8 @@ const props = withDefaults(defineProps<Props>(), {
   modelOrderBy: 'default',
   pluginMainHtml: '',
   pluginToolbarHtml: '',
+  pluginActionHtml: '',
+  customSortMap: () => ({}),
   updateUrl: '',
   pluginUpdates: false,
   cdmExpanded: true,
@@ -202,12 +214,13 @@ const selectOptions = [
   { title: 'None', value: 'none' },
 ];
 
-const sortOptions = [
+const sortOptions = computed(() => [
   { title: 'Default', value: 'default' },
   { title: 'Newest first', value: 'feed_dates' },
   { title: 'Oldest first', value: 'date_reverse' },
   { title: 'Title', value: 'title' },
-];
+  ...Object.entries(props.customSortMap ?? {}).map(([value, title]) => ({ value, title })),
+]);
 
 // Mirrors the legacy actions menu (index.php #toolbar .action-button). Labels
 // that depend on state are computed so they describe the next action.
@@ -248,7 +261,7 @@ const catchupOptions = [
 
 // Computed
 const sortLabel = computed(() => {
-  return sortOptions.find(o => o.value === sortBy.value)?.title ?? 'Default';
+  return sortOptions.value.find(o => o.value === sortBy.value)?.title ?? 'Default';
 });
 
 // Methods

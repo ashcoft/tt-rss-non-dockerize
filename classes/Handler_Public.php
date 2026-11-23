@@ -365,8 +365,29 @@ class Handler_Public extends Handler {
 		header('HTTP/1.1 403 Forbidden');
 	}
 
+    /** Altcha challenge consumed by the login widget. */
+    function loginchallenge(): void {
+            header('Content-Type: application/json');
+            print json_encode(AltchaChallenge::create());
+    }
+
+    /** Legacy self-hosted proof-of-work fallback for clients without Altcha. */
+    function loginpowchallenge(): void {
+            header('Content-Type: application/json');
+            print json_encode(LoginChallenge::issue());
+    }
+
 	function login(): void {
 		if (!Config::get(Config::SINGLE_USER_MODE)) {
+
+			$challenge = LoginChallenge::verify_request();
+
+			if (!$challenge['ok']) {
+				http_response_code(429);
+				header('Content-Type: text/plain; charset=utf-8');
+				print $challenge['error'];
+				return;
+			}
 
 			$login = clean($_POST["login"]);
 			$password = clean($_POST["password"]);
@@ -382,6 +403,7 @@ class Handler_Public extends Handler {
 			}
 
 			if (UserHelper::authenticate($login, $password)) {
+				LoginChallenge::clear_failures();
 				$_POST["password"] = "";
 
 				$_SESSION["ref_schema_version"] = Config::get_schema_version();
@@ -398,6 +420,8 @@ class Handler_Public extends Handler {
 					$_SESSION["profile"] = $profile_obj ? $profile : null;
 				}
 			} else {
+
+				LoginChallenge::record_failure();
 
 				// start an empty session to deliver login error message
 				if (session_status() != PHP_SESSION_ACTIVE)

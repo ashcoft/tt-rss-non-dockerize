@@ -8,8 +8,27 @@
       <v-card-subtitle>Sign in to continue</v-card-subtitle>
 
       <v-card-text>
-        <v-form @submit.prevent="submit">
+        <v-form @submit.prevent="authStore.otpRequired ? submitOtp() : submit()">
+          <!-- Honeypot: hidden from humans, attractive to bots. -->
+          <input
+            v-model="website"
+            class="login-honeypot"
+            type="text"
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+            aria-hidden="true"
+          />
+          <altcha-widget
+            v-if="!authStore.otpRequired"
+            class="altcha-widget"
+            challenge="/public.php?op=loginchallenge"
+            name="altcha"
+            auto="onload"
+            @statechange="onAltchaStateChange"
+          />
           <v-text-field
+            v-if="!authStore.otpRequired"
             v-model="user"
             label="Username"
             prepend-inner-icon="mdi-account"
@@ -18,6 +37,7 @@
             required
           />
           <v-text-field
+            v-if="!authStore.otpRequired"
             v-model="password"
             label="Password"
             prepend-inner-icon="mdi-lock"
@@ -26,12 +46,25 @@
             :disabled="authStore.loggingIn"
             required
           />
-          <div class="login-options">
+          <v-text-field
+            v-if="authStore.otpRequired"
+            v-model="otp"
+            label="Verification code (OTP)"
+            prepend-inner-icon="mdi-shield-key"
+            autocomplete="one-time-code"
+            :disabled="authStore.loggingIn"
+            required
+          />
+          <div v-if="!authStore.otpRequired" class="login-options">
             <v-checkbox v-model="rememberMe" label="Remember me" density="compact" hide-details />
             <v-checkbox v-model="safeMode" label="Safe mode" density="compact" hide-details />
             <v-checkbox v-model="bwLimit" label="Use less traffic" density="compact" hide-details />
           </div>
-          <a class="forgot-link" href="public.php?op=forgotpass">I forgot my password</a>
+          <a
+            v-if="!authStore.otpRequired"
+            class="forgot-link"
+            href="public.php?op=forgotpass"
+          >I forgot my password</a>
           <v-alert
             v-if="authStore.error"
             type="error"
@@ -47,7 +80,16 @@
             block
             :loading="authStore.loggingIn"
           >
-            Log in
+            {{ authStore.otpRequired ? 'Continue' : 'Log in' }}
+          </v-btn>
+          <v-btn
+            v-if="authStore.otpRequired"
+            variant="text"
+            block
+            class="mt-1"
+            @click="authStore.cancelOtp()"
+          >
+            Back
           </v-btn>
         </v-form>
       </v-card-text>
@@ -57,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import 'altcha';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
@@ -67,6 +110,17 @@ const password = ref('');
 const rememberMe = ref(false);
 const safeMode = ref(false);
 const bwLimit = ref(false);
+const otp = ref('');
+const website = ref('');
+const altchaPayload = ref('');
+
+const onAltchaStateChange = (event: CustomEvent<{ state?: string; payload?: string }>) => {
+  if (event.detail?.state === 'verified' && event.detail.payload) {
+    altchaPayload.value = event.detail.payload;
+  } else {
+    altchaPayload.value = '';
+  }
+};
 
 const submit = async () => {
   if (!user.value || !password.value) return;
@@ -74,10 +128,18 @@ const submit = async () => {
     rememberMe: rememberMe.value,
     safeMode: safeMode.value,
     bwLimit: bwLimit.value,
+    honeypot: website.value,
+    altcha: altchaPayload.value || undefined,
   });
   if (ok) {
     emit('loggedIn');
   }
+};
+
+const submitOtp = async () => {
+  if (!otp.value) return;
+  const ok = await authStore.loginWithOtp(otp.value);
+  if (ok) emit('loggedIn');
 };
 </script>
 
@@ -116,5 +178,18 @@ const submit = async () => {
 
 .forgot-link:hover {
   text-decoration: underline;
+}
+
+.altcha-widget {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.login-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 </style>

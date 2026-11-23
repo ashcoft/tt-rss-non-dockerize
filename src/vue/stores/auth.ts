@@ -11,6 +11,12 @@ export const useAuthStore = defineStore('auth', () => {
   const username = ref('');
   const loggingIn = ref(false);
   const error = ref<string | null>(null);
+  const otpRequired = ref(false);
+  const pendingCredentials = ref<{
+    user: string;
+    password: string;
+    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean; honeypot?: string; altcha?: string };
+  } | null>(null);
 
   /**
    * Attempt to sign in. The legacy handler answers with a redirect and the
@@ -20,15 +26,22 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(
     user: string,
     password: string,
-    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean } = {}
+    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean; honeypot?: string; altcha?: string } = {}
   ): Promise<boolean> {
     loggingIn.value = true;
     error.value = null;
+    otpRequired.value = false;
     try {
       const response = await api.login(user, password, options);
+      if (response.otpRequired) {
+        otpRequired.value = true;
+        pendingCredentials.value = { user, password, options };
+        return false;
+      }
       if (response.status === 0) {
         loggedIn.value = true;
         username.value = user;
+        pendingCredentials.value = null;
         return true;
       }
       error.value = response.error ?? 'Invalid username or password';
@@ -39,6 +52,46 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       loggingIn.value = false;
     }
+  }
+
+  /** Finish a login that stopped at the auth_internal OTP step. */
+  async function loginWithOtp(otp: string): Promise<boolean> {
+    const pending = pendingCredentials.value;
+    if (!pending) {
+      error.value = 'Login session expired; enter your password again.';
+      otpRequired.value = false;
+      return false;
+    }
+
+    loggingIn.value = true;
+    error.value = null;
+    try {
+      const response = await api.login(pending.user, pending.password, {
+        ...pending.options,
+        otp,
+      });
+      if (response.status === 0) {
+        loggedIn.value = true;
+        username.value = pending.user;
+        otpRequired.value = false;
+        pendingCredentials.value = null;
+        return true;
+      }
+      error.value = response.error ?? 'Invalid verification code';
+      return false;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Login failed';
+      return false;
+    } finally {
+      loggingIn.value = false;
+    }
+  }
+
+  /** Leave the OTP step and return to the credential form. */
+  function cancelOtp(): void {
+    otpRequired.value = false;
+    pendingCredentials.value = null;
+    error.value = null;
   }
 
   async function logout(): Promise<void> {
@@ -67,7 +120,21 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = '';
     error.value = null;
     loggingIn.value = false;
+    otpRequired.value = false;
+    pendingCredentials.value = null;
   }
 
-  return { loggedIn, username, loggingIn, error, login, logout, setLoggedIn, reset };
+  return {
+    loggedIn,
+    username,
+    loggingIn,
+    error,
+    otpRequired,
+    login,
+    loginWithOtp,
+    cancelOtp,
+    logout,
+    setLoggedIn,
+    reset,
+  };
 });

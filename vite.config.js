@@ -34,7 +34,13 @@ export default defineConfig(({ command }) => ({
   
   // Plugins
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag === 'altcha-widget',
+        },
+      },
+    }),
     vuetify({ autoImport: true }),
   ],
   

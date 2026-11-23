@@ -24,6 +24,8 @@ export interface ApiResponse<T = unknown> {
   status: number;
   content: T;
   error?: string;
+  /** Set when login stopped at the auth_internal OTP step. */
+  otpRequired?: boolean;
 }
 
 export type {
@@ -39,6 +41,59 @@ export type {
   PluginsList,
   AdaptedCounters,
 } from './legacyEndpoints';
+
+/**
+ * Solve the server's SHA-256 proof-of-work challenge. The loop yields on every
+ * digest, so the login button stays responsive while it runs.
+ */
+async function solveProofOfWork(challenge: string, difficulty: number): Promise<number> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('This browser does not support the login security check.');
+  }
+
+  const encoder = new TextEncoder();
+  const bitsRequired = Math.max(12, Math.min(24, Number(difficulty) || 18));
+  const maxNonce = 10_000_000;
+
+  for (let nonce = 0; nonce < maxNonce; nonce++) {
+    const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`${challenge}:${nonce}`));
+    const bytes = new Uint8Array(digest);
+    let bits = 0;
+
+    for (const byte of bytes) {
+      if (byte === 0) {
+        bits += 8;
+        continue;
+      }
+      bits += Math.clz32(byte) - 24;
+      break;
+    }
+
+    if (bits >= bitsRequired) return nonce;
+  }
+
+  throw new Error('Login security check timed out. Reload and try again.');
+}
+
+/** Fetch and solve one login challenge. */
+async function createLoginProof(): Promise<{ challenge: string; nonce: string }> {
+  const response = await fetch('/public.php?op=loginpowchallenge', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Could not start the login security check.');
+  }
+
+  const data = (await response.json()) as { challenge?: string; difficulty?: number };
+  if (!data.challenge) {
+    throw new Error('Could not start the login security check.');
+  }
+
+  const nonce = await solveProofOfWork(data.challenge, Number(data.difficulty));
+  return { challenge: data.challenge, nonce: String(nonce) };
+}
 
 class ApiClient {
   /**
@@ -71,12 +126,40 @@ class ApiClient {
   async login(
     username: string,
     password: string,
-    options: { rememberMe?: boolean; safeMode?: boolean; bwLimit?: boolean } = {}
+    options: {
+      rememberMe?: boolean;
+      safeMode?: boolean;
+      bwLimit?: boolean;
+      otp?: string;
+      honeypot?: string;
+      altcha?: string;
+    } = {}
   ): Promise<ApiResponse<boolean>> {
     const body = new URLSearchParams({ login: username, password });
     if (options.rememberMe) body.set('remember_me', '1');
     if (options.safeMode) body.set('safe_mode', '1');
     if (options.bwLimit) body.set('bw_limit', '1');
+    if (options.otp) body.set('otp', options.otp);
+    if (options.honeypot) body.set('website', options.honeypot);
+    if (options.altcha) body.set('altcha', options.altcha);
+
+    // The Altcha widget is the primary bot check. Fall back to the built-in
+    // proof-of-work only when the widget has not produced a payload.
+    // The OTP step is already gated by the second factor; the server skips
+    // the challenge check when an OTP is present.
+    if (!options.otp && !options.altcha) {
+      try {
+        const proof = await createLoginProof();
+        body.set('challenge', proof.challenge);
+        body.set('nonce', proof.nonce);
+      } catch (err) {
+        return {
+          status: 1,
+          content: false,
+          error: err instanceof Error ? err.message : 'Login security check failed.',
+        };
+      }
+    }
     const response = await fetch('/public.php?op=login', {
       method: 'POST',
       credentials: 'include',
@@ -86,6 +169,13 @@ class ApiClient {
 
     if (!response.ok) {
       return { status: 1, content: false, error: `Login failed (HTTP ${response.status}).` };
+    }
+
+    // auth_internal answers with an OTP form instead of a redirect when the
+    // account has two-factor auth enabled. Do not treat that as a success.
+    const text = await response.text();
+    if (/class=["'][^"']*otpform|name=["']otp["']/.test(text)) {
+      return { status: 2, content: false, otpRequired: true };
     }
 
     try {
@@ -404,10 +494,11 @@ class ApiClient {
   }
 
   async getSearchOptions(): Promise<
-    ApiResponse<{ showLanguage: boolean; defaultLanguage: string; allLanguages: string[] }>
+    ApiResponse<{ showLanguage: boolean; showSyntaxHelp: boolean; defaultLanguage: string; allLanguages: string[] }>
   > {
     return this.wrap(() => endpoints.getSearchOptions(legacyBackend), {
       showLanguage: false,
+      showSyntaxHelp: true,
       defaultLanguage: 'english',
       allLanguages: [],
     });
@@ -460,6 +551,9 @@ class ApiClient {
     return this.wrap(() => endpoints.getPluginButtons(legacyBackend), {
       mainToolbar: '',
       toolbar: '',
+      feedTree: '',
+      actionItems: '',
+      customSortMap: {},
     });
   }
 

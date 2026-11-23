@@ -606,7 +606,7 @@ export async function getInitParams(
  */
 export async function getSearchOptions(
   backend: LegacyBackend
-): Promise<{ showLanguage: boolean; defaultLanguage: string; allLanguages: string[] }> {
+): Promise<{ showLanguage: boolean; showSyntaxHelp: boolean; defaultLanguage: string; allLanguages: string[] }> {
   const response = await backend.call('Feeds', 'search');
   const body = requireBody(response, 'Feeds/search');
   const allLanguages = Array.isArray(body.all_languages)
@@ -616,6 +616,7 @@ export async function getSearchOptions(
 
   return {
     showLanguage: body.show_language === true,
+    showSyntaxHelp: body.show_syntax_help === true,
     // Never hand back an empty language; fall back to the first available one
     // so a search cannot silently return nothing.
     defaultLanguage: defaultLanguage || allLanguages[0] || 'english',
@@ -1363,6 +1364,12 @@ export interface PluginSurfaces {
   mainToolbar: string;
   /** HTML for HOOK_TOOLBAR_BUTTON (the toolbar action menu). */
   toolbar: string;
+  /** HTML for HOOK_FEED_TREE (above the feed tree). */
+  feedTree: string;
+  /** HTML for HOOK_ACTION_ITEM (inside the actions menu). */
+  actionItems: string;
+  /** Extra sort options from HOOK_HEADLINES_CUSTOM_SORT_MAP. */
+  customSortMap: Record<string, string>;
 }
 
 /**
@@ -1377,9 +1384,19 @@ export async function getPluginButtons(backend: LegacyBackend): Promise<PluginSu
   const response = await backend.call('RPC', 'getPluginButtons');
   const body = requireBody(response, 'RPC/getPluginButtons');
 
+  const customSortMap: Record<string, string> = {};
+  if (body.custom_sort_map && typeof body.custom_sort_map === 'object') {
+    for (const [key, value] of Object.entries(body.custom_sort_map as Record<string, unknown>)) {
+      customSortMap[key] = asString(value);
+    }
+  }
+
   return {
     mainToolbar: asString(body.main_toolbar),
     toolbar: asString(body.toolbar),
+    feedTree: asString(body.feed_tree),
+    actionItems: asString(body.action_items),
+    customSortMap,
   };
 }
 

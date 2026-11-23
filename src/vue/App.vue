@@ -6,6 +6,7 @@
     <div v-else class="ttrss-app" :class="{ 'wide-screen': feedsStore.wideScreen }">
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
       <aside class="sidebar" :class="{ open: sidebarOpen }" :style="sidebarStyle">
+        <PluginSurface v-if="pluginFeedTreeHtml" :html="pluginFeedTreeHtml" class="plugin-feed-tree" />
         <FeedTree
           :feeds="feedsStore.feeds"
           :categories="feedsStore.categories"
@@ -35,6 +36,8 @@
             :model-order-by="headlinesStore.orderBy"
             :plugin-main-html="pluginMainHtml"
             :plugin-toolbar-html="pluginToolbarHtml"
+            :plugin-action-html="pluginActionHtml"
+            :custom-sort-map="pluginCustomSortMap"
             :update-url="updateUrl"
             :plugin-updates="pluginUpdatesAvailable"
             :cdm-expanded="feedsStore.cdmExpanded"
@@ -142,6 +145,7 @@
             class="mt-3"
           />
           <a
+            v-if="showSearchSyntaxHelp"
             class="search-syntax-link"
             href="https://tt-rss.org/wiki/SearchSyntax"
             target="_blank"
@@ -325,8 +329,12 @@ const feedSearchResults = computed(() => {
   return query ? items.filter(item => item.title.toLowerCase().includes(query)) : items;
 });
 const searchLanguages = ref<string[]>([]);
+const showSearchSyntaxHelp = ref(true);
 const pluginMainHtml = ref('');
 const pluginToolbarHtml = ref('');
+const pluginFeedTreeHtml = ref('');
+const pluginActionHtml = ref('');
+const pluginCustomSortMap = ref<Record<string, string>>({});
 const updateUrl = ref('');
 const pluginUpdatesAvailable = ref(false);
 
@@ -445,6 +453,9 @@ const loadPluginButtons = async () => {
   if (response.status === 0) {
     pluginMainHtml.value = response.content.mainToolbar;
     pluginToolbarHtml.value = response.content.toolbar;
+    pluginFeedTreeHtml.value = response.content.feedTree;
+    pluginActionHtml.value = response.content.actionItems;
+    pluginCustomSortMap.value = response.content.customSortMap;
   }
 };
 
@@ -459,8 +470,9 @@ const loadUpdates = async () => {
 
 /** Fetch the search stemming languages once the session is available. */
 const loadSearchLanguages = async () => {
-  const { allLanguages } = await headlinesStore.loadSearchOptions();
+  const { allLanguages, showSyntaxHelp } = await headlinesStore.loadSearchOptions();
   searchLanguages.value = allLanguages;
+  showSearchSyntaxHelp.value = showSyntaxHelp;
 };
 
 const onLogout = async () => {

@@ -1437,6 +1437,9 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
   const payload = {
     main_toolbar: '<i onclick="Plugins.Toggle_Sidebar.toggle()">menu</i>',
     toolbar: '<button onclick="Plugins.Foo.bar()">Bar</button>',
+    feed_tree: '<div class="plugin-tree">Tree</div>',
+    action_items: '<button onclick="Plugins.Foo.baz()">Baz</button>',
+    custom_sort_map: { relevance: 'Relevance' },
   };
   const calls = stubFetch([{ text: JSON.stringify(payload) }]);
   const backend = new LegacyBackend();
@@ -1449,6 +1452,9 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
   assert.deepEqual(surfaces, {
     mainToolbar: payload.main_toolbar,
     toolbar: payload.toolbar,
+    feedTree: payload.feed_tree,
+    actionItems: payload.action_items,
+    customSortMap: payload.custom_sort_map,
   });
 });
 

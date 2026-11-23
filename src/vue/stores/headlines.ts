@@ -618,16 +618,17 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   }
 
   /** Load the available search languages from the backend. */
-  async function loadSearchOptions(): Promise<{ defaultLanguage: string; allLanguages: string[] }> {
+  async function loadSearchOptions(): Promise<{ defaultLanguage: string; allLanguages: string[]; showSyntaxHelp: boolean }> {
     const response = await api.getSearchOptions();
     if (response.status === 0) {
       searchLanguage.value = response.content.defaultLanguage;
       return {
         defaultLanguage: response.content.defaultLanguage,
         allLanguages: response.content.allLanguages,
+        showSyntaxHelp: response.content.showSyntaxHelp,
       };
     }
-    return { defaultLanguage: searchLanguage.value, allLanguages: [] };
+    return { defaultLanguage: searchLanguage.value, allLanguages: [], showSyntaxHelp: true };
   }
 
   /**
