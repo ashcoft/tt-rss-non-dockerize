@@ -41,6 +41,23 @@ async function runPluginButton(button: { plugin: string; method: string; title: 
     return;
   }
 
+  // af_readability's legacy button swapped the body in place; its embed method
+  // returns JSON, not an HTML dialog fragment.
+  if (button.plugin.toLowerCase() === 'af_readability' && button.method === 'embed') {
+    pluginBusy.value = true;
+    try {
+      await headlinesStore.toggleFullText(props.article.id);
+    } catch (err) {
+      pluginDialog.value = {
+        title: button.title,
+        html: `<p>${err instanceof Error ? err.message : 'Could not fetch full text.'}</p>`,
+      };
+    } finally {
+      pluginBusy.value = false;
+    }
+    return;
+  }
+
   pluginBusy.value = true;
   try {
     const response = await api.invokePluginHandler(button.plugin, button.method, {

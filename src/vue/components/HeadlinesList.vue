@@ -734,6 +734,11 @@ async function runPluginLeftButton(
   headline: Headline,
   button: { plugin: string; method: string; title: string }
 ): Promise<void> {
+  if (button.plugin.toLowerCase() === 'af_readability' && button.method === 'embed') {
+    emit('action', headline, 'toggle_full_text');
+    return;
+  }
+
   pluginBusy.value = true;
   try {
     const response = await api.invokePluginHandler(button.plugin, button.method, {

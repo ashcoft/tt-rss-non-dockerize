@@ -823,6 +823,13 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
       await feedsStore.catchupFeed(headline.feed_id, false);
       await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
       break;
+    case 'toggle_full_text':
+      try {
+        await headlinesStore.toggleFullText(headline.id);
+      } catch {
+        showMessage('Please enable af_readability first.', 'warning');
+      }
+      break;
     case 'delete':
       try {
         await headlinesStore.deleteArticle(headline.id);

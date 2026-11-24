@@ -3,6 +3,7 @@ const PLUGIN_ICONS: Record<string, string> = {
   note: 'mdi-note-edit-outline',
   link: 'mdi-link-variant',
   bookmark_outline: 'mdi-bookmark-outline',
+  description: 'mdi-text-box-outline',
   share: 'mdi-share-variant',
   print: 'mdi-printer',
 };
