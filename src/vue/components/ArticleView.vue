@@ -166,7 +166,7 @@ const sanitizedContent = computed(() => {
 </script>
 
 <template>
-  <div class="article-view post">
+  <div class="article-view post" :data-article-id="article.id">
     <article class="article-content content">
       <header class="article-header header">
         <div class="article-header-inner">

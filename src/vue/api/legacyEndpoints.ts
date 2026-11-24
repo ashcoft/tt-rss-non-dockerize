@@ -1181,6 +1181,30 @@ export async function invokePluginHandler(
   return response.raw;
 }
 
+/**
+ * Fetch the full article text through the `af_readability` plugin.
+ *
+ * The plugin's `embed` method prints `{content: "..."}`; when the plugin is
+ * disabled the backend answers E_UNKNOWN_PLUGIN and the transport throws.
+ */
+export async function getFullText(backend: LegacyBackend, articleId: number): Promise<string> {
+  const response = await backend.call('PluginHandler', 'embed', {
+    plugin: 'af_readability',
+    id: articleId,
+  });
+
+  let body = response.body;
+  if (!body) {
+    try {
+      body = JSON.parse(response.raw) as Record<string, unknown>;
+    } catch {
+      throw new LegacyProtocolError('af_readability returned a non-JSON response.');
+    }
+  }
+
+  return asString(body.content);
+}
+
 /** Article tags are stored comma-separated; `tags_str` is what the handler reads. */
 export async function setArticleTags(
   backend: LegacyBackend,

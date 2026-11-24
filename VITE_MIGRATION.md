@@ -223,8 +223,8 @@ Other parity work in the same pass:
   "Generate new URL" action, matching `CommonDialogs.generatedFeed`.
 - **Remaining hotkeys.** `next_article_or_scroll`, page/line scrolling,
   `toggle_expand`, `article_span_grid` and `cat_toggle_collapse` now do work
-  instead of being no-ops; `toggle_full_text` calls `af_readability` when the
-  plugin is loaded.
+  instead of being no-ops; `toggle_full_text` fetches the full article through
+  `af_readability` and toggles back to the original content.
 - **Phone gestures.** The narrow layout supports pull-to-refresh (force-update
   the current feed), swipe-to-read (mark a row read and slide it out), and a
   timed long-press that synthesises the `contextmenu` event iOS never fires.
@@ -237,9 +237,12 @@ Other parity work in the same pass:
 
 `include/vue_shell.php` now defines the small `window.PluginHost` registry
 (register/run/run_until/unregister and the hook constants) before plugin JS
-runs. That lets plugin-provided Select-menu handlers be dispatched. Plugins
-whose JS builds Dojo widgets still cannot run those widgets; their server-side
-handlers and form submissions remain the supported path.
+runs. That lets plugin-provided Select-menu handlers be dispatched. It also
+defines inert `window.Plugins` and `window.require` globals: plugin scripts
+written for the removed Dojo/AMD loader can then assign their namespaces and
+call `require([...], cb)` without throwing. Plugins whose JS builds Dojo
+widgets still cannot run those widgets; their server-side handlers and form
+submissions remain the supported path.
 
 Deployment note: the Altcha widget creates a blob worker. If the reverse proxy
 sets a Content-Security-Policy, include `worker-src 'self' blob:` (or

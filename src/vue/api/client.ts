@@ -549,6 +549,11 @@ class ApiClient {
     );
   }
 
+  /** Full article text from the af_readability plugin. */
+  async getFullText(articleId: number): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.getFullText(legacyBackend, articleId), '');
+  }
+
   /** Keyboard-shortcuts help as an HTML fragment (sanitize before display). */
   async getHotkeyHelp(): Promise<ApiResponse<string>> {
     return this.wrap(() => endpoints.getHotkeyHelp(legacyBackend), '');

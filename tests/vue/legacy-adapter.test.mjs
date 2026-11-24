@@ -1721,3 +1721,18 @@ test('getFeedTree keeps per-feed error/updated and the runtime info', async () =
     daemonStampOk: false,
   });
 });
+
+test('getFullText reads the af_readability content payload', async () => {
+  installGlobals();
+  const calls = stubFetch([{ text: JSON.stringify({ content: '<p>Full text</p>' }) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const content = await endpoints.getFullText(backend, 42);
+
+  assert.equal(content, '<p>Full text</p>');
+  assert.ok(calls[0].body.includes('op=PluginHandler'));
+  assert.ok(calls[0].body.includes('method=embed'));
+  assert.ok(calls[0].body.includes('plugin=af_readability'));
+  assert.ok(calls[0].body.includes('id=42'));
+});

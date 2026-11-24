@@ -139,6 +139,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const cursorId = ref<number | null>(null);
   /** Ids checked via the per-row selection checkbox. */
   const selectedHeadlineIds = ref<Set<number>>(new Set());
+  /** Original content saved while af_readability full text is shown. */
+  const fullTextOriginal = new Map<number, string>();
 
   // Getters
   const unreadCount = computed(() => {
@@ -260,6 +262,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
 
       if (response.status === 0) {
         headlines.value = response.content.headlines;
+        fullTextOriginal.clear();
         // A fresh page invalidates any previous cursor position and selection.
         cursorId.value = headlines.value[0]?.id ?? null;
         selectedHeadlineIds.value = new Set();
@@ -465,6 +468,29 @@ export const useHeadlinesStore = defineStore('headlines', () => {
       void useFeedsStore().refreshCounters();
     } catch (err) {
       console.error('Failed to toggle publish:', err);
+    }
+  }
+
+  /** Toggle af_readability full text for an article, caching the original. */
+  async function toggleFullText(articleId: number): Promise<void> {
+    const headline = headlines.value.find(h => h.id === articleId);
+    if (!headline) return;
+
+    const original = fullTextOriginal.get(articleId);
+    if (original !== undefined) {
+      headline.content = original;
+      fullTextOriginal.delete(articleId);
+    } else {
+      const response = await api.getFullText(articleId);
+      if (response.status !== 0 || !response.content) {
+        throw new Error(response.error ?? 'af_readability did not return any content.');
+      }
+      fullTextOriginal.set(articleId, headline.content);
+      headline.content = response.content;
+    }
+
+    if (selectedArticle.value?.id === articleId) {
+      selectedArticle.value.content = headline.content;
     }
   }
 
@@ -727,6 +753,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     skip.value = 0;
     cursorId.value = null;
     selectedHeadlineIds.value = new Set();
+    fullTextOriginal.clear();
   }
 
   return {
@@ -768,6 +795,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     markAsUnread,
     toggleStar,
     togglePublish,
+    toggleFullText,
     deleteArticle,
     deleteArticles,
     toggleStarred,

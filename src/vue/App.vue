@@ -1254,16 +1254,12 @@ const handleHotkey = (action: string): void => {
       runDetached(handleToolbarAction('toggleWideScreen'), 'toggle widescreen');
       break;
     case 'toggle_full_text':
-      // af_readability owns the full-text fetch; without it the legacy client
-      // showed the same hint.
-      {
-        const plugins = (window as unknown as { Plugins?: Record<string, { embed?: (id: number) => void }> }).Plugins;
-        const readability = plugins?.Af_Readability;
-        if (cursor && readability?.embed) {
-          readability.embed(cursor.id);
-        } else {
+      if (!cursor) {
+        showMessage('Select an article first.', 'info');
+      } else {
+        headlinesStore.toggleFullText(cursor.id).catch(() => {
           showMessage('Please enable af_readability first.', 'warning');
-        }
+        });
       }
       break;
     case 'toggle_cdm_expanded':

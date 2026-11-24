@@ -129,6 +129,16 @@ if ($authenticated === true) {
 	</script>
 
 	<?php
+	// Plugin JS was written for the removed Dojo/AMD globals. Provide inert
+	// namespaces so top-level assignments and `require([...], cb)` calls do not
+	// throw; the Vue app hosts plugin UI through PluginHandler instead.
+	?>
+	<script type="text/javascript">
+		window.Plugins = window.Plugins || {};
+		window.require = window.require || function () {};
+	</script>
+
+	<?php
 	if ($authenticated === true) {
 		UserHelper::print_user_stylesheet();
 	}
