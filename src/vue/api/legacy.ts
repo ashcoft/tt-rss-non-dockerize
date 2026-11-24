@@ -81,7 +81,10 @@ export async function fetchCsrfToken(shellPath = '/index.php', force = false): P
   // The shell is served with an ETag and answers 304 when the client already
   // has a copy. After logging in the previous copy is stale (it embeds an empty
   // token), so the revalidation must be bypassed to get the authenticated body.
-  const response = await fetch(shellPath, {
+  // A forced refresh also gets a cache-busting query so an intermediate cache
+  // cannot replay the stale token.
+  const url = force ? `${shellPath}?_=${Date.now()}` : shellPath;
+  const response = await fetch(url, {
     credentials: 'include',
     cache: 'no-store',
     headers: { Accept: 'text/html', 'Cache-Control': 'no-cache' },
