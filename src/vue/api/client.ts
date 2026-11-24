@@ -935,8 +935,11 @@ class ApiClient {
 
   async checkForUpdates(): Promise<ApiResponse<endpoints.UpdateInfo>> {
     return this.wrap(() => endpoints.checkForUpdates(legacyBackend), {
+      current_version: '',
+      latest_release: null,
       changeset: null,
       plugins: [],
+      checked_at: 0,
     });
   }
 

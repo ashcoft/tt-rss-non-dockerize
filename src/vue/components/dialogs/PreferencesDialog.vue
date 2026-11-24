@@ -16,6 +16,7 @@
           <v-tab value="plugins">Plugins</v-tab>
           <v-tab value="feeds">Feeds</v-tab>
           <v-tab value="labels">Labels</v-tab>
+          <v-tab v-if="isAdmin" value="updates">Updates</v-tab>
           <v-tab v-if="isAdmin" value="users">Users</v-tab>
           <v-tab v-if="isAdmin" value="system">System</v-tab>
         </v-tabs>
@@ -231,6 +232,10 @@
             <LabelsPanel v-if="tab === 'labels'" />
           </v-window-item>
 
+          <v-window-item v-if="isAdmin" value="updates">
+            <UpdatesPanel v-if="tab === 'updates'" />
+          </v-window-item>
+
           <v-window-item v-if="isAdmin" value="users">
             <UsersPanel v-if="tab === 'users'" />
           </v-window-item>
@@ -270,6 +275,7 @@ import ManageFeedsPanel from './ManageFeedsPanel.vue';
 import LabelsPanel from './LabelsPanel.vue';
 import UsersPanel from './UsersPanel.vue';
 import SystemPanel from './SystemPanel.vue';
+import UpdatesPanel from './UpdatesPanel.vue';
 import { useFeedsStore } from '../../stores';
 import type { PluginPrefsTab } from '../../api/legacyEndpoints';
 

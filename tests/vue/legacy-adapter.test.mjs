@@ -1740,3 +1740,33 @@ test('getFullText reads the af_readability content payload', async () => {
   assert.ok(calls[0].body.includes('plugin=af_readability'));
   assert.ok(calls[0].body.includes('id=42'));
 });
+
+test('checkForUpdates maps the current version, release and plugin names', async () => {
+  installGlobals();
+  const payload = {
+    current_version: 'vite-dev-0.0.5',
+    latest_release: {
+      tag_name: 'vite-dev-0.0.6',
+      html_url: 'https://example.com/releases/0.0.6',
+      published_at: '2026-11-24T10:00:00Z',
+    },
+    changeset: {
+      id: 'vite-dev-0.0.6',
+      timestamp: 1795517600,
+      compare_url: 'https://example.com/compare',
+    },
+    plugins: [{ plugin: 'af_readability', rv: { need_update: true } }],
+    checked_at: 1795517700,
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const info = await endpoints.checkForUpdates(backend);
+
+  assert.equal(info.current_version, 'vite-dev-0.0.5');
+  assert.equal(info.latest_release?.tag_name, 'vite-dev-0.0.6');
+  assert.equal(info.changeset?.id, 'vite-dev-0.0.6');
+  assert.deepEqual(info.plugins, ['af_readability']);
+  assert.equal(info.checked_at, 1795517700);
+});

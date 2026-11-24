@@ -221,6 +221,12 @@ Other parity work in the same pass:
 - **Show as feed.** The toolbar's syndication button (and the action menu) opens
   the generated URL for the current feed, category or search, with a
   "Generate new URL" action, matching `CommonDialogs.generatedFeed`.
+- **Update notifications.** `RPC/checkforupdates` now returns the running
+  version, the latest release and the local-plugin update list. The main page
+  shows a dismissible banner when either is available, the toolbar's plugin
+  icon opens Preferences → Plugins, and the admin Preferences dialog has an
+  Updates tab with "Check again" and "Update local plugins". Core releases are
+  still installed by the deployment pipeline/CLI; the UI only reports them.
 - **Remaining hotkeys.** `next_article_or_scroll`, page/line scrolling,
   `toggle_expand`, `article_span_grid` and `cat_toggle_collapse` now do work
   instead of being no-ops; `toggle_full_text` fetches the full article through

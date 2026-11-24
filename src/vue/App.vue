@@ -68,6 +68,25 @@
         <div class="content-body">
         <section id="headlines-wrap-inner" class="content headlines-wrap-inner">
           <v-alert
+            v-if="!updateNoticeDismissed && (updateUrl || pluginUpdateNames.length > 0)"
+            type="info"
+            variant="tonal"
+            density="compact"
+            closable
+            class="mx-2 mt-2"
+            @click:close="updateNoticeDismissed = true"
+          >
+            <div v-if="updateUrl">
+              A newer release <strong>{{ latestVersion }}</strong> is available.
+              <a :href="updateUrl" target="_blank" rel="noopener noreferrer">View release</a>
+            </div>
+            <div v-if="pluginUpdateNames.length > 0">
+              {{ pluginUpdateNames.length }} local plugin update{{ pluginUpdateNames.length === 1 ? '' : 's' }} available.
+              <a href="#" @click.prevent="openPluginUpdates">Review in Preferences</a>
+            </div>
+          </v-alert>
+
+          <v-alert
             v-if="headlinesStore.notice && headlinesStore.headlines.length === 0"
             type="info"
             variant="tonal"
@@ -388,6 +407,12 @@ const pluginHeadlineHtml = ref('');
 const pluginCustomSortMap = ref<Record<string, string>>({});
 const updateUrl = ref('');
 const pluginUpdatesAvailable = ref(false);
+const currentVersion = ref('');
+const latestVersion = ref('');
+const latestReleaseUrl = ref('');
+const pluginUpdateNames = ref<string[]>([]);
+const updateCheckedAt = ref(0);
+const updateNoticeDismissed = ref(false);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -531,11 +556,30 @@ const loadPluginButtons = async (feedId?: number, isCat?: boolean) => {
 };
 
 /** Check for a newer core release and updated local plugins (admins only). */
-const loadUpdates = async () => {
+const loadUpdates = async (notify = false) => {
   const response = await api.checkForUpdates();
   if (response.status === 0) {
-    updateUrl.value = response.content.changeset?.compare_url ?? '';
-    pluginUpdatesAvailable.value = response.content.plugins.length > 0;
+    const info = response.content;
+    currentVersion.value = info.current_version;
+    latestVersion.value = info.changeset?.id ?? info.latest_release?.tag_name ?? '';
+    updateUrl.value = info.changeset?.compare_url ?? '';
+    latestReleaseUrl.value = info.latest_release?.html_url ?? '';
+    pluginUpdateNames.value = info.plugins;
+    pluginUpdatesAvailable.value = info.plugins.length > 0;
+    updateCheckedAt.value = info.checked_at;
+    updateNoticeDismissed.value = false;
+
+    if (notify) {
+      if (info.changeset) {
+        showMessage(`New release ${info.changeset.id} is available`, 'info');
+      } else if (info.plugins.length > 0) {
+        showMessage(`${info.plugins.length} local plugin update(s) available`, 'info');
+      } else {
+        showMessage('You are running the latest release', 'success');
+      }
+    }
+  } else if (notify) {
+    showMessage(response.error ?? 'Could not check for updates', 'error');
   }
 };
 
@@ -1021,6 +1065,12 @@ const openSystemLog = () => {
   prefsOpen.value = true;
 };
 
+/** Open the Preferences → Plugins tab, where local plugin updates live. */
+const openPluginUpdates = () => {
+  prefsTab.value = 'plugins';
+  prefsOpen.value = true;
+};
+
 /** Submit a POST form to backend.php in a new window (legacy postOpenWindow). */
 const postOpenWindow = (params: Record<string, string | number>) => {
   const token = (window as unknown as { __csrf_token?: string }).__csrf_token ?? '';
@@ -1179,6 +1229,12 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       break;
     case 'preferences':
       prefsOpen.value = true;
+      break;
+    case 'pluginUpdates':
+      openPluginUpdates();
+      break;
+    case 'checkUpdates':
+      await loadUpdates(true);
       break;
     case 'manageFeeds':
       feedsDialogOpen.value = true;

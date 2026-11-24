@@ -84,7 +84,7 @@
         icon="mdi-puzzle"
         variant="text"
         title="Plugin updates are available"
-        @click="handleAction('preferences')"
+        @click="handleAction('pluginUpdates')"
       />
     </div>
 
@@ -342,6 +342,7 @@ const actionOptions = computed(() => [
     value: 'toggleCdmExpanded',
     icon: 'mdi-unfold-more-horizontal',
   },
+  { title: 'Check for updates', value: 'checkUpdates', icon: 'mdi-update' },
   { title: 'Keyboard shortcuts help', value: 'hotkeyHelp', icon: 'mdi-keyboard' },
   { title: 'Toggle light/dark theme', value: 'toggleTheme', icon: 'mdi-theme-light-dark' },
   { title: 'Logout', value: 'logout', icon: 'mdi-logout' },

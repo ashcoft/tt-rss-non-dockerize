@@ -2239,8 +2239,16 @@ export async function testFilter(
 }
 
 export interface UpdateInfo {
+  /** Version currently running. */
+  current_version: string;
+  /** Latest published release, when the check is enabled and succeeded. */
+  latest_release: { tag_name: string; html_url: string; published_at: string } | null;
+  /** Set only when the latest release is newer than the running version. */
   changeset: { id: string; timestamp: number; compare_url: string } | null;
-  plugins: unknown[];
+  /** Local plugin names that have updates. */
+  plugins: string[];
+  /** Unix time of this check. */
+  checked_at: number;
 }
 
 /** Check for a newer core release and updated local plugins (admins only). */
@@ -2258,8 +2266,31 @@ export async function checkForUpdates(backend: LegacyBackend): Promise<UpdateInf
         }
       : null;
 
+  const releaseRaw = body.latest_release;
+  const latestRelease =
+    releaseRaw && typeof releaseRaw === 'object' && !Array.isArray(releaseRaw)
+      ? {
+          tag_name: asString((releaseRaw as Record<string, unknown>).tag_name),
+          html_url: asString((releaseRaw as Record<string, unknown>).html_url),
+          published_at: asString((releaseRaw as Record<string, unknown>).published_at),
+        }
+      : null;
+
+  const plugins = Array.isArray(body.plugins)
+    ? body.plugins
+        .map((item) =>
+          typeof item === 'string'
+            ? item
+            : asString((item as Record<string, unknown>)?.plugin)
+        )
+        .filter((name) => name !== '')
+    : [];
+
   return {
+    current_version: asString(body.current_version),
+    latest_release: latestRelease,
     changeset,
-    plugins: Array.isArray(body.plugins) ? body.plugins : [],
+    plugins,
+    checked_at: asNumber(body.checked_at),
   };
 }

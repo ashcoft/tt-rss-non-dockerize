@@ -49,6 +49,17 @@ function compileComponent(relativePath) {
         default: {
           getPluginPrefsSection: async () => ({ status: 1, content: '' }),
           invokePluginHandler: async () => ({ status: 1, content: '' }),
+          checkForUpdates: async () => ({
+            status: 1,
+            content: {
+              current_version: '',
+              latest_release: null,
+              changeset: null,
+              plugins: [],
+              checked_at: 0,
+            },
+          }),
+          updateLocalPlugins: async () => ({ status: 1, content: [] }),
         },
       };
     }
