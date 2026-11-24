@@ -209,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { Feed } from '../types';
 import PluginSurface from './PluginSurface.vue';
 
@@ -286,6 +286,11 @@ const emit = defineEmits<{
 // understands; arbitrary values are silently ignored by the backend.
 const viewMode = ref(props.modelViewMode);
 const sortBy = ref(props.modelOrderBy);
+
+// Startup applies the legacy default view/sort after the first render, so the
+// local selects must follow the props instead of only initialising from them.
+watch(() => props.modelViewMode, (value) => { viewMode.value = value; });
+watch(() => props.modelOrderBy, (value) => { sortBy.value = value; });
 
 const viewModeOptions = [
   { title: 'Adaptive', value: 'adaptive' },
