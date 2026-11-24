@@ -9,6 +9,7 @@
       <v-card-text style="overflow-y: auto; flex: 1 1 auto">
         <v-tabs v-model="tab" color="primary" class="prefs-tabs">
           <v-tab value="general">General</v-tab>
+          <v-tab v-if="isAdmin" value="updates">Updates</v-tab>
           <v-tab value="advanced">Advanced</v-tab>
           <v-tab value="account">Account</v-tab>
           <v-tab value="filters">Filters</v-tab>
@@ -16,7 +17,6 @@
           <v-tab value="plugins">Plugins</v-tab>
           <v-tab value="feeds">Feeds</v-tab>
           <v-tab value="labels">Labels</v-tab>
-          <v-tab v-if="isAdmin" value="updates">Updates</v-tab>
           <v-tab v-if="isAdmin" value="users">Users</v-tab>
           <v-tab v-if="isAdmin" value="system">System</v-tab>
         </v-tabs>
