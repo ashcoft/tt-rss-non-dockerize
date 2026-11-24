@@ -158,9 +158,13 @@ test('fetchCsrfToken returns empty when the declaration is absent', async () => 
 });
 
 test('a structured error body becomes a LegacyApiError', async () => {
-  installGlobals();
+  installGlobals({ csrf: null });
+  const unauthorized = JSON.stringify({ error: { code: 'E_UNAUTHORIZED', params: [] } });
+  const shell = '<script>const __csrf_token = "deadbeef";</script>';
   stubFetch([
-    { text: JSON.stringify({ error: { code: 'E_UNAUTHORIZED', params: [] } }) },
+    { text: unauthorized },
+    { text: shell },
+    { text: unauthorized },
   ]);
   const backend = new LegacyBackend();
   backend.setCsrfToken('t');

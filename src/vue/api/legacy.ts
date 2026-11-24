@@ -71,10 +71,10 @@ const CSRF_MARKER = '__csrf_token';
  * is not already present. The literal `auto` is never returned: sending it can
  * never pass `validate_csrf()` and would silently mask a missing session.
  */
-export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> {
+export async function fetchCsrfToken(shellPath = '/index.php', force = false): Promise<string> {
   const win = window as unknown as Record<string, unknown>;
   const embedded = win.__csrf_token;
-  if (typeof embedded === 'string' && embedded !== '' && embedded !== CSRF_PLACEHOLDER) {
+  if (!force && typeof embedded === 'string' && embedded !== '' && embedded !== CSRF_PLACEHOLDER) {
     return embedded;
   }
 
@@ -174,9 +174,9 @@ export class LegacyBackend {
   }
 
   /** Read the token from the shell if it has not been captured yet. */
-  async ensureCsrfToken(): Promise<string> {
-    if (!this.csrfToken) {
-      this.csrfToken = await fetchCsrfToken();
+  async ensureCsrfToken(force = false): Promise<string> {
+    if (force || !this.csrfToken) {
+      this.csrfToken = await fetchCsrfToken('/index.php', force);
     }
     return this.csrfToken;
   }
@@ -190,11 +190,35 @@ export class LegacyBackend {
    */
   async call(op: string, method: string, params: LegacyParams = {}): Promise<LegacyResponse> {
     const body = encodeParams(op, method, params);
+    const needsCsrf = LegacyBackend.requiresCsrf(op, method);
 
-    if (LegacyBackend.requiresCsrf(op, method)) {
+    if (needsCsrf) {
       body.set('csrf_token', await this.resolveCsrfToken(op, method));
     }
 
+    try {
+      return await this.execute(op, method, body);
+    } catch (error) {
+      // A rotated session token shows up as E_UNAUTHORIZED. Refresh it once
+      // and retry, so polling recovers instead of logging CSRF warnings forever.
+      if (
+        needsCsrf &&
+        error instanceof LegacyApiError &&
+        error.code === 'E_UNAUTHORIZED'
+      ) {
+        this.csrfToken = null;
+        body.set('csrf_token', await this.resolveCsrfToken(op, method, true));
+        return await this.execute(op, method, body);
+      }
+      throw error;
+    }
+  }
+
+  private async execute(
+    op: string,
+    method: string,
+    body: URLSearchParams
+  ): Promise<LegacyResponse> {
     const response = await this.send(op, method, body);
     const raw = await response.text();
     const parsed = parseBody(raw);
@@ -245,8 +269,10 @@ export class LegacyBackend {
    * Guarding here is what keeps the previous client's bug from returning: an
    * empty or literal "auto" token can never pass `validate_csrf()`.
    */
-  private async resolveCsrfToken(op: string, method: string): Promise<string> {
-    const token = this.csrfToken ?? (await this.ensureCsrfToken());
+  private async resolveCsrfToken(op: string, method: string, force = false): Promise<string> {
+    const token = force
+      ? await this.ensureCsrfToken(true)
+      : this.csrfToken ?? (await this.ensureCsrfToken());
 
     if (token === '' || token === CSRF_PLACEHOLDER) {
       throw new LegacyProtocolError(
