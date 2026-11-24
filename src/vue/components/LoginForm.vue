@@ -19,24 +19,6 @@
             autocomplete="off"
             aria-hidden="true"
           />
-          <altcha-widget
-            v-if="!authStore.otpRequired && !altchaFailed"
-            class="altcha-widget"
-            challenge="/public.php?op=loginchallenge"
-            name="altcha"
-            auto="onload"
-            @statechange="onAltchaStateChange"
-          />
-          <v-alert
-            v-else-if="!authStore.otpRequired && altchaFailed"
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="mb-2"
-          >
-            The Altcha widget could not start here (usually a Content-Security-Policy
-            restriction). The built-in proof-of-work check will be used instead.
-          </v-alert>
           <v-text-field
             v-if="!authStore.otpRequired"
             v-model="user"
@@ -112,7 +94,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import 'altcha';
 import DOMPurify from 'dompurify';
 import api from '../api/client';
 import { useAuthStore } from '../stores/auth';
@@ -127,8 +108,6 @@ const safeMode = ref(false);
 const bwLimit = ref(false);
 const otp = ref('');
 const website = ref('');
-const altchaPayload = ref('');
-const altchaFailed = ref(false);
 const pluginButtonsHtml = ref('');
 
 onMounted(async () => {
@@ -142,22 +121,6 @@ onMounted(async () => {
   }
 });
 
-const onAltchaStateChange = (event: CustomEvent<{ state?: string; payload?: string }>) => {
-  const state = event.detail?.state;
-  if (state === 'verified' && event.detail.payload) {
-    altchaPayload.value = event.detail.payload;
-    altchaFailed.value = false;
-  } else if (state === 'error') {
-    // The widget relies on a blob worker; strict CSPs (e.g. an embedded
-    // deployment) block it. api.login() then falls back to the built-in
-    // proof-of-work challenge, so hide the broken widget.
-    altchaFailed.value = true;
-    altchaPayload.value = '';
-  } else {
-    altchaPayload.value = '';
-  }
-};
-
 const submit = async () => {
   if (!user.value || !password.value) return;
   const ok = await authStore.login(user.value, password.value, {
@@ -165,7 +128,6 @@ const submit = async () => {
     safeMode: safeMode.value,
     bwLimit: bwLimit.value,
     honeypot: website.value,
-    altcha: altchaPayload.value || undefined,
   });
   if (ok) {
     emit('logged-in');
@@ -226,11 +188,6 @@ const submitOtp = async () => {
 
 .forgot-link:hover {
   text-decoration: underline;
-}
-
-.altcha-widget {
-  display: block;
-  margin-bottom: 12px;
 }
 
 .login-honeypot {

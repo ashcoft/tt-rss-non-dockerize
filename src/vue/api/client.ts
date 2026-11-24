@@ -144,8 +144,8 @@ class ApiClient {
     if (options.honeypot) body.set('website', options.honeypot);
     if (options.altcha) body.set('altcha', options.altcha);
 
-    // The Altcha widget is the primary bot check. Fall back to the built-in
-    // proof-of-work only when the widget has not produced a payload.
+    // The Vue login form uses the built-in proof-of-work challenge. An
+    // Altcha payload is still accepted when another client supplies one.
     // The OTP step is already gated by the second factor; the server skips
     // the challenge check when an OTP is present.
     if (!options.otp && !options.altcha) {

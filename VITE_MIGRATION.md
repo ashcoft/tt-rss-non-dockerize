@@ -244,13 +244,13 @@ call `require([...], cb)` without throwing. Plugins whose JS builds Dojo
 widgets still cannot run those widgets; their server-side handlers and form
 submissions remain the supported path.
 
-Deployment note: the Altcha widget creates a blob worker. If the reverse proxy
-sets a Content-Security-Policy, include `worker-src 'self' blob:` (or
-`script-src ... blob:`) so it can start. Without it the widget reports an
-error, the login card hides it, and `api.login()` falls back to the built-in
-proof-of-work challenge, so login still works but the browser logs a CSP
-violation. The login form is also gated on the session check, so an
-authenticated page load never mounts Altcha at all.
+The login form uses the server's built-in proof-of-work challenge. The Altcha
+widget was removed: it creates a blob worker, and common Content-Security-Policy
+headers (`script-src 'self' ...`) block it, which produced repeated
+`worker-src` violations on the login page. `api.login()` still accepts an
+Altcha payload if another client supplies one, and the server continues to
+offer `/public.php?op=loginchallenge`. The login form is also gated on the
+session check, so an authenticated page load never mounts login UI at all.
 
 ### Dojo removed
 
