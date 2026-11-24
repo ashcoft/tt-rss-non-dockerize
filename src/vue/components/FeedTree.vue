@@ -1,5 +1,5 @@
 <template>
-  <div class="feed-tree">
+  <div ref="rootRef" class="feed-tree">
 
     <v-list v-model:opened="openedGroups" nav density="compact" class="feed-list">
       <!-- Special Feeds -->
@@ -304,6 +304,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { Feed, Category, Label } from '../types';
+import { useLongPressContextMenu } from '../composables/useLongPressContextMenu';
 
 interface Props {
   feeds: Feed[];
@@ -347,6 +348,8 @@ const emit = defineEmits<{
 const LABEL_BASE_INDEX = -1024;
 
 // State
+const rootRef = ref<HTMLElement | null>(null);
+useLongPressContextMenu(rootRef);
 const searchQuery = ref('');
 const contextMenuKey = ref<string | null>(null);
 const draggedFeedId = ref<number | null>(null);

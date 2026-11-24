@@ -27,8 +27,15 @@ function compileComponent(relativePath) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   });
   const module = { exports: {} };
+  const localRequire = (id) => {
+    // Gesture wiring is not exercised by the render test.
+    if (id.includes('useLongPressContextMenu')) {
+      return { useLongPressContextMenu: () => {} };
+    }
+    return require(id);
+  };
   // Executes the compiled local component, not remote or user-supplied code.
-  new Function('require', 'module', 'exports', outputText)(require, module, module.exports);
+  new Function('require', 'module', 'exports', outputText)(localRequire, module, module.exports);
   return module.exports.default;
 }
 

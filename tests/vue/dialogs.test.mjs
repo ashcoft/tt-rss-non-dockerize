@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { createRenderer, defineComponent, h, nextTick } from 'vue';
+import { createRenderer, defineComponent, h, nextTick, ref } from 'vue';
 import { parse, compileScript } from 'vue/compiler-sfc';
 import ts from 'typescript';
 
@@ -61,6 +61,19 @@ function compileComponent(relativePath) {
     // our `default` rather than double-wrapping it.
     if (id === 'dompurify') {
       return { __esModule: true, default: { sanitize: (value) => value } };
+    }
+    // Phone gestures are not exercised by the render tests.
+    if (id.includes('usePullAndSwipe')) {
+      return {
+        usePullAndSwipe: () => ({
+          pullDistance: ref(0),
+          refreshing: ref(false),
+          stopRefreshing: () => {},
+        }),
+      };
+    }
+    if (id.includes('useLongPressContextMenu')) {
+      return { useLongPressContextMenu: () => {} };
     }
     // The Pinia stores pull in a large dependency graph that this renderer
     // does not need; a minimal stub is enough for the dialog under test.

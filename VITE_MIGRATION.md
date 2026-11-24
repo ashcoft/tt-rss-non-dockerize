@@ -225,18 +225,21 @@ Other parity work in the same pass:
   `toggle_expand`, `article_span_grid` and `cat_toggle_collapse` now do work
   instead of being no-ops; `toggle_full_text` calls `af_readability` when the
   plugin is loaded.
+- **Phone gestures.** The narrow layout supports pull-to-refresh (force-update
+  the current feed), swipe-to-read (mark a row read and slide it out), and a
+  timed long-press that synthesises the `contextmenu` event iOS never fires.
+- **Back gesture.** Opening the feed drawer or an article pushes a history
+  entry on the narrow layout, so the device Back gesture closes the topmost
+  overlay instead of leaving the app; resize reconciles stale entries.
+- **CDM sticky headers.** The expanded-row header now gets `data-is-stuck` and
+  a sticky position while its content is visible, matching the legacy
+  intersection observers.
 
 `include/vue_shell.php` now defines the small `window.PluginHost` registry
 (register/run/run_until/unregister and the hook constants) before plugin JS
 runs. That lets plugin-provided Select-menu handlers be dispatched. Plugins
 whose JS builds Dojo widgets still cannot run those widgets; their server-side
 handlers and form submissions remain the supported path.
-
-Still not ported from the legacy client: the phone-only pull-to-refresh
-gesture and the Back-gesture overlay history stack. The sidebar drawer, the
-reading pane and keyboard navigation already work without them; they only
-change how the browser's Back button and a downward drag behave on narrow
-screens.
 
 ### Dojo removed
 

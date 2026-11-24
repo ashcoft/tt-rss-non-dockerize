@@ -10,6 +10,19 @@
     :is-vfeed="isVfeed ? '1' : '0'"
     :data-is-vfeed="isVfeed ? 'true' : 'false'"
   >
+    <div
+      v-if="refreshing || pullDistance > 0"
+      class="pull-refresh"
+      :class="{ ready: pullDistance >= 64, spinning: refreshing }"
+      :style="{
+        transform: `translate(-50%, ${pullDistance}px)`,
+        opacity: refreshing ? 1 : Math.min(1, pullDistance / 64),
+      }"
+    >
+      <v-progress-circular v-if="refreshing" indeterminate size="18" width="2" />
+      <v-icon v-else size="20">mdi-refresh</v-icon>
+    </div>
+
     <div v-if="loading" class="headlines-loading">
       <v-progress-circular indeterminate color="primary" />
       <span>Loading headlines...</span>
@@ -118,6 +131,7 @@
                rows use the legacy single .hl grid. Both keep the Vue classes
                the E2E suite and the app's own styles rely on. -->
           <template v-if="combined">
+            <div class="header-sticky-guard"></div>
             <div class="header">
               <div class="left hl-left">
                 <v-checkbox
@@ -480,6 +494,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import DOMPurify from 'dompurify';
 import type { Headline } from '@/types';
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
+import { usePullAndSwipe } from '@/composables/usePullAndSwipe';
+import { useLongPressContextMenu } from '@/composables/useLongPressContextMenu';
 import { pluginIcon } from '../utils/pluginIcons';
 import api from '@/api/client';
 
@@ -525,6 +541,7 @@ const emit = defineEmits<{
   'bulk-action': [action: string, ids: number[]];
   'next-unread': [];
   'reload-current': [];
+  'pull-refresh': [];
 }>();
 
 // Infinite scroll wiring (Phase 5)
@@ -577,6 +594,53 @@ const observeAutoCatchupRows = () => {
   });
 };
 
+// CDM sticky header: the guard above the header tells us when the header has
+// scrolled past, and the content observer parks the header while the body is
+// still visible (mirrors Headlines.sticky_*_observer).
+let stickyHeaderObserver: IntersectionObserver | null = null;
+let stickyContentObserver: IntersectionObserver | null = null;
+let observedSticky = new WeakSet<Element>();
+
+const observeStickyRows = () => {
+  const container = listRef.value;
+  if (!container || !props.combined) return;
+
+  if (!stickyHeaderObserver) {
+    stickyHeaderObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const header = entry.target.closest('.cdm')?.querySelector('.header');
+          if (!header) continue;
+          if (entry.isIntersecting) header.removeAttribute('data-is-stuck');
+          else header.setAttribute('data-is-stuck', 'true');
+        }
+      },
+      { threshold: [0, 1], root: container }
+    );
+
+    stickyContentObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const header = entry.target.closest('.cdm')?.querySelector<HTMLElement>('.header');
+          if (header) header.style.position = entry.isIntersecting ? 'sticky' : 'unset';
+        }
+      },
+      { threshold: [0, 1], root: container }
+    );
+  }
+
+  container.querySelectorAll('.cdm .header-sticky-guard').forEach((guard) => {
+    if (observedSticky.has(guard)) return;
+    observedSticky.add(guard);
+    stickyHeaderObserver!.observe(guard);
+  });
+  container.querySelectorAll('.cdm .content').forEach((content) => {
+    if (observedSticky.has(content)) return;
+    observedSticky.add(content);
+    stickyContentObserver!.observe(content);
+  });
+};
+
 // Scroll fallback: marks rows whose midpoint is already above the viewport.
 // The observer handles rows that leave the viewport, while this catches rows
 // skipped by a fast jump (e.g. Home/End or a large wheel scroll).
@@ -614,24 +678,39 @@ const { setupScrollListener } = useInfiniteScroll({
 onMounted(() => {
   if (listRef.value) setupScrollListener(listRef.value);
   observeAutoCatchupRows();
+  observeStickyRows();
 });
 
 watch(
-  () => [props.headlines.length, props.combined, props.autoCatchup] as const,
+  () => [props.headlines.length, props.combined, props.autoCatchup, props.cdmExpanded] as const,
   () => {
     if (!props.autoCatchup || !props.combined) {
       autoCatchupObserver?.disconnect();
       autoCatchupObserver = null;
       observedRows = new WeakSet<Element>();
-      return;
+    } else {
+      void nextTick(observeAutoCatchupRows);
     }
-    void nextTick(observeAutoCatchupRows);
+
+    if (!props.combined) {
+      stickyHeaderObserver?.disconnect();
+      stickyContentObserver?.disconnect();
+      stickyHeaderObserver = null;
+      stickyContentObserver = null;
+      observedSticky = new WeakSet<Element>();
+    } else {
+      void nextTick(observeStickyRows);
+    }
   }
 );
 
 onUnmounted(() => {
   autoCatchupObserver?.disconnect();
   autoCatchupObserver = null;
+  stickyHeaderObserver?.disconnect();
+  stickyContentObserver?.disconnect();
+  stickyHeaderObserver = null;
+  stickyContentObserver = null;
 });
 
 
@@ -668,11 +747,15 @@ async function runPluginLeftButton(
     pluginBusy.value = false;
   }
 }
+/** Rows swiped away on the phone layout, hidden until the list reloads. */
+const swipedIds = ref<Set<number>>(new Set());
+
 /** VFEED_GROUP_BY_FEED groups all rows of a feed together under one heading. */
 const displayHeadlines = computed(() => {
-  if (!props.groupByFeed) return props.headlines;
+  const visible = props.headlines.filter(headline => !swipedIds.value.has(headline.id));
+  if (!props.groupByFeed) return visible;
   const groups = new Map<number, Headline[]>();
-  for (const headline of props.headlines) {
+  for (const headline of visible) {
     const group = groups.get(headline.feed_id) ?? [];
     group.push(headline);
     groups.set(headline.feed_id, group);
@@ -681,6 +764,28 @@ const displayHeadlines = computed(() => {
 });
 
 const gridSpanIds = ref<Set<number>>(new Set());
+
+const { pullDistance, refreshing, stopRefreshing } = usePullAndSwipe(listRef, {
+  onRefresh: () => emit('pull-refresh'),
+  onSwipeRead: (articleId) => {
+    swipedIds.value = new Set([...swipedIds.value, articleId]);
+    const headline = props.headlines.find(item => item.id === articleId);
+    if (headline) emit('action', headline, 'mark_read');
+  },
+});
+
+useLongPressContextMenu(listRef);
+
+watch(
+  () => props.loading,
+  (loading) => {
+    if (loading) {
+      swipedIds.value = new Set();
+    } else {
+      stopRefreshing();
+    }
+  }
+);
 
 const toggleGridSpan = (id: number) => {
   const next = new Set(gridSpanIds.value);
@@ -759,6 +864,46 @@ const sanitize = (html: string): string =>
   height: 100%;
   overflow-y: auto;
   background: rgb(var(--v-theme-surface));
+}
+
+/* Pull-to-refresh badge (phone layout only). */
+.pull-refresh {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(var(--v-theme-on-background), 0.15);
+  border-radius: 50%;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  color: rgb(var(--v-theme-primary));
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.pull-refresh.ready {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+}
+
+.pull-refresh.spinning {
+  color: rgb(var(--v-theme-primary));
+}
+
+/* Swipe-to-read: the row follows the finger and the affordance rides in. */
+.headlines-list-content > .v-list-item.swiping {
+  position: relative;
+  overflow: hidden;
+}
+
+.headlines-list-content > .v-list-item.swipe-anim {
+  transition: transform 0.2s ease, height 0.2s ease, opacity 0.2s ease,
+    margin 0.2s ease, padding 0.2s ease;
 }
 
 .headlines-loading,

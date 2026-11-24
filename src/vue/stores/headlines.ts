@@ -237,7 +237,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   // only the newest request may write the list.
   let loadSequence = 0;
 
-  async function loadHeadlines(feedId: number | string, isCat: boolean = false) {
+  async function loadHeadlines(feedId: number | string, isCat: boolean = false, forceUpdate: boolean = false) {
     const sequence = ++loadSequence;
     loading.value = true;
     error.value = null;
@@ -253,6 +253,7 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         searchLanguage: searchLanguage.value,
         orderBy: orderBy.value,
         firstId: headlines.value[0]?.id,
+        forceUpdate,
       });
 
       if (sequence !== loadSequence) return;

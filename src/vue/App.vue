@@ -107,6 +107,7 @@
             @bulk-action="handleBulkAction"
             @next-unread="handleNextUnread"
             @reload-current="handleReloadCurrent"
+            @pull-refresh="handlePullRefresh"
           />
         </section>
 
@@ -227,7 +228,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import api from './api/client';
 import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
@@ -417,6 +418,17 @@ const refreshCurrentFeed = async () => {
 
   await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
   await feedsStore.loadFeeds();
+};
+
+/** Phone pull-to-refresh: force the backend to update the feed, then reload. */
+const handlePullRefresh = async () => {
+  if (feedsStore.currentFeedId === null) return;
+  try {
+    await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat, true);
+    await feedsStore.loadFeeds();
+  } catch (err) {
+    console.error('Pull-to-refresh failed:', err);
+  }
 };
 
 /** Start the periodic refresh of the current feed and its counters. */
@@ -745,6 +757,73 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
 const handleArticleClose = () => {
   headlinesStore.clearSelection();
 };
+
+// ---------------------------------------------------------------------------
+// Phone Back gesture: the drawer and an open article get history entries so
+// Back dismisses them instead of leaving the app (legacy reconcileOverlayHistory).
+// ---------------------------------------------------------------------------
+const overlayStack: string[] = [];
+let suppressPopstate = 0;
+let suppressReconcile = false;
+
+const isNarrowLayout = () =>
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+
+const reconcileOverlayHistory = () => {
+  if (typeof window === 'undefined' || suppressReconcile) return;
+
+  if (!isNarrowLayout()) {
+    while (overlayStack.length > 0) {
+      overlayStack.pop();
+      suppressPopstate++;
+      window.history.back();
+    }
+    return;
+  }
+
+  const open: string[] = [];
+  if (headlinesStore.selectedArticle) open.push('article');
+  if (sidebarOpen.value) open.push('drawer');
+
+  while (overlayStack.length > 0 && !open.includes(overlayStack[overlayStack.length - 1])) {
+    overlayStack.pop();
+    suppressPopstate++;
+    window.history.back();
+  }
+
+  for (const name of open) {
+    if (!overlayStack.includes(name)) {
+      overlayStack.push(name);
+      window.history.pushState({ ttrss_overlay: name }, '');
+    }
+  }
+};
+
+const onOverlayPopState = () => {
+  if (suppressPopstate > 0) {
+    suppressPopstate--;
+    return;
+  }
+  if (overlayStack.length === 0) return;
+
+  const name = overlayStack.pop();
+  suppressReconcile = true;
+
+  if (name === 'drawer') {
+    sidebarOpen.value = false;
+  } else if (name === 'article') {
+    handleArticleClose();
+  }
+
+  // Let Vue's post-flush watcher run while reconciliation is still suppressed.
+  window.setTimeout(() => {
+    suppressReconcile = false;
+  }, 0);
+};
+
+watch([sidebarOpen, () => headlinesStore.selectedArticle], () => reconcileOverlayHistory(), {
+  flush: 'post',
+});
 
 /** Mark the unread articles above/below one article as read. */
 const handleMarkRelative = async (articleId: number, above: boolean) => {
@@ -1334,9 +1413,16 @@ onMounted(async () => {
 
     startPolling();
   }
+
+  window.addEventListener('popstate', onOverlayPopState);
+  window.addEventListener('resize', reconcileOverlayHistory);
 });
 
-onUnmounted(stopPolling);
+onUnmounted(() => {
+  stopPolling();
+  window.removeEventListener('popstate', onOverlayPopState);
+  window.removeEventListener('resize', reconcileOverlayHistory);
+});
 </script>
 
 <style scoped>
