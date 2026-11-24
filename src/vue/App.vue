@@ -498,20 +498,7 @@ const onLoggedIn = async () => {
 
   // A failing secondary request (plugin hooks, update check) must not prevent
   // the initial feed from opening.
-  const results = await Promise.allSettled([
-    feedsStore.loadFeeds(),
-    feedsStore.loadDisplayPrefs(),
-    labelsStore.loadLabels(),
-    loadSearchLanguages(),
-    loadPluginButtons(),
-    loadUpdates(),
-  ]);
-
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      console.error('Startup load failed:', result.reason);
-    }
-  }
+  await loadStartupData();
 
   applyThemePalette();
 
@@ -523,6 +510,7 @@ const onLoggedIn = async () => {
   }
 
   startPolling();
+  scheduleUpdateCheck();
 };
 
 /** Load the plugin-provided toolbar button fragments for this session. */
@@ -552,6 +540,38 @@ const loadSearchLanguages = async () => {
   const { allLanguages, showSyntaxHelp } = await headlinesStore.loadSearchOptions();
   searchLanguages.value = allLanguages;
   showSearchSyntaxHelp.value = showSyntaxHelp;
+};
+
+/**
+ * Load startup data one request at a time.
+ *
+ * The old code fired six requests in parallel; on a small PHP-FPM pool that
+ * can exhaust the upstream and make Feeds/view answer 502. Sequential loads
+ * cost a little latency but keep the app usable on modest servers.
+ */
+const loadStartupData = async () => {
+  const steps: Array<[string, () => Promise<unknown>]> = [
+    ['feeds', () => feedsStore.loadFeeds()],
+    ['display preferences', () => feedsStore.loadDisplayPrefs()],
+    ['labels', () => labelsStore.loadLabels()],
+    ['search languages', () => loadSearchLanguages()],
+    ['plugin buttons', () => loadPluginButtons()],
+  ];
+
+  for (const [name, step] of steps) {
+    try {
+      await step();
+    } catch (err) {
+      console.error(`Startup load failed (${name}):`, err);
+    }
+  }
+};
+
+/** Run the update check after the initial feed has loaded, off the critical path. */
+const scheduleUpdateCheck = () => {
+  window.setTimeout(() => {
+    void loadUpdates();
+  }, 1500);
 };
 
 const onLogout = async () => {
@@ -1393,20 +1413,7 @@ onMounted(async () => {
   if (authenticated) {
     authStore.setLoggedIn(true);
 
-    const results = await Promise.allSettled([
-      feedsStore.loadFeeds(),
-      feedsStore.loadDisplayPrefs(),
-      labelsStore.loadLabels(),
-      loadSearchLanguages(),
-      loadPluginButtons(),
-      loadUpdates(),
-    ]);
-
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        console.error('Startup load failed:', result.reason);
-      }
-    }
+    await loadStartupData();
 
     applyThemePalette();
 
@@ -1418,6 +1425,7 @@ onMounted(async () => {
     }
 
     startPolling();
+    scheduleUpdateCheck();
   }
 
   window.addEventListener('popstate', onOverlayPopState);

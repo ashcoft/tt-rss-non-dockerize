@@ -927,10 +927,15 @@ class RPC extends Handler_Protected {
 			'toolbar' => $this->_render_plugin_hook(PluginHost::HOOK_TOOLBAR_BUTTON),
 			'feed_tree' => $this->_render_plugin_hook(PluginHost::HOOK_FEED_TREE),
 			'action_items' => $this->_render_plugin_hook(PluginHost::HOOK_ACTION_ITEM),
-			'headline_toolbar' => $this->_render_plugin_hook_args(PluginHost::HOOK_HEADLINE_TOOLBAR_BUTTON, [$feed, $is_cat]),
+			'headline_toolbar' => $feed > 0
+				? $this->_render_plugin_hook_args(PluginHost::HOOK_HEADLINE_TOOLBAR_BUTTON, [$feed, $is_cat])
+				: '',
 			// HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2 renders <option> elements
-			// for the legacy Select dropdown.
-			'headline_menu_items' => $this->_render_plugin_hook_args(PluginHost::HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2, [$feed, $is_cat]),
+			// for the legacy Select dropdown. Only call it for a concrete feed:
+			// the startup request has no feed and some plugins assume one.
+			'headline_menu_items' => $feed > 0
+				? $this->_render_plugin_hook_args(PluginHost::HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2, [$feed, $is_cat])
+				: '',
 			'custom_sort_map' => $custom_sort_map,
 		]);
 	}
