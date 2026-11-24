@@ -30,6 +30,7 @@ function requireModule(id) {
 const LOCAL_SOURCES = {
   '@/composables/useInfiniteScroll': '../../src/vue/composables/useInfiniteScroll.ts',
   '../../utils/runDetached': '../../src/vue/utils/runDetached.ts',
+  '../utils/pluginIcons': '../../src/vue/utils/pluginIcons.ts',
 };
 
 function compileComponent(relativePath) {

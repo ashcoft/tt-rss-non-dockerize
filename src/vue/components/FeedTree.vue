@@ -156,6 +156,21 @@
             <v-icon v-else size="16">mdi-rss</v-icon>
           </template>
           <template #append>
+            <v-progress-circular
+              v-if="loadingFeedId === feed.id"
+              class="feed-loading"
+              indeterminate
+              size="14"
+              width="2"
+            />
+            <v-icon
+              v-else-if="feed.error"
+              class="feed-error"
+              icon="mdi-alert-circle"
+              size="14"
+              color="warning"
+              :title="feed.error"
+            />
             <span v-if="feed.unread > 0" class="counter">{{ feed.unread }}</span>
             <span class="feed-actions">
               <v-btn
@@ -247,6 +262,21 @@
             <v-icon v-else size="16">mdi-rss</v-icon>
           </template>
           <template #append>
+            <v-progress-circular
+              v-if="loadingFeedId === feed.id"
+              class="feed-loading"
+              indeterminate
+              size="14"
+              width="2"
+            />
+            <v-icon
+              v-else-if="feed.error"
+              class="feed-error"
+              icon="mdi-alert-circle"
+              size="14"
+              color="warning"
+              :title="feed.error"
+            />
             <span v-if="feed.unread > 0" class="counter">{{ feed.unread }}</span>
             <span class="feed-actions">
               <v-btn
@@ -291,6 +321,8 @@ interface Props {
   hideReadShowsSpecial?: boolean;
   /** FEEDS_SORT_BY_UNREAD: order feeds by their unread count. */
   sortByUnread?: boolean;
+  /** Feed currently loading headlines, shown with a spinner. */
+  loadingFeedId?: number | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -300,7 +332,8 @@ const props = withDefaults(defineProps<Props>(), {
   iconsUrl: '/public.php',
   specialCounters: () => ({}),
   hideReadShowsSpecial: true,
-  sortByUnread: false
+  sortByUnread: false,
+  loadingFeedId: null
 });
 
 const emit = defineEmits<{
@@ -344,6 +377,16 @@ const onDragEnd = () => {
 };
 // The virtual feed group starts expanded, like the legacy tree.
 const openedGroups = ref<string[]>(['special']);
+
+/** Legacy x hotkey: collapse/expand the active category's group. */
+const toggleCategory = (categoryId: number) => {
+  const key = `cat-${categoryId}`;
+  openedGroups.value = openedGroups.value.includes(key)
+    ? openedGroups.value.filter(value => value !== key)
+    : [...openedGroups.value, key];
+};
+
+defineExpose({ toggleCategory });
 // Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
 // broken icon does not hide the rest.
 const iconFailed = ref(new Set<number>());

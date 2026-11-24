@@ -3,6 +3,18 @@
     <div class="toolbar-left">
       <v-icon v-if="feedInfo" icon="mdi-rss" size="18" class="feed-icon" />
       <span v-if="feedInfo" class="feed-title">{{ feedInfo.title }}</span>
+      <template v-if="searchQuery">
+        <span class="search-query" :title="searchQuery">Search: {{ searchQuery }}</span>
+        <v-btn size="small" variant="text" @click="emit('action', 'cancelSearch')">Cancel search</v-btn>
+      </template>
+      <v-btn
+        v-if="feedInfo"
+        icon="mdi-rss-box"
+        variant="text"
+        size="small"
+        title="Show as feed"
+        @click="emit('action', 'showAsFeed')"
+      />
       <span class="toolbar-center">
         <!-- Feed update error, mirroring the legacy toolbar's error icon. -->
         <v-icon
@@ -18,6 +30,41 @@
       <!-- Plugin-provided main toolbar buttons (HOOK_MAIN_TOOLBAR_BUTTON). -->
       <PluginSurface v-if="pluginMainHtml" :html="pluginMainHtml" class="plugin-main-toolbar" />
       <PluginSurface v-if="pluginHeadlineHtml" :html="pluginHeadlineHtml" class="plugin-headline-toolbar" />
+
+      <!-- Legacy alert icons: server reachability, error log, daemon health. -->
+      <v-icon
+        v-if="networkDown"
+        class="net-alert"
+        icon="mdi-wifi-off"
+        color="warning"
+        size="18"
+        title="Communication problem with server."
+      />
+      <v-icon
+        v-if="recentLogEvents > 0"
+        class="log-alert"
+        icon="mdi-alert"
+        color="warning"
+        size="18"
+        title="Recent entries found in event log."
+        @click="emit('open-system-log')"
+      />
+      <v-icon
+        v-if="daemonIsRunning === false"
+        class="daemon-alert"
+        icon="mdi-heart-pulse"
+        color="warning"
+        size="18"
+        title="Update daemon is not running."
+      />
+      <v-icon
+        v-else-if="daemonStampOk === false"
+        class="daemon-alert"
+        icon="mdi-clock-alert-outline"
+        color="warning"
+        size="18"
+        title="Update daemon is not updating feeds."
+      />
 
       <a
         v-if="updateUrl"
@@ -57,6 +104,18 @@
           >
             <v-list-item-title>{{ item.title }}</v-list-item-title>
           </v-list-item>
+          <template v-if="pluginMenuItems.length > 0">
+            <v-divider />
+            <template v-for="(item, index) in pluginMenuItems" :key="`plugin-${index}`">
+              <v-divider v-if="item.separator" />
+              <v-list-item
+                v-else
+                @click="emit('plugin-select', item.value)"
+              >
+                <v-list-item-title>{{ item.title }}</v-list-item-title>
+              </v-list-item>
+            </template>
+          </template>
         </v-list>
       </v-menu>
 
@@ -173,8 +232,20 @@ interface Props {
   pluginUpdates?: boolean;
   /** CDM_EXPANDED: every combined row is expanded. */
   cdmExpanded?: boolean;
+  /** Current search term, shown with a cancel link like the legacy toolbar. */
+  searchQuery?: string;
   /** WIDESCREEN_MODE: the feed tree is hidden. */
   wideScreen?: boolean;
+  /** Plugin `<option>` entries for the Select menu. */
+  pluginMenuItems?: Array<{ value: string; title: string; separator: boolean }>;
+  /** Recent event-log entries (0 hides the alert icon). */
+  recentLogEvents?: number;
+  /** Backend reachability, from the transport. */
+  networkDown?: boolean;
+  /** False when the update daemon is known to be stopped. */
+  daemonIsRunning?: boolean | null;
+  /** False when the daemon's update stamp is stale. */
+  daemonStampOk?: boolean | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -189,11 +260,19 @@ const props = withDefaults(defineProps<Props>(), {
   updateUrl: '',
   pluginUpdates: false,
   cdmExpanded: true,
+  searchQuery: '',
   wideScreen: false,
+  pluginMenuItems: () => [],
+  recentLogEvents: 0,
+  networkDown: false,
+  daemonIsRunning: null,
+  daemonStampOk: null,
 });
 
 const emit = defineEmits<{
   (e: 'action', action: string, payload?: string | number | object): void;
+  (e: 'plugin-select', value: string): void;
+  (e: 'open-system-log'): void;
 }>();
 
 // State
@@ -233,11 +312,14 @@ const actionOptions = computed(() => [
   { title: 'Refresh', value: 'refresh', icon: 'mdi-refresh' },
   { title: 'Search...', value: 'focusSearch', icon: 'mdi-magnify' },
   { title: 'Search feeds...', value: 'searchFeeds', icon: 'mdi-filter-outline' },
+  { title: 'Show as feed...', value: 'showAsFeed', icon: 'mdi-rss-box' },
   { title: 'Subscribe to feed...', value: 'manageFeeds', icon: 'mdi-plus-box' },
   { title: 'Edit this feed...', value: 'edit', icon: 'mdi-pencil' },
   { title: 'Unsubscribe', value: 'delete', icon: 'mdi-delete' },
   { title: 'Mark as read', value: 'catchup', icon: 'mdi-check-all' },
   { title: '(Un)hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' },
+  { title: 'Debug feed update', value: 'debugFeedUpdate', icon: 'mdi-bug-outline' },
+  { title: 'Debug viewfeed()', value: 'debugViewFeed', icon: 'mdi-code-json' },
   { title: 'Toggle combined mode', value: 'toggleCombinedMode', icon: 'mdi-view-agenda-outline' },
   {
     title: props.wideScreen ? 'Disable widescreen mode' : 'Enable widescreen mode',
@@ -331,6 +413,15 @@ const handleAction = (command: string, payload?: string | number | object) => {
 .feed-icon {
   margin-left: 4px;
   color: rgba(var(--v-theme-on-background), 0.55);
+}
+
+.search-query {
+  max-width: 220px;
+  overflow: hidden;
+  color: rgba(var(--v-theme-on-background), 0.6);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar-right :deep(.v-btn) {

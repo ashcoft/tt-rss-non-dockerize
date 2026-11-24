@@ -46,6 +46,10 @@ export interface AdaptedFeed {
   site_url: string;
   /** True when the backend has a cached favicon for this feed. */
   has_icon: boolean;
+  /** The feed's last update error, or "". */
+  error: string;
+  /** The feed's last update time as the backend formatted it. */
+  updated: string;
 }
 
 export interface AdaptedCategory {
@@ -93,6 +97,24 @@ export interface AdaptedHeadline {
   feed_bg_color: string;
   /** Plugin-provided article buttons (parsed from the backend's HTML). */
   pluginButtons: AdaptedPluginButton[];
+  /** Plugin-provided buttons rendered on the left of the headline row. */
+  pluginLeftButtons: AdaptedPluginButton[];
+  /** The headline's feed site URL, for the row's feed icon/pill. */
+  feed_site_url: string;
+  /** True when the headline's feed has a cached icon. */
+  feed_has_icon: boolean;
+  /** Content language from the backend. */
+  lang: string;
+  /** Localized import date shown as the row tooltip. */
+  imported: string;
+}
+
+/** One plugin-provided entry in the headlines Select menu. */
+export interface AdaptedPluginSelectItem {
+  value: string;
+  title: string;
+  /** `<option></option>` separators from the plugin markup. */
+  separator: boolean;
 }
 
 /**
@@ -119,6 +141,7 @@ export interface AdaptedLabel {
 interface LegacyCounters {
   feeds: Map<number, number>;
   categories: Map<number, number>;
+  runtime: AdaptedRuntimeInfo | null;
 }
 
 function asString(value: unknown, fallback = ''): string {
@@ -174,7 +197,27 @@ async function loadCounters(backend: LegacyBackend): Promise<LegacyCounters> {
     }
   }
 
-  return { feeds, categories };
+  return { feeds, categories, runtime: adaptRuntimeInfo(body['runtime-info']) };
+}
+
+export interface AdaptedRuntimeInfo {
+  /** Recent error-log entries; only present for admins using SQL logging. */
+  recentLogEvents: number;
+  /** False when the update daemon is known to be stopped. */
+  daemonIsRunning: boolean | null;
+  /** False when the daemon is running but its update stamp is stale. */
+  daemonStampOk: boolean | null;
+}
+
+function adaptRuntimeInfo(raw: unknown): AdaptedRuntimeInfo | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const info = raw as Record<string, unknown>;
+
+  return {
+    recentLogEvents: asNumber(info.recent_log_events, 0),
+    daemonIsRunning: 'daemon_is_running' in info ? asBoolean(info.daemon_is_running) : null,
+    daemonStampOk: 'daemon_stamp_ok' in info ? asBoolean(info.daemon_stamp_ok) : null,
+  };
 }
 
 /** The unread counters for the virtual ("special") feeds. */
@@ -193,6 +236,8 @@ export interface AdaptedCounters {
   special: Record<number, number>;
   feeds: Record<number, number>;
   categories: Record<number, number>;
+  /** Daemon/log health piggybacked on the counters poll. */
+  runtime: AdaptedRuntimeInfo | null;
 }
 
 /** Read the authoritative counters, e.g. after an article action. */
@@ -203,6 +248,7 @@ export async function getCounters(backend: LegacyBackend): Promise<AdaptedCounte
     special: specialCounters(counters),
     feeds: Object.fromEntries(counters.feeds),
     categories: Object.fromEntries(counters.categories),
+    runtime: counters.runtime,
   };
 }
 
@@ -255,6 +301,8 @@ function adaptTreeNode(
     feed_url: '',
     site_url: '',
     has_icon: asString(node.icon) !== '',
+    error: asString(node.error),
+    updated: asString(node.updated),
   };
 }
 
@@ -325,6 +373,8 @@ export async function getFeedTree(
   feeds: AdaptedFeed[];
   categories: AdaptedCategory[];
   special: Record<number, number>;
+  /** Daemon/log health piggybacked on the counters request. */
+  runtime: AdaptedRuntimeInfo | null;
 }> {
   const [treeResponse, counters] = await Promise.all([
     backend.call('Pref_Feeds', 'getfeedtree', { mode: 2 }),
@@ -339,7 +389,7 @@ export async function getFeedTree(
 
   collectTree(rootItems, null, counters, feeds, categories);
 
-  return { feeds, categories, special: specialCounters(counters) };
+  return { feeds, categories, special: specialCounters(counters), runtime: counters.runtime };
 }
 
 export interface HeadlinesPage {
@@ -354,6 +404,10 @@ export interface HeadlinesPage {
   feedSiteUrl: string;
   /** Set when the first article changed while paging through a feed. */
   firstIdChanged: boolean;
+  /** Plugin entries for the headlines Select menu. */
+  pluginMenuItems: AdaptedPluginSelectItem[];
+  /** True when the list mixes several feeds (a virtual feed). */
+  isVfeed: boolean;
 }
 
 /**
@@ -382,6 +436,43 @@ function adaptPluginButtons(html: string): AdaptedPluginButton[] {
     });
   }
   return buttons;
+}
+
+/** Decode the handful of entities the backend emits inside `<option>`. */
+function decodeOptionText(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&#x27;/gi, "'");
+}
+
+/**
+ * Parse the plugin `<option>` list for the headlines Select menu
+ * (`HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2`). Plugins may emit separators as
+ * an empty `<option>`, which the Vue menu renders as a divider.
+ */
+function adaptPluginSelectMenu(html: string): AdaptedPluginSelectItem[] {
+  if (!html) return [];
+
+  const items: AdaptedPluginSelectItem[] = [];
+
+  for (const match of html.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi)) {
+    const attrs = match[1];
+    const valueMatch = /\bvalue\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
+    const value = valueMatch ? (valueMatch[2] ?? valueMatch[3] ?? '') : '';
+    const title = decodeOptionText(match[2].replace(/<[^>]*>/g, '').trim());
+
+    if (value === '') {
+      items.push({ value: '', title, separator: true });
+      continue;
+    }
+
+    items.push({ value, title: title || value, separator: false });
+  }
+
+  return items;
 }
 
 function adaptHeadline(raw: unknown): AdaptedHeadline {
@@ -434,6 +525,11 @@ function adaptHeadline(raw: unknown): AdaptedHeadline {
     image_preview: asString(line.image_preview),
     feed_bg_color: asString(line.feed_bg_color),
     pluginButtons: adaptPluginButtons(asString(line.buttons)),
+    pluginLeftButtons: adaptPluginButtons(asString(line.buttons_left)),
+    feed_site_url: asString(line.site_url),
+    feed_has_icon: asBoolean(line.has_icon),
+    lang: asString(line.lang),
+    imported: asString(line.imported),
   };
 }
 
@@ -496,10 +592,12 @@ export async function getHeadlines(
   const feedError = asString(toolbar.error).trim() || null;
   const feedSiteUrl = asString(toolbar.site_url);
   const firstIdChanged = headlines.first_id_changed === true;
+  const pluginMenuItems = adaptPluginSelectMenu(asString(toolbar.plugin_menu_items));
+  const isVfeed = asBoolean(headlines.is_vfeed);
 
   if (typeof content === 'string') {
     // A string body is the legacy empty/error marker.
-    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError, feedSiteUrl, firstIdChanged };
+    return { headlines: [], count, first_id: firstId, message: stripTags(content), feedError, feedSiteUrl, firstIdChanged, pluginMenuItems, isVfeed };
   }
 
   const rows = expectArray(content, 'Feeds/view.headlines.content');
@@ -511,6 +609,8 @@ export async function getHeadlines(
     feedError,
     feedSiteUrl,
     firstIdChanged,
+    pluginMenuItems,
+    isVfeed,
   };
 }
 
@@ -1379,6 +1479,8 @@ export interface PluginSurfaces {
   actionItems: string;
   /** HTML for HOOK_HEADLINE_TOOLBAR_BUTTON (per-feed headline toolbar). */
   headlineToolbar: string;
+  /** `<option>` markup for HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2. */
+  headlineMenuItems: string;
   /** Extra sort options from HOOK_HEADLINES_CUSTOM_SORT_MAP. */
   customSortMap: Record<string, string>;
 }
@@ -1415,8 +1517,29 @@ export async function getPluginButtons(
     feedTree: asString(body.feed_tree),
     actionItems: asString(body.action_items),
     headlineToolbar: asString(body.headline_toolbar),
+    headlineMenuItems: asString(body.headline_menu_items),
     customSortMap,
   };
+}
+
+/**
+ * Fetch HOOK_LOGINFORM_ADDITIONAL_BUTTONS for the Vue login screen.
+ *
+ * `public.php` is the unauthenticated entry point (the same one the legacy
+ * login form used), so this bypasses the backend.php transport.
+ */
+export async function getLoginFormButtons(): Promise<string> {
+  const response = await fetch('public.php?op=loginformbuttons', {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new LegacyProtocolError(`public.php answered ${response.status}`);
+  }
+
+  const body = (await response.json()) as Record<string, unknown>;
+  return asString(body.html);
 }
 
 /** Fetch one plugin-provided preferences section (`HOOK_PREFS_TAB_SECTION`). */

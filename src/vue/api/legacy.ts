@@ -13,6 +13,8 @@
  *   plain JSON object, some print nothing, and errors use `{error: {code}}`.
  */
 
+import { markNetworkFailure, markNetworkSuccess } from '../utils/networkStatus';
+
 export type LegacyParam = string | number | boolean;
 export type LegacyParams = Record<string, LegacyParam | LegacyParam[] | undefined>;
 
@@ -267,11 +269,15 @@ export class LegacyBackend {
         body: body.toString(),
       });
     } catch (cause) {
+      markNetworkFailure();
       const detail = cause instanceof Error ? cause.message : String(cause);
       throw new LegacyProtocolError(`${op}->${method} request failed: ${detail}`);
     }
 
+    markNetworkSuccess();
+
     if (!response.ok) {
+      if (response.status >= 500) markNetworkFailure();
       throw new LegacyProtocolError(`${op}->${method} returned HTTP ${response.status}.`);
     }
 
@@ -293,11 +299,15 @@ export class LegacyBackend {
         body: form,
       });
     } catch (cause) {
+      markNetworkFailure();
       const detail = cause instanceof Error ? cause.message : String(cause);
       throw new LegacyProtocolError(`${op}->${method} request failed: ${detail}`);
     }
 
+    markNetworkSuccess();
+
     if (!response.ok) {
+      if (response.status >= 500) markNetworkFailure();
       throw new LegacyProtocolError(`${op}->${method} returned HTTP ${response.status}.`);
     }
 

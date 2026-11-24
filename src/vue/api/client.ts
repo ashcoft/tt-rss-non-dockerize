@@ -40,6 +40,7 @@ export type {
   PluginInfo,
   PluginsList,
   AdaptedCounters,
+  AdaptedRuntimeInfo,
 } from './legacyEndpoints';
 
 /**
@@ -208,12 +209,14 @@ class ApiClient {
       feeds: endpoints.AdaptedFeed[];
       categories: endpoints.AdaptedCategory[];
       special: Record<number, number>;
+      runtime: endpoints.AdaptedRuntimeInfo | null;
     }>
   > {
     return this.wrap(() => endpoints.getFeedTree(legacyBackend), {
       feeds: [],
       categories: [],
       special: {},
+      runtime: null,
     });
   }
 
@@ -222,6 +225,7 @@ class ApiClient {
       special: {},
       feeds: {},
       categories: {},
+      runtime: null,
     });
   }
 
@@ -348,6 +352,8 @@ class ApiClient {
       feedError: null,
       feedSiteUrl: '',
       firstIdChanged: false,
+      pluginMenuItems: [],
+      isVfeed: false,
     });
   }
 
@@ -559,8 +565,14 @@ class ApiClient {
       feedTree: '',
       actionItems: '',
       headlineToolbar: '',
+      headlineMenuItems: '',
       customSortMap: {},
     });
+  }
+
+  /** HOOK_LOGINFORM_ADDITIONAL_BUTTONS HTML for the login screen. */
+  async getLoginFormButtons(): Promise<ApiResponse<string>> {
+    return this.wrap(() => endpoints.getLoginFormButtons(), '');
   }
 
   /** Plugin-provided preferences section HTML. */

@@ -4,6 +4,7 @@ import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
 import api from '@/api/client';
+import { pluginIcon } from '../utils/pluginIcons';
 import ShareDialog from './dialogs/ShareDialog.vue';
 
 const props = defineProps<{
@@ -20,20 +21,12 @@ const emit = defineEmits<{
 const headlinesStore = useHeadlinesStore();
 
 // Plugin article buttons run their handler through PluginHandler and render the
-// returned HTML fragment in a dialog. Material-icons names are mapped to their
-// MDI equivalents (the Vue app uses @mdi/font).
-const PLUGIN_ICONS: Record<string, string> = {
-  note: 'mdi-note-edit-outline',
-  link: 'mdi-link-variant',
-  bookmark_outline: 'mdi-bookmark-outline',
-};
-
-const pluginIcon = (icon: string): string => PLUGIN_ICONS[icon] ?? 'mdi-extension';
-
+// returned HTML fragment in a dialog. Icons are mapped to MDI in pluginIcons.
 const pluginDialog = ref<{ title: string; html: string } | null>(null);
 const pluginBusy = ref(false);
 const shareDialogOpen = ref(false);
 const shareArticleId = ref(props.article.id);
+const zoomOpen = ref(false);
 
 /** Sanitize the plugin's dialog body before rendering it. */
 const sanitizedPluginHtml = computed(() =>
@@ -94,6 +87,27 @@ const openOriginal = () => {
   window.open(props.article.link, '_blank', 'noopener,noreferrer');
 };
 
+/** Print just the article body in a clean window, not the app chrome. */
+const printArticle = () => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+
+  const title = props.article.title.replace(/[<>&]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] ?? char));
+  const meta = [props.article.feed_title, props.article.updated_long || props.article.updated]
+    .filter(Boolean)
+    .join(' · ');
+
+  printWindow.document.write(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>` +
+      '<style>body{font-family:system-ui,sans-serif;line-height:1.55;margin:2rem auto;max-width:46rem;padding:0 1rem;color:#222}' +
+      'img{max-width:100%;height:auto}h1{font-size:1.6rem;line-height:1.25}.meta{color:#666;font-size:.875rem;margin-bottom:1.5rem}</style>' +
+      `</head><body><h1>${title}</h1><p class="meta">${meta}</p>${sanitizedContent.value}</body></html>`
+  );
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+};
+
 /** Clicking the body/image opens the original site, but links and text
  * selections keep their normal behaviour. */
 const onBodyClick = (event: MouseEvent) => {
@@ -152,12 +166,12 @@ const sanitizedContent = computed(() => {
 </script>
 
 <template>
-  <div class="article-view">
-    <article class="article-content">
-      <header class="article-header">
+  <div class="article-view post">
+    <article class="article-content content">
+      <header class="article-header header">
         <div class="article-header-inner">
           <v-btn icon="mdi-close" variant="text" @click="closeArticle" class="mr-2" />
-          <h1>
+          <h1 class="title">
             <a :href="article.link" target="_blank" rel="noopener noreferrer">
               {{ article.title }}
             </a>
@@ -175,8 +189,10 @@ const sanitizedContent = computed(() => {
           >
             <v-icon>{{ pluginIcon(button.icon) }}</v-icon>
           </v-btn>
+          <v-btn icon="mdi-magnify-plus-outline" variant="text" size="small" title="Zoom article" @click="zoomOpen = true" />
+          <v-btn icon="mdi-printer-outline" variant="text" size="small" title="Print article" @click="printArticle" />
         </div>
-        <div class="article-meta">
+        <div class="article-meta row">
           <a
             v-if="feedSiteUrl"
             class="feed"
@@ -200,9 +216,11 @@ const sanitizedContent = computed(() => {
           </a>
         </div>
       </header>
-      
+
       <!-- Content is sanitized client-side using DOMPurify for XSS prevention -->
-      <div class="article-body" v-html="sanitizedContent" @click="onBodyClick"></div>
+      <div class="article-body content" @click="onBodyClick">
+        <div class="content-inner" v-html="sanitizedContent"></div>
+      </div>
 
       <!-- Attachments (enclosures): playable audio/video inline, others linked. -->
       <div v-if="attachments.length > 0" class="article-attachments">
@@ -215,7 +233,7 @@ const sanitizedContent = computed(() => {
           </a>
         </div>
       </div>
-      
+
       <!-- Tags, score and note, compacted to the legacy post footer. -->
       <div class="article-tools">
         <div class="article-tags-row">
@@ -263,7 +281,7 @@ const sanitizedContent = computed(() => {
       </div>
 
       <!-- Article metadata footer -->
-      <footer class="article-footer">
+      <footer class="article-footer row">
         <a :href="article.link" target="_blank" rel="noopener noreferrer">
           View Original
         </a>
@@ -277,6 +295,26 @@ const sanitizedContent = computed(() => {
         </div>
       </footer>
     </article>
+
+    <!-- Zoom: a readable full-screen view of the sanitized article body. -->
+    <v-dialog v-model="zoomOpen" fullscreen scrollable>
+      <v-card class="zoom-card">
+        <v-toolbar density="compact" color="surface">
+          <v-toolbar-title>{{ article.title }}</v-toolbar-title>
+          <v-spacer />
+          <v-btn icon="mdi-printer-outline" variant="text" title="Print article" @click="printArticle" />
+          <v-btn icon="mdi-close" variant="text" title="Close" @click="zoomOpen = false" />
+        </v-toolbar>
+        <v-card-text class="zoom-content">
+          <h1>{{ article.title }}</h1>
+          <div class="zoom-meta">
+            <span>{{ article.feed_title }}</span>
+            <time>{{ article.updated_long || article.updated }}</time>
+          </div>
+          <div class="content-inner" v-html="sanitizedContent"></div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <!-- Share plugin: the legacy JS drove this dialog, so the Vue app owns it. -->
     <ShareDialog v-model="shareDialogOpen" :article-id="shareArticleId" />
@@ -466,5 +504,39 @@ const sanitizedContent = computed(() => {
 
 .article-footer a:hover {
   text-decoration: underline;
+}
+
+.zoom-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.zoom-content {
+  flex: 1;
+  overflow-y: auto;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.zoom-content h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+.zoom-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: rgba(var(--v-theme-on-background), 0.6);
+  font-size: 0.875rem;
+}
+
+.zoom-content :deep(img) {
+  max-width: 100%;
+  height: auto;
 }
 </style>

@@ -273,10 +273,19 @@ import SystemPanel from './SystemPanel.vue';
 import { useFeedsStore } from '../../stores';
 import type { PluginPrefsTab } from '../../api/legacyEndpoints';
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{ modelValue: boolean; initialTab?: string }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
 
-const tab = ref('general');
+const tab = ref(props.initialTab ?? 'general');
+
+// A caller (e.g. the toolbar's log alert) can ask for a specific tab; apply it
+// whenever the dialog opens, since the dialog stays mounted between uses.
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open && props.initialTab) tab.value = props.initialTab;
+  }
+);
 const loadingPrefs = ref(false);
 const loadingFilters = ref(false);
 const isAdmin = ref(false);

@@ -28,6 +28,11 @@ export interface Headline {
   author: string;
   score: number;
   note: string;
+  feed_site_url?: string;
+  feed_has_icon?: boolean;
+  lang?: string;
+  imported?: string;
+  pluginLeftButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
 }
 
 export interface Article {
@@ -51,6 +56,22 @@ export interface Article {
   author: string;
   score: number;
   note: string;
+  feed_site_url?: string;
+  feed_has_icon?: boolean;
+  lang?: string;
+  imported?: string;
+  pluginLeftButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
+  pluginButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
+  enclosures?: Array<{
+    content_url: string;
+    content_type: string;
+    title: string;
+    duration: string;
+    width: number;
+    height: number;
+  }>;
+  image_preview?: string;
+  feed_bg_color?: string;
 }
 
 /**
@@ -98,6 +119,10 @@ export const useHeadlinesStore = defineStore('headlines', () => {
   const feedError = ref<string | null>(null);
   /** The current feed's site URL, from the toolbar payload. */
   const feedSiteUrl = ref('');
+  /** Plugin entries for the headlines Select menu. */
+  const pluginMenuItems = ref<Array<{ value: string; title: string; separator: boolean }>>([]);
+  /** True when the list mixes several feeds (a virtual feed). */
+  const isVfeed = ref(false);
   /** Feeds/view reports that the first article changed while paging. */
   const firstIdChanged = ref(false);
   const viewMode = ref<string>('adaptive');
@@ -242,6 +267,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
         notice.value = response.content.message;
         feedError.value = response.content.feedError;
         feedSiteUrl.value = response.content.feedSiteUrl;
+        pluginMenuItems.value = response.content.pluginMenuItems;
+        isVfeed.value = response.content.isVfeed;
         firstIdChanged.value = response.content.firstIdChanged;
       } else {
         error.value = response.error ?? 'Failed to load headlines';
@@ -692,6 +719,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     selectedArticle.value = null;
     error.value = null;
     notice.value = null;
+    pluginMenuItems.value = [];
+    isVfeed.value = false;
     searchQuery.value = '';
     hasMore.value = false;
     skip.value = 0;
@@ -709,6 +738,8 @@ export const useHeadlinesStore = defineStore('headlines', () => {
     notice,
     feedError,
     feedSiteUrl,
+    pluginMenuItems,
+    isVfeed,
     firstIdChanged,
     viewMode,
     searchQuery,

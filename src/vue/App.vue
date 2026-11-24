@@ -3,11 +3,12 @@
     <!-- Login gate (Phase 3) -->
     <LoginForm v-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
 
-    <div v-else class="ttrss-app" :class="{ 'wide-screen': feedsStore.wideScreen }">
+    <div v-else id="main" class="ttrss-app ttrss_main" :class="{ 'wide-screen': feedsStore.wideScreen }">
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
-      <aside class="sidebar" :class="{ open: sidebarOpen }" :style="sidebarStyle">
+      <aside id="feeds-holder" class="sidebar feeds-holder" :class="{ open: sidebarOpen }" :style="sidebarStyle">
         <PluginSurface v-if="pluginFeedTreeHtml" :html="pluginFeedTreeHtml" class="plugin-feed-tree" />
         <FeedTree
+          ref="feedTreeRef"
           :feeds="feedsStore.feeds"
           :categories="feedsStore.categories"
           :labels="labelsStore.labels"
@@ -17,6 +18,7 @@
           :special-counters="feedsStore.specialCounters"
           :hide-read-shows-special="feedsStore.hideReadShowsSpecial"
           :sort-by-unread="feedsStore.feedsSortByUnread"
+          :loading-feed-id="headlinesStore.loading ? (typeof feedsStore.currentFeedId === 'number' ? feedsStore.currentFeedId : null) : null"
           @select="handleFeedSelect"
           @feed-action="handleFeedAction"
           @reorder="handleFeedReorder"
@@ -24,10 +26,10 @@
           @category-action="handleCategoryAction"
         />
       </aside>
-      <div class="sidebar-splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
+      <div class="sidebar-splitter" id="feeds-holder_splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
 
-      <div class="app-content">
-        <header class="app-header">
+      <div id="content-wrap" class="app-content content-wrap">
+        <header id="toolbar-frame" class="app-header toolbar-frame">
           <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
           <Toolbar
             :feed-info="feedsStore.currentFeed"
@@ -42,12 +44,20 @@
             :update-url="updateUrl"
             :plugin-updates="pluginUpdatesAvailable"
             :cdm-expanded="feedsStore.cdmExpanded"
+            :search-query="headlinesStore.searchQuery"
             :wide-screen="feedsStore.wideScreen"
+            :plugin-menu-items="headlinesStore.pluginMenuItems"
+            :recent-log-events="feedsStore.recentLogEvents"
+            :network-down="networkDown"
+            :daemon-is-running="feedsStore.daemonIsRunning"
+            :daemon-stamp-ok="feedsStore.daemonStampOk"
             @action="handleToolbarAction"
+            @plugin-select="handlePluginSelectAction"
+            @open-system-log="openSystemLog"
           />
         </header>
 
-        <section class="content">
+        <section id="headlines-wrap-inner" class="content headlines-wrap-inner">
           <v-alert
             v-if="headlinesStore.notice && headlinesStore.headlines.length === 0"
             type="info"
@@ -71,6 +81,7 @@
           </v-alert>
 
           <HeadlinesList
+            ref="headlinesListRef"
             :headlines="headlinesStore.headlines"
             :loading="headlinesStore.loading"
             :loading-more="headlinesStore.loadingMore"
@@ -86,6 +97,8 @@
             :auto-catchup="feedsStore.cdmAutoCatchup"
             :feed-site-url="headlinesStore.feedSiteUrl"
             :first-id-changed="headlinesStore.firstIdChanged"
+            :icons-url="feedsStore.iconsUrl"
+            :is-vfeed="headlinesStore.isVfeed"
             @toggle-select="headlinesStore.toggleHeadlineSelected"
             @auto-catchup="handleAutoCatchup"
             @select="handleHeadlineSelect"
@@ -100,14 +113,16 @@
         <!-- In combined mode the content is inline in the list, so no panel. -->
         <div
           v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
+          id="content-insert_splitter"
           class="article-splitter"
           title="Resize article pane"
           @pointerdown="startArticleResize"
         />
         <aside
-          class="article-panel"
-          :style="articleStyle"
           v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
+          id="content-insert"
+          class="article-panel content-insert"
+          :style="articleStyle"
         >
           <ArticleView
             :article="headlinesStore.selectedArticle"
@@ -123,8 +138,14 @@
     <!-- Dialogs (Phase 3/4) -->
     <ManageFeedsDialog v-model="feedsDialogOpen" />
     <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
-    <PreferencesDialog v-model="prefsOpen" />
+    <PreferencesDialog v-model="prefsOpen" :initial-tab="prefsTab" />
     <HotkeyHelpDialog v-model="hotkeyHelpOpen" />
+    <GeneratedFeedDialog
+      v-model="generatedFeedOpen"
+      :feed-id="generatedFeedId"
+      :is-cat="generatedFeedIsCat"
+      :search="generatedFeedSearch"
+    />
 
     <!-- Legacy "Search..." dialog: the toolbar has no permanent search box. -->
     <v-dialog v-model="searchDialogOpen" max-width="520">
@@ -219,8 +240,11 @@ import ManageFeedsDialog from './components/dialogs/ManageFeedsDialog.vue';
 import LabelsDialog from './components/dialogs/LabelsDialog.vue';
 import PreferencesDialog from './components/dialogs/PreferencesDialog.vue';
 import HotkeyHelpDialog from './components/dialogs/HotkeyHelpDialog.vue';
+import GeneratedFeedDialog from './components/dialogs/GeneratedFeedDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
 import { runDetached } from './utils/runDetached';
+import { networkDown } from './utils/networkStatus';
+import { runPluginSelectMenuAction } from './utils/pluginHost';
 import { FEED_ALL, FEED_FRESH } from './api/legacyEndpoints';
 
 const feedsStore = useFeedsStore();
@@ -242,12 +266,19 @@ const prefsOpen = ref(
   typeof window !== 'undefined' &&
     (window as unknown as { __open_preferences?: boolean }).__open_preferences === true
 );
+/** Which preferences tab the dialog opens on (e.g. System from the log alert). */
+const prefsTab = ref('general');
 const hotkeyHelpOpen = ref(false);
 const searchDialogOpen = ref(false);
 const searchDraft = ref('');
 const searchLanguageDraft = ref(headlinesStore.searchLanguage);
 const feedSearchOpen = ref(false);
 const feedSearchDraft = ref('');
+/** "Show as feed" dialog target. */
+const generatedFeedOpen = ref(false);
+const generatedFeedId = ref(0);
+const generatedFeedIsCat = ref(false);
+const generatedFeedSearch = ref('');
 
 // Splitter sizes are persisted locally, mirroring the legacy draggable panes.
 const SIDEBAR_WIDTH_KEY = 'ttrss.sidebarWidth';
@@ -309,6 +340,9 @@ const startArticleResize = (event: PointerEvent) => {
   document.addEventListener('pointerup', onUp);
 };
 const labelArticleId = ref<number | null>(null);
+/** Exposed methods used by legacy hotkeys (grid span, category collapse). */
+const headlinesListRef = ref<{ toggleGridSpan: (id: number) => void } | null>(null);
+const feedTreeRef = ref<{ toggleCategory: (id: number) => void } | null>(null);
 
 /** Feed/category matches for the "Search feeds..." dialog. */
 const feedSearchResults = computed(() => {
@@ -691,6 +725,10 @@ const handleHeadlineAction = async (headline: Headline, action: string) => {
     case 'open_feed':
       await handleFeedSelect(headline.feed_id, false);
       break;
+    case 'catchup_feed':
+      await feedsStore.catchupFeed(headline.feed_id, false);
+      await headlinesStore.loadHeadlines(feedsStore.currentFeedId, feedsStore.currentIsCat);
+      break;
     case 'delete':
       try {
         await headlinesStore.deleteArticle(headline.id);
@@ -860,6 +898,74 @@ const selectFeedSearchResult = async (item: { id: number; isCat: boolean }) => {
   await handleFeedSelect(item.id, item.isCat);
 };
 
+/** Open a preferences tab, used by the toolbar's event-log alert. */
+const openSystemLog = () => {
+  prefsTab.value = 'system';
+  prefsOpen.value = true;
+};
+
+/** Submit a POST form to backend.php in a new window (legacy postOpenWindow). */
+const postOpenWindow = (params: Record<string, string | number>) => {
+  const token = (window as unknown as { __csrf_token?: string }).__csrf_token ?? '';
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'backend.php';
+  form.target = '_blank';
+  form.rel = 'noopener noreferrer';
+
+  for (const [name, value] of Object.entries({ ...params, csrf_token: token })) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = String(value);
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+};
+
+/** Feeds::updatedebugger in a new window; only regular feeds can be debugged. */
+const debugFeedUpdate = () => {
+  const feedId = feedsStore.currentFeedId;
+  if (feedsStore.currentIsCat || typeof feedId !== 'number' || feedId <= 0) {
+    showMessage("You can't debug this kind of feed.", 'warning');
+    return;
+  }
+  postOpenWindow({ op: 'Feeds', method: 'updatedebugger', feed_id: feedId });
+};
+
+/** Feeds/view with debug=1 in a new window, mirroring the legacy hotkey. */
+const debugViewFeed = () => {
+  const feedId = feedsStore.currentFeedId;
+  if (typeof feedId !== 'number') {
+    showMessage("You can't debug this kind of feed.", 'warning');
+    return;
+  }
+  postOpenWindow({
+    op: 'Feeds',
+    method: 'view',
+    feed: feedId,
+    cat: feedsStore.currentIsCat ? 1 : 0,
+    timestamps: 1,
+    debug: 1,
+    view_mode: headlinesStore.viewMode,
+    order_by: headlinesStore.orderBy,
+    query: headlinesStore.searchQuery,
+    search_language: headlinesStore.searchLanguage,
+  });
+};
+
+/** Dispatch a plugin-provided Select-menu entry to plugin JS. */
+const handlePluginSelectAction = (value: string) => {
+  if (runPluginSelectMenuAction(value)) {
+    showMessage('Plugin action dispatched', 'info');
+  } else {
+    showMessage(`No plugin handler for "${value}"`, 'warning');
+  }
+};
+
 /** Dispatch a toolbar action (refresh, catchup, search, view mode, sort). */
 const handleToolbarAction = async (action: string, payload?: string | number | object) => {
   const feedId = feedsStore.currentFeedId;
@@ -933,8 +1039,26 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     case 'searchFeeds':
       openFeedSearch();
       break;
+    case 'cancelSearch':
+      headlinesStore.setSearchQuery('');
+      await headlinesStore.loadHeadlines(feedId, isCat);
+      break;
+    case 'showAsFeed':
+      if (typeof feedId === 'number') {
+        generatedFeedId.value = feedId;
+        generatedFeedIsCat.value = isCat;
+        generatedFeedSearch.value = headlinesStore.searchQuery;
+        generatedFeedOpen.value = true;
+      }
+      break;
     case 'hotkeyHelp':
       hotkeyHelpOpen.value = true;
+      break;
+    case 'debugFeedUpdate':
+      debugFeedUpdate();
+      break;
+    case 'debugViewFeed':
+      debugViewFeed();
       break;
     case 'preferences':
       prefsOpen.value = true;
@@ -981,17 +1105,41 @@ const handleHotkey = (action: string): void => {
       break;
     case 'next_article':
     case 'next_article_noscroll':
+    case 'next_article_noexpand':
       headlinesStore.moveCursor(1);
       break;
     case 'prev_article':
     case 'prev_article_noscroll':
+    case 'prev_article_noexpand':
       headlinesStore.moveCursor(-1);
       break;
+    case 'next_article_or_scroll':
+      if (feedsStore.combinedMode) {
+        document.querySelector('.headlines-list')?.scrollBy({ top: 120, behavior: 'smooth' });
+      } else {
+        headlinesStore.moveCursor(1);
+      }
+      break;
+    case 'prev_article_or_scroll':
+      if (feedsStore.combinedMode) {
+        document.querySelector('.headlines-list')?.scrollBy({ top: -120, behavior: 'smooth' });
+      } else {
+        headlinesStore.moveCursor(-1);
+      }
+      break;
+    case 'next_headlines_page':
     case 'article_page_down':
       document.querySelector('.headlines-list')?.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
       break;
+    case 'prev_headlines_page':
     case 'article_page_up':
       document.querySelector('.headlines-list')?.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+      break;
+    case 'article_scroll_down':
+      document.querySelector('.headlines-list')?.scrollBy({ top: 60, behavior: 'smooth' });
+      break;
+    case 'article_scroll_up':
+      document.querySelector('.headlines-list')?.scrollBy({ top: -60, behavior: 'smooth' });
       break;
     case 'search_dialog':
       openArticleSearch();
@@ -1027,8 +1175,27 @@ const handleHotkey = (action: string): void => {
       runDetached(handleToolbarAction('toggleWideScreen'), 'toggle widescreen');
       break;
     case 'toggle_full_text':
+      // af_readability owns the full-text fetch; without it the legacy client
+      // showed the same hint.
+      {
+        const plugins = (window as unknown as { Plugins?: Record<string, { embed?: (id: number) => void }> }).Plugins;
+        const readability = plugins?.Af_Readability;
+        if (cursor && readability?.embed) {
+          readability.embed(cursor.id);
+        } else {
+          showMessage('Please enable af_readability first.', 'warning');
+        }
+      }
+      break;
     case 'toggle_cdm_expanded':
+    case 'toggle_expand':
       runDetached(handleToolbarAction('toggleCdmExpanded'), 'toggle expanded');
+      break;
+    case 'feed_debug_update':
+      debugFeedUpdate();
+      break;
+    case 'feed_debug_viewfeed':
+      debugViewFeed();
       break;
     case 'email_article':
       if (cursor) {
@@ -1039,7 +1206,12 @@ const handleHotkey = (action: string): void => {
       handleArticleClose();
       break;
     case 'article_span_grid':
+      if (cursor) headlinesListRef.value?.toggleGridSpan(cursor.id);
+      break;
     case 'cat_toggle_collapse':
+      if (feedsStore.currentIsCat && typeof currentFeed === 'number') {
+        feedTreeRef.value?.toggleCategory(currentFeed);
+      }
       break;
     case 'select_all':
     case 'select_unread':
@@ -1107,10 +1279,11 @@ const handleHotkey = (action: string): void => {
       }
       break;
     case 'create_filter':
+      prefsTab.value = 'filters';
       prefsOpen.value = true;
       break;
     case 'collapse_sidebar':
-      sidebarOpen.value = false;
+      sidebarOpen.value = !sidebarOpen.value;
       break;
     case 'help_dialog':
       hotkeyHelpOpen.value = true;
@@ -1120,7 +1293,12 @@ const handleHotkey = (action: string): void => {
   }
 };
 
-useKeyboard({ onAction: handleHotkey });
+useKeyboard({
+  onAction: handleHotkey,
+  prefixes: feedsStore.hotkeyPrefixes,
+  map: feedsStore.hotkeyMap,
+  isCombined: () => feedsStore.combinedMode,
+});
 
 // Lifecycle
 onMounted(async () => {

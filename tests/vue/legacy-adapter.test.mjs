@@ -1440,6 +1440,7 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
     feed_tree: '<div class="plugin-tree">Tree</div>',
     action_items: '<button onclick="Plugins.Foo.baz()">Baz</button>',
     headline_toolbar: '<button onclick="Plugins.Foo.qux()">Qux</button>',
+    headline_menu_items: "<option value='foo_action'>Foo action</option><option></option>",
     custom_sort_map: { relevance: 'Relevance' },
   };
   const calls = stubFetch([{ text: JSON.stringify(payload) }]);
@@ -1456,6 +1457,7 @@ test('getPluginButtons maps the toolbar HTML fragments', async () => {
     feedTree: payload.feed_tree,
     actionItems: payload.action_items,
     headlineToolbar: payload.headline_toolbar,
+    headlineMenuItems: payload.headline_menu_items,
     customSortMap: payload.custom_sort_map,
   });
 });
@@ -1632,4 +1634,90 @@ test('getPluginPrefsTabs maps the plugin tab fragments', async () => {
   assert.equal(tabs.length, 1);
   assert.equal(tabs[0].plugin, 'Psql_Trgm');
   assert.equal(tabs[0].title, 'Similar articles');
+});
+
+test('getHeadlines maps plugin Select-menu items, left buttons and row metadata', async () => {
+  installGlobals();
+  const payload = {
+    headlines: {
+      first_id: 42,
+      is_vfeed: true,
+      toolbar: {
+        site_url: 'https://example.com',
+        plugin_menu_items:
+          "<option value='mark_all'>Mark all</option><option></option><option value='tag'>Tag</option>",
+      },
+      content: [
+        {
+          id: 42,
+          title: 'Test Article',
+          unread: true,
+          buttons_left: '<i onclick="Plugins.Note.edit(42)" title="Note">note</i>',
+          site_url: 'https://example.com/feed',
+          has_icon: true,
+          lang: 'de',
+          imported: 'Imported yesterday',
+        },
+      ],
+    },
+    'headlines-info': { count: 1 },
+  };
+  stubFetch([{ text: JSON.stringify(payload) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getHeadlines(backend, 7);
+
+  assert.equal(page.isVfeed, true);
+  assert.equal(page.feedSiteUrl, 'https://example.com');
+  assert.deepEqual(page.pluginMenuItems, [
+    { value: 'mark_all', title: 'Mark all', separator: false },
+    { value: '', title: '', separator: true },
+    { value: 'tag', title: 'Tag', separator: false },
+  ]);
+
+  const [headline] = page.headlines;
+  assert.deepEqual(headline.pluginLeftButtons, [
+    { plugin: 'Note', method: 'edit', icon: 'note', title: 'Note' },
+  ]);
+  assert.equal(headline.feed_site_url, 'https://example.com/feed');
+  assert.equal(headline.feed_has_icon, true);
+  assert.equal(headline.lang, 'de');
+  assert.equal(headline.imported, 'Imported yesterday');
+});
+
+test('getFeedTree keeps per-feed error/updated and the runtime info', async () => {
+  installGlobals();
+  const tree = {
+    items: [
+      {
+        bare_id: 1,
+        name: 'News',
+        items: [
+          { id: 'FEED:7', bare_id: 7, name: 'Broken feed', error: 'HTTP 500', updated: 'Never' },
+        ],
+      },
+    ],
+  };
+  const counters = {
+    counters: [{ id: 7, kind: 'feed', counter: 3 }],
+    'runtime-info': {
+      recent_log_events: 2,
+      daemon_is_running: 0,
+      daemon_stamp_ok: 0,
+    },
+  };
+  stubFetch([{ text: JSON.stringify(tree) }, { text: JSON.stringify(counters) }]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  const page = await endpoints.getFeedTree(backend);
+
+  assert.equal(page.feeds[0].error, 'HTTP 500');
+  assert.equal(page.feeds[0].updated, 'Never');
+  assert.deepEqual(page.runtime, {
+    recentLogEvents: 2,
+    daemonIsRunning: false,
+    daemonStampOk: false,
+  });
 });

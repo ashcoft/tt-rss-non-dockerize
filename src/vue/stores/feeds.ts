@@ -75,12 +75,21 @@ export const useFeedsStore = defineStore('feeds', () => {
   const iconsUrl = ref('/public.php');
   /** Unread counters for the virtual ("special") feeds, keyed by feed id. */
   const specialCounters = ref<Record<number, number>>({});
+  /** Hotkey prefixes from the backend map (a, c, f, g, plus plugin ones). */
+  const hotkeyPrefixes = ref<string[]>([]);
+  /** Backend hotkey map, plugin remaps included; sequences without `|`. */
+  const hotkeyMap = ref<Record<string, string>>({});
+  /** Recent error-log entries, piggybacked on the counters poll. */
+  const recentLogEvents = ref(0);
+  /** Daemon health, piggybacked on the counters poll. */
+  const daemonIsRunning = ref<boolean | null>(null);
+  const daemonStampOk = ref<boolean | null>(null);
 
   // Getters
   const feedsByCategory = computed((): FeedsByCategoryMap => {
     const result = new Map<string, Feed[]>();
     result.set('uncategorized', []);
-    
+
     for (const feed of feeds.value) {
       if (feed.cat_id != null) {
         const catKey = String(feed.cat_id);
@@ -97,7 +106,7 @@ export const useFeedsStore = defineStore('feeds', () => {
         }
       }
     }
-    
+
     return result;
   });
 
@@ -134,14 +143,21 @@ export const useFeedsStore = defineStore('feeds', () => {
   async function loadFeeds() {
     loading.value = true;
     error.value = null;
-    
+
     try {
       const response = await api.getFeedTree();
-      
+
       if (response.status === 0) {
         feeds.value = response.content.feeds;
         categories.value = response.content.categories;
         specialCounters.value = response.content.special ?? {};
+
+        const runtime = response.content.runtime;
+        if (runtime) {
+          recentLogEvents.value = runtime.recentLogEvents;
+          daemonIsRunning.value = runtime.daemonIsRunning;
+          daemonStampOk.value = runtime.daemonStampOk;
+        }
       } else {
         error.value = response.error ?? 'Failed to load feeds';
       }
@@ -163,7 +179,7 @@ export const useFeedsStore = defineStore('feeds', () => {
     if (feed) {
       feed.unread = Math.max(0, feed.unread + delta);
     }
-    
+
     // Update category unread (cat_id can be 0 for uncategorized)
     const catId = feed?.cat_id;
     if (catId != null) {
@@ -191,6 +207,13 @@ export const useFeedsStore = defineStore('feeds', () => {
       for (const category of categories.value) {
         const unread = response.content.categories[category.id];
         if (typeof unread === 'number') category.unread = unread;
+      }
+
+      const runtime = response.content.runtime;
+      if (runtime) {
+        recentLogEvents.value = runtime.recentLogEvents;
+        daemonIsRunning.value = runtime.daemonIsRunning;
+        daemonStampOk.value = runtime.daemonStampOk;
       }
     } catch (err) {
       console.error('Failed to refresh counters:', err);
@@ -440,6 +463,21 @@ export const useFeedsStore = defineStore('feeds', () => {
       if (typeof params.icons_url === 'string' && params.icons_url !== '') {
         iconsUrl.value = params.icons_url;
       }
+
+      // `hotkeys` is [prefixes, map]; the map is plugin-merged. Drop the
+      // "|mnemonic" suffix the help panel uses so lookup can compare sequences.
+      const hotkeys = params.hotkeys;
+      if (Array.isArray(hotkeys) && hotkeys.length === 2 && Array.isArray(hotkeys[0])) {
+        hotkeyPrefixes.value = hotkeys[0].map((prefix) => String(prefix));
+        const rawMap = hotkeys[1];
+        if (typeof rawMap === 'object' && rawMap !== null) {
+          const normalized: Record<string, string> = {};
+          for (const [sequence, action] of Object.entries(rawMap as Record<string, unknown>)) {
+            normalized[sequence.replace(/\|.*$/, '')] = String(action);
+          }
+          hotkeyMap.value = normalized;
+        }
+      }
     } catch (err) {
       console.error('Failed to load display preferences:', err);
     }
@@ -659,12 +697,17 @@ export const useFeedsStore = defineStore('feeds', () => {
     availableThemes,
     iconsUrl,
     specialCounters,
-    
+    hotkeyPrefixes,
+    hotkeyMap,
+    recentLogEvents,
+    daemonIsRunning,
+    daemonStampOk,
+
     // Getters
     feedsByCategory,
     totalUnread,
     currentFeed,
-    
+
     // Actions
     loadFeeds,
     selectFeed,

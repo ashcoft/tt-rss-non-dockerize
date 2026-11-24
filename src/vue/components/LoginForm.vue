@@ -91,6 +91,9 @@
           >
             Back
           </v-btn>
+          <!-- HOOK_LOGINFORM_ADDITIONAL_BUTTONS (SSO providers and similar).
+               Native forms/links keep working; the fragment is sanitized. -->
+          <div v-if="pluginButtonsHtml" class="login-plugin-buttons" v-html="pluginButtonsHtml" />
         </v-form>
       </v-card-text>
     </v-card>
@@ -98,8 +101,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import 'altcha';
+import DOMPurify from 'dompurify';
+import api from '../api/client';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
@@ -113,6 +118,18 @@ const bwLimit = ref(false);
 const otp = ref('');
 const website = ref('');
 const altchaPayload = ref('');
+const pluginButtonsHtml = ref('');
+
+onMounted(async () => {
+  try {
+    const response = await api.getLoginFormButtons();
+    if (response.status === 0 && response.content.trim() !== '') {
+      pluginButtonsHtml.value = DOMPurify.sanitize(response.content);
+    }
+  } catch (err) {
+    console.warn('Could not load plugin login buttons:', err);
+  }
+});
 
 const onAltchaStateChange = (event: CustomEvent<{ state?: string; payload?: string }>) => {
   if (event.detail?.state === 'verified' && event.detail.payload) {
@@ -203,5 +220,17 @@ const submitOtp = async () => {
   width: 1px;
   height: 1px;
   opacity: 0;
+}
+
+.login-plugin-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.login-plugin-buttons :deep(button),
+.login-plugin-buttons :deep(input[type='submit']) {
+  cursor: pointer;
 }
 </style>

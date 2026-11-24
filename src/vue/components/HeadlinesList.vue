@@ -1,5 +1,15 @@
 <template>
-  <div ref="listRef" class="headlines-list">
+  <div
+    ref="listRef"
+    id="headlines-frame"
+    class="headlines-list"
+    :class="{ cdm: combined }"
+    :data-enable-grid="grid ? 'true' : 'false'"
+    :data-is-cdm-expanded="cdmExpanded ? 'true' : 'false'"
+    :data-auto-catchup="autoCatchup ? 'true' : 'false'"
+    :is-vfeed="isVfeed ? '1' : '0'"
+    :data-is-vfeed="isVfeed ? 'true' : 'false'"
+  >
     <div v-if="loading" class="headlines-loading">
       <v-progress-circular indeterminate color="primary" />
       <span>Loading headlines...</span>
@@ -47,6 +57,12 @@
           class="feed-title"
         >
           <span class="title">{{ headline.feed_title }}</span>
+          <a
+            href="#"
+            class="catchup"
+            title="Mark feed as read"
+            @click.prevent.stop="emit('action', headline, 'catchup_feed')"
+          ><v-icon size="14">mdi-done-all</v-icon></a>
         </div>
         <div
           class="v-list-item"
@@ -56,6 +72,7 @@
               Unread: !headline.is_read,
               'headline-read': headline.is_read,
               'headline-active': headline.id === activeId,
+              active: headline.id === activeId,
               expanded: combined && isExpanded(headline),
               expandable: combined && !isExpanded(headline),
               marked: headline.is_marked,
@@ -63,7 +80,12 @@
               'grid-span': gridSpanIds.has(headline.id),
             },
           ]"
+          :id="`RROW-${headline.id}`"
           :data-headline-id="headline.id"
+          :data-article-id="headline.id"
+          :data-orig-feed-id="headline.feed_id"
+          :data-orig-feed-title="headline.feed_title"
+          :data-score="headline.score"
           @click="selectHeadline(headline)"
           @contextmenu.prevent="contextMenuId = headline.id"
         >
@@ -92,147 +114,322 @@
             </v-list>
           </v-menu>
 
-          <!-- Left icon strip: checkbox, star, publish. Mirrors the legacy
-               .hl/.cdm header. -->
-          <div class="hl-left">
-            <v-checkbox
-              :model-value="selectedIds.has(headline.id)"
-              hide-details
-              density="compact"
-              title="Select article"
-              @click.stop
-              @update:model-value="(checked: boolean) => emit('toggle-select', headline.id, checked)"
-            />
-            <button
-              type="button"
-              class="hl-icon"
-              :class="{ active: headline.is_marked }"
-              :title="headline.is_marked ? 'Unstar' : 'Star'"
-              @click.stop="emit('action', headline, 'toggle_star')"
-            >
-              <v-icon size="18">{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
-            </button>
-            <button
-              type="button"
-              class="hl-icon"
-              :class="{ active: headline.is_published }"
-              :title="headline.is_published ? 'Unpublish' : 'Publish'"
-              @click.stop="emit('action', headline, 'toggle_publish')"
-            >
-              <v-icon size="18">mdi-rss</v-icon>
-            </button>
-            <button
-              v-if="headline.is_read"
-              type="button"
-              class="hl-icon"
-              title="Mark as unread"
-              @click.stop="emit('action', headline, 'toggle_read')"
-            >
-              <v-icon size="16">mdi-circle-outline</v-icon>
-            </button>
-            <span v-if="!headline.is_read" class="unread-dot" title="Unread"></span>
-          </div>
+          <!-- Combined rows use the legacy .cdm/.header markup; three-panel
+               rows use the legacy single .hl grid. Both keep the Vue classes
+               the E2E suite and the app's own styles rely on. -->
+          <template v-if="combined">
+            <div class="header">
+              <div class="left hl-left">
+                <v-checkbox
+                  :model-value="selectedIds.has(headline.id)"
+                  hide-details
+                  density="compact"
+                  title="Select article"
+                  @click.stop
+                  @update:model-value="(checked: boolean) => emit('toggle-select', headline.id, checked)"
+                />
+                <button
+                  type="button"
+                  class="hl-icon marked-pic"
+                  :class="{ active: headline.is_marked }"
+                  :title="headline.is_marked ? 'Unstar' : 'Star'"
+                  @click.stop="emit('action', headline, 'toggle_star')"
+                >
+                  <v-icon size="18">{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                </button>
+                <button
+                  type="button"
+                  class="hl-icon pub-pic"
+                  :class="{ active: headline.is_published }"
+                  :title="headline.is_published ? 'Unpublish' : 'Publish'"
+                  @click.stop="emit('action', headline, 'toggle_publish')"
+                >
+                  <v-icon size="18">mdi-rss</v-icon>
+                </button>
+                <button
+                  v-if="headline.is_read"
+                  type="button"
+                  class="hl-icon"
+                  title="Mark as unread"
+                  @click.stop="emit('action', headline, 'toggle_read')"
+                >
+                  <v-icon size="16">mdi-circle-outline</v-icon>
+                </button>
+                <span v-if="!headline.is_read" class="unread-dot" title="Unread"></span>
+              </div>
 
-          <!-- Title, author, labels and the inline excerpt. -->
-          <div class="hl-title v-list-item-title headline-title">
-            <a
-              class="hl-title-link"
-              :href="headline.link"
-              :title="headline.title"
-              @click.prevent.stop="selectHeadline(headline)"
-            >{{ headline.title }}</a>
-            <span v-if="debugIds" class="hl-debug">{{ headline.id }}/{{ headline.feed_id }}</span>
-            <span v-if="headline.author" class="headline-author">{{ headline.author }}</span>
-            <span
-              v-if="headline.excerpt && (!combined || !isExpanded(headline)) && showPreview !== false"
-              class="headline-preview"
-              v-html="sanitize(headline.excerpt)"
-            ></span>
-          </div>
+              <span
+                class="titleWrap hl-title v-list-item-title headline-title"
+                @click.stop="selectHeadline(headline)"
+              >
+                <span v-if="debugIds" class="hl-debug">{{ headline.id }}/{{ headline.feed_id }}</span>
+                <a
+                  class="title hl-title-link"
+                  :href="headline.link"
+                  :title="headline.title"
+                  @click.prevent.stop="selectHeadline(headline)"
+                >{{ headline.title }}</a>
+                <span v-if="headline.author" class="author headline-author">{{ headline.author }}</span>
+                <span
+                  v-if="headline.excerpt && !isExpanded(headline) && showPreview !== false"
+                  class="preview headline-preview"
+                  v-html="sanitize(headline.excerpt)"
+                ></span>
+                <span v-if="headline.tags.length > 0" class="tags hl-tags">
+                  <v-icon size="14">mdi-tag-outline</v-icon>
+                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
+                  <a
+                    href="#"
+                    class="headline-label-add"
+                    title="Assign labels"
+                    @click.prevent.stop="emit('action', headline, 'label')"
+                  >(+)</a>
+                </span>
+              </span>
 
-          <!-- Tags sit on their own row below the title, not inline with it. -->
-          <div v-if="headline.tags.length > 0" class="hl-tags">
-            <v-icon size="14">mdi-tag-outline</v-icon>
-            <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
-            <a
-              href="#"
-              class="headline-label-add"
-              title="Assign labels"
-              @click.prevent.stop="emit('action', headline, 'label')"
-            >(+)</a>
-          </div>
+              <a
+                class="feed hl-feed headline-feed-label"
+                :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+                :href="feedSiteUrl || '#'"
+                :target="feedSiteUrl ? '_blank' : undefined"
+                :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
+                :title="feedSiteUrl ? 'Open site' : 'Open feed'"
+                @click="onFeedPillClick($event, headline)"
+              >{{ headline.feed_title }}</a>
 
-          <!-- Feed pill and date, right-aligned as in the legacy row. -->
-          <a
-            class="hl-feed headline-feed-label"
-            :style="{ backgroundColor: headline.feed_bg_color || undefined }"
-            :href="feedSiteUrl || '#'"
-            :target="feedSiteUrl ? '_blank' : undefined"
-            :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
-            :title="feedSiteUrl ? 'Open site' : 'Open feed'"
-            @click="onFeedPillClick($event, headline)"
-          >{{ headline.feed_title }}</a>
-          <span v-if="headline.updated" class="hl-updated headline-date">
-            {{ formatDate(headline.updated) }}
-          </span>
+              <span v-if="headline.updated" class="updated hl-updated headline-date">
+                {{ formatDate(headline.updated) }}
+              </span>
 
-          <div class="hl-right">
-            <v-icon
-              :icon="headline.score > 0 ? 'mdi-trending-up' : headline.score < 0 ? 'mdi-trending-down' : 'mdi-trending-neutral'"
-              :color="headline.score > 0 ? 'green' : headline.score < 0 ? 'red' : undefined"
-              size="16"
-              :title="`Score: ${headline.score}`"
-            />
-            <button
-              v-if="combined && grid"
-              type="button"
-              class="hl-icon"
-              :class="{ active: gridSpanIds.has(headline.id) }"
-              title="Span all columns"
-              @click.stop="toggleGridSpan(headline.id)"
-            >
-              <v-icon size="16">mdi-arrow-expand-horizontal</v-icon>
-            </button>
-            <button
-              type="button"
-              class="hl-icon"
-              title="Open original"
-              @click.stop="openOriginal(headline)"
-            >
-              <v-icon size="16">mdi-arrow-right</v-icon>
-            </button>
-            <button
-              type="button"
-              class="hl-icon"
-              title="Open feed"
-              @click.stop="emit('action', headline, 'open_feed')"
-            >
-              <v-icon size="16">mdi-rss</v-icon>
-            </button>
-          </div>
+              <div class="right hl-right">
+                <v-icon
+                  class="icon-score"
+                  :icon="headline.score > 0 ? 'mdi-trending-up' : headline.score < 0 ? 'mdi-trending-down' : 'mdi-trending-neutral'"
+                  :color="headline.score > 0 ? 'green' : headline.score < 0 ? 'red' : undefined"
+                  size="16"
+                  :title="String(headline.score)"
+                />
+                <button
+                  v-if="combined && grid"
+                  type="button"
+                  class="hl-icon icon-grid-span"
+                  :class="{ active: gridSpanIds.has(headline.id) }"
+                  title="Span all columns"
+                  @click.stop="toggleGridSpan(headline.id)"
+                >
+                  <v-icon size="16">mdi-arrow-expand-horizontal</v-icon>
+                </button>
+                <button
+                  type="button"
+                  class="hl-icon"
+                  title="Open original"
+                  @click.stop="openOriginal(headline)"
+                >
+                  <v-icon size="16">mdi-arrow-right</v-icon>
+                </button>
+                <span class="icon-feed" :title="headline.feed_title" @click.stop="emit('action', headline, 'open_feed')">
+                  <img
+                    v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
+                    :src="feedIconUrl(headline.feed_id)"
+                    class="feed-icon"
+                    width="16"
+                    height="16"
+                    alt=""
+                    @error="iconFailed.add(headline.feed_id)"
+                  />
+                  <v-icon v-else size="16">mdi-rss</v-icon>
+                </span>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="left hl-left">
+              <v-checkbox
+                :model-value="selectedIds.has(headline.id)"
+                hide-details
+                density="compact"
+                title="Select article"
+                @click.stop
+                @update:model-value="(checked: boolean) => emit('toggle-select', headline.id, checked)"
+              />
+              <button
+                type="button"
+                class="hl-icon marked-pic"
+                :class="{ active: headline.is_marked }"
+                :title="headline.is_marked ? 'Unstar' : 'Star'"
+                @click.stop="emit('action', headline, 'toggle_star')"
+              >
+                <v-icon size="18">{{ headline.is_marked ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+              </button>
+              <button
+                type="button"
+                class="hl-icon pub-pic"
+                :class="{ active: headline.is_published }"
+                :title="headline.is_published ? 'Unpublish' : 'Publish'"
+                @click.stop="emit('action', headline, 'toggle_publish')"
+              >
+                <v-icon size="18">mdi-rss</v-icon>
+              </button>
+              <button
+                v-if="headline.is_read"
+                type="button"
+                class="hl-icon"
+                title="Mark as unread"
+                @click.stop="emit('action', headline, 'toggle_read')"
+              >
+                <v-icon size="16">mdi-circle-outline</v-icon>
+              </button>
+              <span v-if="!headline.is_read" class="unread-dot" title="Unread"></span>
+              <button
+                v-for="button in headline.pluginLeftButtons ?? []"
+                :key="`left-${button.plugin}.${button.method}`"
+                type="button"
+                class="hl-icon"
+                :title="button.title"
+                @click.stop="runPluginLeftButton(headline, button)"
+              >
+                <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
+              </button>
+            </div>
+
+            <div class="title hl-title v-list-item-title headline-title" @click.stop="selectHeadline(headline)">
+              <span class="hl-content">
+                <span v-if="debugIds" class="hl-debug">{{ headline.id }}/{{ headline.feed_id }}</span>
+                <a
+                  class="title hl-title-link"
+                  :href="headline.link"
+                  :title="headline.title"
+                  @click.prevent.stop="selectHeadline(headline)"
+                >{{ headline.title }}</a>
+                <span v-if="headline.author" class="author headline-author">{{ headline.author }}</span>
+                <span
+                  v-if="headline.excerpt && showPreview !== false"
+                  class="preview headline-preview"
+                  v-html="sanitize(headline.excerpt)"
+                ></span>
+                <span v-if="headline.tags.length > 0" class="tags hl-tags">
+                  <v-icon size="14">mdi-tag-outline</v-icon>
+                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
+                  <a
+                    href="#"
+                    class="headline-label-add"
+                    title="Assign labels"
+                    @click.prevent.stop="emit('action', headline, 'label')"
+                  >(+)</a>
+                </span>
+              </span>
+            </div>
+
+            <span class="feed hl-feed headline-feed-label">
+              <a
+                :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+                :href="feedSiteUrl || '#'"
+                :target="feedSiteUrl ? '_blank' : undefined"
+                :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
+                :title="feedSiteUrl ? 'Open site' : 'Open feed'"
+                @click="onFeedPillClick($event, headline)"
+              >{{ headline.feed_title }}</a>
+            </span>
+
+            <div class="updated-wrap">
+              <span v-if="headline.updated" class="updated hl-updated headline-date">
+                {{ formatDate(headline.updated) }}
+              </span>
+            </div>
+
+            <div class="right hl-right">
+              <v-icon
+                class="icon-score"
+                :icon="headline.score > 0 ? 'mdi-trending-up' : headline.score < 0 ? 'mdi-trending-down' : 'mdi-trending-neutral'"
+                :color="headline.score > 0 ? 'green' : headline.score < 0 ? 'red' : undefined"
+                size="16"
+                :title="String(headline.score)"
+              />
+              <button
+                type="button"
+                class="hl-icon"
+                title="Open original"
+                @click.stop="openOriginal(headline)"
+              >
+                <v-icon size="16">mdi-arrow-right</v-icon>
+              </button>
+              <span class="icon-feed" :title="headline.feed_title" @click.stop="emit('action', headline, 'open_feed')">
+                <img
+                  v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
+                  :src="feedIconUrl(headline.feed_id)"
+                  class="feed-icon"
+                  width="16"
+                  height="16"
+                  alt=""
+                  @error="iconFailed.add(headline.feed_id)"
+                />
+                <v-icon v-else size="16">mdi-rss</v-icon>
+              </span>
+            </div>
+          </template>
 
           <!-- Combined mode: full body only when the row is expanded. -->
           <div
             v-if="combined && isExpanded(headline)"
-            class="headline-content"
+            class="content headline-content"
             @click="onContentClick($event, headline)"
           >
             <img
               v-if="headline.image_preview"
-              class="headline-image-preview"
+              class="cdm-image-preview headline-image-preview"
               :src="headline.image_preview"
               alt=""
               loading="lazy"
             />
-            <div class="cdm-content-inner" v-html="sanitize(headline.content)"></div>
-            <div v-if="headline.comments_link" class="cdm-footer">
-              <a
-                class="headline-comments-link"
-                :href="headline.comments_link"
-                target="_blank"
-                rel="noopener noreferrer"
-                @click.stop
-              >({{ headline.comments_count }} {{ headline.comments_count === 1 ? 'comment' : 'comments' }})</a>
+            <div
+              class="content-inner cdm-content-inner"
+              :lang="headline.lang || 'en'"
+              v-html="sanitize(headline.content)"
+            ></div>
+            <div class="footer cdm-footer">
+              <div class="left">
+                <button
+                  v-for="button in headline.pluginLeftButtons ?? []"
+                  :key="`footer-${button.plugin}.${button.method}`"
+                  type="button"
+                  class="hl-icon"
+                  :title="button.title"
+                  @click.stop="runPluginLeftButton(headline, button)"
+                >
+                  <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
+                </button>
+                <span v-if="headline.tags.length > 0" class="tags hl-tags">
+                  <v-icon size="14">mdi-tag-outline</v-icon>
+                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
+                </span>
+                <a
+                  href="#"
+                  class="headline-label-add"
+                  title="Assign labels"
+                  @click.prevent.stop="emit('action', headline, 'label')"
+                >(+)</a>
+                <a
+                  v-if="headline.comments_link"
+                  class="comments headline-comments-link"
+                  :href="headline.comments_link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  @click.stop
+                >({{ headline.comments_count }} {{ headline.comments_count === 1 ? 'comment' : 'comments' }})</a>
+              </div>
+              <div class="right">
+                <button
+                  v-for="button in headline.pluginButtons ?? []"
+                  :key="`${button.plugin}.${button.method}`"
+                  type="button"
+                  class="hl-icon"
+                  :title="button.title"
+                  @click.stop="runPluginLeftButton(headline, button)"
+                >
+                  <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -258,6 +455,23 @@
         </v-btn>
       </div>
     </div>
+
+    <!-- Plugin article-button output, sanitized before rendering. -->
+    <v-dialog :model-value="pluginDialog !== null" max-width="640" @update:model-value="(open: boolean) => { if (!open) pluginDialog = null; }">
+      <v-card>
+        <v-card-title>{{ pluginDialog?.title || 'Plugin' }}</v-card-title>
+        <v-card-text>
+          <div v-if="pluginBusy" class="text-center py-4">
+            <v-progress-circular indeterminate color="primary" />
+          </div>
+          <div v-else class="plugin-dialog-html" v-html="sanitizedPluginHtml" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="pluginDialog = null">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -266,6 +480,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import DOMPurify from 'dompurify';
 import type { Headline } from '@/types';
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
+import { pluginIcon } from '../utils/pluginIcons';
+import api from '@/api/client';
 
 const props = defineProps<{
   headlines: Headline[];
@@ -294,6 +510,10 @@ const props = defineProps<{
   selectedIds?: Set<number>;
   /** CDM_AUTO_CATCHUP: mark articles read as they scroll past. */
   autoCatchup?: boolean;
+  /** Base URL for public.php feed icons. */
+  iconsUrl?: string;
+  /** True when the list mixes several feeds. */
+  isVfeed?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -416,6 +636,38 @@ onUnmounted(() => {
 
 
 const contextMenuId = ref<number | null>(null);
+/** Feed ids whose icon failed to load, so the RSS glyph is used instead. */
+const iconFailed = ref<Set<number>>(new Set());
+
+/** Feed icon URL, matching FeedTree's public.php?op=feed_icon form. */
+const feedIconUrl = (feedId: number): string =>
+  `${props.iconsUrl ?? '/public.php'}?op=feed_icon&id=${feedId}`;
+
+// Plugin buttons on the left of a row run through PluginHandler; the returned
+// fragment is shown in a sanitized dialog, like the reading pane does.
+const pluginDialog = ref<{ title: string; html: string } | null>(null);
+const pluginBusy = ref(false);
+const sanitizedPluginHtml = computed(() =>
+  pluginDialog.value ? DOMPurify.sanitize(pluginDialog.value.html) : ''
+);
+
+async function runPluginLeftButton(
+  headline: Headline,
+  button: { plugin: string; method: string; title: string }
+): Promise<void> {
+  pluginBusy.value = true;
+  try {
+    const response = await api.invokePluginHandler(button.plugin, button.method, {
+      id: headline.id,
+    });
+    pluginDialog.value = {
+      title: button.title,
+      html: response.status === 0 ? response.content : `<p>${response.error ?? 'Plugin handler failed.'}</p>`,
+    };
+  } finally {
+    pluginBusy.value = false;
+  }
+}
 /** VFEED_GROUP_BY_FEED groups all rows of a feed together under one heading. */
 const displayHeadlines = computed(() => {
   if (!props.groupByFeed) return props.headlines;
@@ -436,6 +688,8 @@ const toggleGridSpan = (id: number) => {
   else next.add(id);
   gridSpanIds.value = next;
 };
+
+defineExpose({ toggleGridSpan });
 
 /** The feed pill opens the feed site; fall back to selecting the feed. */
 const onFeedPillClick = (event: MouseEvent, headline: Headline) => {
@@ -459,6 +713,24 @@ const onContentClick = (event: MouseEvent, headline: Headline) => {
 const isExpanded = (headline: Headline): boolean => {
   return Boolean(props.combined) && (Boolean(props.cdmExpanded) || headline.id === props.activeId);
 };
+
+// Legacy Article.cdmMoveToId(): when a collapsed row expands, scroll it to the
+// top if it does not already fit in the viewport.
+watch(
+  () => props.activeId,
+  async (id) => {
+    if (!id || !props.combined || props.cdmExpanded) return;
+    await nextTick();
+    const container = listRef.value;
+    const row = container?.querySelector<HTMLElement>(`[data-headline-id="${id}"]`);
+    if (!container || !row) return;
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (rowRect.top < containerRect.top || rowRect.bottom > containerRect.bottom) {
+      container.scrollTop += rowRect.top - containerRect.top;
+    }
+  }
+);
 
 /** Clicking a row selects it; App marks it read and moves the cursor. */
 const selectHeadline = (headline: Headline) => {
@@ -537,6 +809,54 @@ const sanitize = (html: string): string =>
 
 .headlines-list-content > .v-list-item.headline-active {
   box-shadow: inset 3px 0 0 rgb(var(--v-theme-success));
+}
+
+/* Combined rows keep the legacy .cdm/.header shape: the row itself is a
+   block, and the controls sit in a single-row header grid. */
+.headlines-list-content > .cdm {
+  display: block;
+  padding: 0;
+}
+
+.headlines-list-content > .cdm > .header {
+  display: grid;
+  grid-template-areas: "left title feed updated right";
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  min-height: 32px;
+  padding: 1px 8px;
+}
+
+.updated-wrap {
+  grid-area: updated;
+}
+
+.hl-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hl-feed a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hl-feed a:hover {
+  text-decoration: underline;
+}
+
+.feed-icon {
+  vertical-align: middle;
+}
+
+.icon-feed {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
 }
 
 .hl-left {
@@ -641,12 +961,22 @@ const sanitize = (html: string): string =>
 .feed-title {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 12px 8px 4px;
   color: rgba(var(--v-theme-on-background), 0.55);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.feed-title .catchup {
+  color: rgb(var(--v-theme-primary));
+  opacity: 0.7;
+}
+
+.feed-title .catchup:hover {
+  opacity: 1;
 }
 
 .hl-debug {
@@ -844,6 +1174,11 @@ const sanitize = (html: string): string =>
   .hl-updated,
   .hl-right {
     display: none;
+  }
+
+  .headlines-list-content > .cdm > .header {
+    grid-template-areas: "left title";
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .hl-icon {

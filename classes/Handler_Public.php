@@ -371,6 +371,22 @@ class Handler_Public extends Handler {
             print json_encode(AltchaChallenge::create());
     }
 
+    /**
+     * HTML for HOOK_LOGINFORM_ADDITIONAL_BUTTONS.
+     *
+     * The legacy login form rendered this server-side. The Vue login screen is
+     * a separate page, so it fetches the same fragment here instead.
+     */
+    function loginformbuttons(): void {
+            header('Content-Type: application/json');
+
+            ob_start();
+            PluginHost::getInstance()->run_hooks(PluginHost::HOOK_LOGINFORM_ADDITIONAL_BUTTONS);
+            $html = (string) ob_get_clean();
+
+            print json_encode(['html' => $html]);
+    }
+
     /** Legacy self-hosted proof-of-work fallback for clients without Altcha. */
     function loginpowchallenge(): void {
             header('Content-Type: application/json');

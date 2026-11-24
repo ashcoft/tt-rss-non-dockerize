@@ -16,7 +16,7 @@ settings run entirely on Vue 3 + Vuetify + Pinia, talking to `backend.php`
 through the legacy adapter.
 
 The verification notes below record earlier sessions; the current test
-suite has grown to 112 Node tests, and `build`, `type-check`, `test:vue`,
+suite has grown to 115 Node tests, and `build`, `type-check`, `test:vue`,
 `lint:vue` and `lint:js` pass.
 
 What was verified in this session (PHP 8.4 + PostgreSQL 17, a real tt-rss
@@ -171,6 +171,72 @@ rather than the clickable item. There is no known blocker here.
 
 All were verified against the live backend, including that all six view
 modes and all four sort orders return correctly ordered results.
+
+### Remaining UI/UX parity (2026-11-24)
+
+The theme CSS (`themes/feedly`) is written against the legacy DOM, so the Vue
+tree now carries the same structural hooks where they are cheap to add:
+
+- `#main`, `#feeds-holder`, `#feeds-holder_splitter`, `#content-wrap`,
+  `#toolbar-frame`, `#headlines-wrap-inner`, `#headlines-frame`,
+  `#content-insert` and `#content-insert_splitter` mirror the Dojo layout.
+- Rows render the legacy `.hl` / `.cdm` shape: `.header`, `.left`, `.title` /
+  `.titleWrap`, `.feed`, `.updated`, `.right`, `.content`, `.content-inner`,
+  `.footer`, `.tags`, `RROW-<id>`, and `data-article-id`/`data-score`
+  attributes. `#headlines-frame` also carries `is-vfeed`,
+  `data-enable-grid`, `data-is-cdm-expanded` and `data-auto-catchup`, which the
+  theme's selectors read.
+- The reading pane is a `.post` with `.header`, `.row`, `.content`,
+  `.content-inner` and `.footer` children.
+
+Other parity work in the same pass:
+
+- **Plugin Select-menu items.** `RPC/getPluginButtons` renders
+  `HOOK_HEADLINE_TOOLBAR_SELECT_MENU_ITEM2`, and `Feeds/view` already returns
+  the same markup per feed. The adapter parses the `<option>` list (empty
+  options become dividers) and the toolbar dispatches a selection through the
+  legacy `PluginHost` registry.
+- **Plugin article left buttons.** `buttons_left` is mapped onto each headline
+  and rendered in the row (or the combined footer), dispatching through
+  `PluginHandler` like the existing right-hand buttons.
+- **Plugin login buttons.** `public.php?op=loginformbuttons` exposes
+  `HOOK_LOGINFORM_ADDITIONAL_BUTTONS`; the Vue login card sanitizes and renders
+  the fragment, so SSO buttons keep working.
+- **Plugin hotkeys.** `RPC/sanityCheck` init-params carry the plugin-merged
+  hotkey map. `useKeyboard` now matches that map (prefixes, keydown notation
+  such as `*(33)` and `{3}(38)`, plugin remaps) instead of a hardcoded table.
+- **Feed debugger.** The action menu and `f D` / `f %` hotkeys POST
+  `Feeds/updatedebugger` or `Feeds/view` with `debug=1` to a new window, the
+  same way the legacy `App.postOpenWindow` did.
+- **Log/network/daemon alerts.** `RPC/getAllCounters` already piggybacks
+  runtime info; the adapter now keeps `recent_log_events` and daemon health, so
+  the toolbar shows the legacy alert icons. Transport failures set a shared
+  network-down flag (including 5xx responses).
+- **CDM move-on-expand.** Selecting a collapsed combined row scrolls it to the
+  top when it does not fit, matching `Article.cdmMoveToId()`.
+- **Per-feed indicators.** The tree row shows a spinner for the feed whose
+  headlines are loading and an alert icon with the feed's last update error.
+- **Article zoom/print.** The reading pane offers a full-screen zoom dialog and
+  a clean-window print of the sanitized article body.
+- **Show as feed.** The toolbar's syndication button (and the action menu) opens
+  the generated URL for the current feed, category or search, with a
+  "Generate new URL" action, matching `CommonDialogs.generatedFeed`.
+- **Remaining hotkeys.** `next_article_or_scroll`, page/line scrolling,
+  `toggle_expand`, `article_span_grid` and `cat_toggle_collapse` now do work
+  instead of being no-ops; `toggle_full_text` calls `af_readability` when the
+  plugin is loaded.
+
+`include/vue_shell.php` now defines the small `window.PluginHost` registry
+(register/run/run_until/unregister and the hook constants) before plugin JS
+runs. That lets plugin-provided Select-menu handlers be dispatched. Plugins
+whose JS builds Dojo widgets still cannot run those widgets; their server-side
+handlers and form submissions remain the supported path.
+
+Still not ported from the legacy client: the phone-only pull-to-refresh
+gesture and the Back-gesture overlay history stack. The sidebar drawer, the
+reading pane and keyboard navigation already work without them; they only
+change how the browser's Back button and a downward drag behave on narrow
+screens.
 
 ### Dojo removed
 

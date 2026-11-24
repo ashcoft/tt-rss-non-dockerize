@@ -13,6 +13,12 @@ export interface Feed {
   feed_url?: string;
   icon?: string;
   site_url?: string;
+  /** True when the backend has a cached favicon for this feed. */
+  has_icon?: boolean;
+  /** The feed's last update error, or "". */
+  error?: string;
+  /** The feed's last update time as the backend formatted it. */
+  updated?: string;
 }
 
 export interface Category {
@@ -51,6 +57,16 @@ export interface Headline {
   author: string;
   score: number;
   note: string;
+  /** The feed's site URL reported on the headline row. */
+  feed_site_url?: string;
+  /** True when the headline's feed has a cached icon. */
+  feed_has_icon?: boolean;
+  /** Content language, used as the legacy `lang` attribute. */
+  lang?: string;
+  /** Localized import date shown as the row tooltip. */
+  imported?: string;
+  /** Plugin-provided buttons rendered on the left of the row. */
+  pluginLeftButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
 }
 
 export interface Article {
