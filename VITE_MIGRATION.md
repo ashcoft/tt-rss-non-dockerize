@@ -249,7 +249,8 @@ sets a Content-Security-Policy, include `worker-src 'self' blob:` (or
 `script-src ... blob:`) so it can start. Without it the widget reports an
 error, the login card hides it, and `api.login()` falls back to the built-in
 proof-of-work challenge, so login still works but the browser logs a CSP
-violation.
+violation. The login form is also gated on the session check, so an
+authenticated page load never mounts Altcha at all.
 
 ### Dojo removed
 

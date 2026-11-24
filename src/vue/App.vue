@@ -1,7 +1,14 @@
 <template>
   <v-app>
+    <!-- Do not mount the login form until the session check finishes: it
+         renders the Altcha widget, which starts blob workers and would flash
+         the login screen on every authenticated page load. -->
+    <div v-if="!sessionChecked" class="app-boot">
+      <v-progress-circular indeterminate color="primary" />
+    </div>
+
     <!-- Login gate (Phase 3) -->
-    <LoginForm v-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
+    <LoginForm v-else-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
 
     <div v-else id="main" class="ttrss-app ttrss_main" :class="{ 'wide-screen': feedsStore.wideScreen }">
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
@@ -255,6 +262,7 @@ const labelsStore = useLabelsStore();
 const theme = useTheme();
 
 // UI State
+const sessionChecked = ref(false);
 const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
@@ -1379,7 +1387,9 @@ useKeyboard({
 onMounted(async () => {
   // The legacy shell only serves this page to an authenticated session, so a
   // readable CSRF token means we are already logged in.
-  const authenticated = await api.checkSession();
+  const authenticated = await api.checkSession().catch(() => false);
+  sessionChecked.value = true;
+
   if (authenticated) {
     authStore.setLoggedIn(true);
 
@@ -1422,6 +1432,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.app-boot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: rgb(var(--v-theme-background));
+}
+
 .ttrss-app {
   display: flex;
   height: 100vh;
