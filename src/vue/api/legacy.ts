@@ -112,7 +112,7 @@ export async function fetchCsrfToken(shellPath = '/index.php'): Promise<string> 
  * a pattern over it both invites backtracking concerns and obscures that only
  * one exact declaration is being read. Returns '' when it is absent.
  */
-function readTokenDeclaration(shell: string): string {
+export function readTokenDeclaration(shell: string): string {
   const at = shell.indexOf(CSRF_MARKER);
 
   if (at === -1) {

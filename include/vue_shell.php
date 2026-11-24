@@ -66,6 +66,10 @@ if ($authenticated === true) {
 
 	<script type="text/javascript">
 		const __csrf_token = "<?= $csrf_token ?>";
+		// `const` at top level does not create a window property, and the Vue
+		// adapter reads this global first so it does not have to re-fetch the
+		// shell (which can return a different session's copy).
+		window.__csrf_token = __csrf_token;
 
 		const __default_light_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_LIGHT_THEME), 'themes/light.css') ?>";
 		const __default_dark_theme = "<?= get_theme_path(Config::get(Config::DEFAULT_DARK_THEME), 'themes/night.css') ?>";

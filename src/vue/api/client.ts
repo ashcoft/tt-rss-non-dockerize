@@ -17,6 +17,7 @@ import legacyBackend, {
   LegacyApiError,
   LegacyProtocolError,
   fetchCsrfToken,
+  readTokenDeclaration,
 } from './legacy';
 import * as endpoints from './legacyEndpoints';
 
@@ -180,7 +181,9 @@ class ApiClient {
     }
 
     try {
-      const token = await fetchCsrfToken();
+      // The login POST follows a redirect to the authenticated shell, which
+      // already carries the session token. Prefer it over a second fetch.
+      const token = readTokenDeclaration(text) || (await fetchCsrfToken());
       legacyBackend.setCsrfToken(token);
       return { status: 0, content: true };
     } catch {
