@@ -3,6 +3,9 @@
     <div class="toolbar-left">
       <v-icon v-if="feedInfo" icon="mdi-rss" size="18" class="feed-icon" />
       <span v-if="feedInfo" class="feed-title">{{ feedInfo.title }}</span>
+      <span v-if="selectedCount > 0" class="selection-count">
+        {{ selectedCount }} article{{ selectedCount === 1 ? '' : 's' }} selected
+      </span>
       <template v-if="searchQuery">
         <span class="search-query" :title="searchQuery">Search: {{ searchQuery }}</span>
         <v-btn size="small" variant="text" @click="emit('action', 'cancelSearch')">Cancel search</v-btn>
@@ -232,6 +235,8 @@ interface Props {
   pluginUpdates?: boolean;
   /** CDM_EXPANDED: every combined row is expanded. */
   cdmExpanded?: boolean;
+  /** Number of headlines checked for bulk actions. */
+  selectedCount?: number;
   /** Current search term, shown with a cancel link like the legacy toolbar. */
   searchQuery?: string;
   /** WIDESCREEN_MODE: the feed tree is hidden. */
@@ -260,6 +265,7 @@ const props = withDefaults(defineProps<Props>(), {
   updateUrl: '',
   pluginUpdates: false,
   cdmExpanded: true,
+  selectedCount: 0,
   searchQuery: '',
   wideScreen: false,
   pluginMenuItems: () => [],
@@ -421,6 +427,13 @@ const handleAction = (command: string, payload?: string | number | object) => {
   color: rgba(var(--v-theme-on-background), 0.6);
   font-size: 0.8125rem;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-count {
+  margin-left: 8px;
+  color: rgba(var(--v-theme-on-background), 0.6);
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 

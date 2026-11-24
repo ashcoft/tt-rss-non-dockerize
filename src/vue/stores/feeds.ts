@@ -75,6 +75,10 @@ export const useFeedsStore = defineStore('feeds', () => {
   const iconsUrl = ref('/public.php');
   /** Unread counters for the virtual ("special") feeds, keyed by feed id. */
   const specialCounters = ref<Record<number, number>>({});
+  /** Legacy _DEFAULT_VIEW_MODE from init-params. */
+  const defaultViewMode = ref('adaptive');
+  /** Legacy _DEFAULT_VIEW_ORDER_BY from init-params. */
+  const defaultViewOrderBy = ref('default');
   /** Hotkey prefixes from the backend map (a, c, f, g, plus plugin ones). */
   const hotkeyPrefixes = ref<string[]>([]);
   /** Backend hotkey map, plugin remaps included; sequences without `|`. */
@@ -452,6 +456,12 @@ export const useFeedsStore = defineStore('feeds', () => {
       vfeedGroupByFeed.value = Number(params.vfeed_group_by_feed) === 1;
       debugHeadlineIds.value = Number(params.debug_headline_ids) === 1;
       feedsSortByUnread.value = Number(params.feeds_sort_by_unread) === 1;
+      if (typeof params.default_view_mode === 'string' && params.default_view_mode !== '') {
+        defaultViewMode.value = params.default_view_mode;
+      }
+      if (typeof params.default_view_order_by === 'string' && params.default_view_order_by !== '') {
+        defaultViewOrderBy.value = params.default_view_order_by;
+      }
       confirmFeedCatchup.value = Number(params.confirm_feed_catchup) !== 0;
       cdmAutoCatchup.value = Number(params.cdm_auto_catchup) === 1;
       currentTheme.value = typeof params.theme === 'string' ? params.theme : '';
@@ -697,6 +707,8 @@ export const useFeedsStore = defineStore('feeds', () => {
     availableThemes,
     iconsUrl,
     specialCounters,
+    defaultViewMode,
+    defaultViewOrderBy,
     hotkeyPrefixes,
     hotkeyMap,
     recentLogEvents,

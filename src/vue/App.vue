@@ -51,6 +51,7 @@
             :update-url="updateUrl"
             :plugin-updates="pluginUpdatesAvailable"
             :cdm-expanded="feedsStore.cdmExpanded"
+            :selected-count="headlinesStore.selectionCount"
             :search-query="headlinesStore.searchQuery"
             :wide-screen="feedsStore.wideScreen"
             :plugin-menu-items="headlinesStore.pluginMenuItems"
@@ -64,6 +65,7 @@
           />
         </header>
 
+        <div class="content-body">
         <section id="headlines-wrap-inner" class="content headlines-wrap-inner">
           <v-alert
             v-if="headlinesStore.notice && headlinesStore.headlines.length === 0"
@@ -130,7 +132,7 @@
           v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
           id="content-insert"
           class="article-panel content-insert"
-          :style="articleStyle"
+          :style="feedsStore.wideScreen ? {} : articleStyle"
         >
           <ArticleView
             :article="headlinesStore.selectedArticle"
@@ -140,6 +142,7 @@
             @mark-relative="handleMarkRelative"
           />
         </aside>
+        </div>
       </div>
     </div>
 
@@ -499,6 +502,7 @@ const onLoggedIn = async () => {
   // A failing secondary request (plugin hooks, update check) must not prevent
   // the initial feed from opening.
   await loadStartupData();
+  applyDefaultViewPrefs();
 
   applyThemePalette();
 
@@ -565,6 +569,12 @@ const loadStartupData = async () => {
       console.error(`Startup load failed (${name}):`, err);
     }
   }
+};
+
+/** Adopt the legacy default view mode and sort order from init-params. */
+const applyDefaultViewPrefs = () => {
+  if (feedsStore.defaultViewMode) headlinesStore.setViewMode(feedsStore.defaultViewMode);
+  if (feedsStore.defaultViewOrderBy) headlinesStore.setOrderBy(feedsStore.defaultViewOrderBy);
 };
 
 /** Run the update check after the initial feed has loaded, off the critical path. */
@@ -1414,6 +1424,7 @@ onMounted(async () => {
     authStore.setLoggedIn(true);
 
     await loadStartupData();
+    applyDefaultViewPrefs();
 
     applyThemePalette();
 
@@ -1523,6 +1534,34 @@ onUnmounted(() => {
   min-width: 0;
   overflow: hidden;
   background: rgb(var(--v-theme-surface));
+}
+
+.content-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Widescreen mode mirrors the legacy trailing article pane: list and reading
+   pane side by side, with the feed tree collapsed. */
+.wide-screen .content-body {
+  flex-direction: row;
+}
+
+.wide-screen .content {
+  flex: 1 1 50%;
+}
+
+.wide-screen .article-panel {
+  flex: 0 0 50%;
+  border-top: 0;
+  border-left: 1px solid rgba(var(--v-theme-on-background), 0.12);
+}
+
+.wide-screen .article-splitter {
+  display: none;
 }
 
 /* Status alerts must keep their height; the list below takes the rest. */
