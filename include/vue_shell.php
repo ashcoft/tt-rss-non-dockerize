@@ -138,8 +138,10 @@ if ($authenticated === true) {
 	// throw; the Vue app hosts plugin UI through PluginHandler instead.
 	?>
 	<script type="text/javascript">
-		window.Plugins = window.Plugins || {};
-		window.require = window.require || function () {};
+		// `var` also creates a global binding, not only a window property, so
+		// legacy plugin scripts can resolve these identifiers even in strict mode.
+		var Plugins = window.Plugins = window.Plugins || {};
+		var require = window.require = window.require || function () {};
 	</script>
 
 	<?php

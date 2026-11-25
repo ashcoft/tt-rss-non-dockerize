@@ -1059,6 +1059,11 @@ const sanitize = (html: string): string =>
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
+  /* Some local plugins (card_view) hide .titleWrap and render the title inside
+     .content-inner instead. Their JS does not run in the Vue app, so keep the
+     Vue title visible even when that CSS is loaded. */
+  opacity: 1 !important;
+  visibility: visible;
   font-size: 0.95rem;
   line-height: 1.35;
 }
