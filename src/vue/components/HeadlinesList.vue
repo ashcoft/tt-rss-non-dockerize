@@ -62,7 +62,7 @@
 
       <div
         class="headlines-list-content"
-        :class="{ 'headlines-grid': combined && grid, cdm: combined }"
+        :class="{ 'headlines-grid': combined && grid }"
       >
         <template v-for="(headline, headlineIndex) in displayHeadlines" :key="headline.id">
         <div
@@ -391,7 +391,7 @@
           >
             <img
               v-if="headline.image_preview"
-              class="cdm-image-preview headline-image-preview"
+              class="headline-image-preview"
               :src="headline.image_preview"
               alt=""
               loading="lazy"
@@ -1157,7 +1157,9 @@ const sanitize = (html: string): string =>
 
 .headline-preview {
   flex: 1 1 0;
-  min-width: 0;
+  /* The title link keeps its content width, so without a floor the preview
+     collapses to a few pixels on long titles. */
+  min-width: 10ch;
   overflow: hidden;
   color: rgba(var(--v-theme-on-background), 0.58);
   font-size: 0.8125rem;

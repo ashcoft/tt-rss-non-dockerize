@@ -183,7 +183,7 @@ test.describe('Vue front-end', () => {
     await page.getByRole('button', { name: 'Select' }).click();
     await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'All' }).first().click();
 
-    await expect(page.getByText(/selected/)).toBeVisible();
+    await expect(page.locator('.bulk-count')).toHaveText(/selected/);
     await page.getByRole('button', { name: 'Mark read' }).click();
     // The action reports success through the app snackbar.
     await expect(page.locator('.v-snackbar')).toContainText(/marked as read/i, { timeout: 10000 });
@@ -235,7 +235,7 @@ test.describe('Vue front-end', () => {
 
     await page.getByRole('button', { name: 'Select' }).click();
     await page.locator('.v-overlay-container .v-list-item').filter({ hasText: 'All' }).first().click();
-    await expect(page.getByText(/selected/)).toBeVisible();
+    await expect(page.locator('.bulk-count')).toHaveText(/selected/);
 
     // The score prompt is a native dialog; answer it, then expect success.
     page.once('dialog', (dialog) => dialog.accept('5'));
@@ -253,7 +253,8 @@ test.describe('Vue front-end', () => {
     await expect(row).toBeVisible({ timeout: 15000 });
     const title = (await row.locator('.hl-title-link').innerText()).trim();
 
-    // Star it, then confirm the Starred feed now contains it.
+    // The theme hides the star control until the row is hovered.
+    await row.hover();
     await row.getByRole('button', { name: 'Star' }).click();
     await page.locator('.feed-list').getByText('Starred articles', { exact: true }).click();
     const starred = page.locator('.headlines-list-content .v-list-item').filter({ hasText: title });
@@ -261,6 +262,7 @@ test.describe('Vue front-end', () => {
 
     // Unstar it again; the button flips back and the article leaves the feed on
     // the next load (the list is not re-fetched in place).
+    await starred.first().hover();
     await starred.first().getByRole('button', { name: 'Unstar' }).click();
     await page.reload();
     await page.locator('.toolbar .feed-title').waitFor({ timeout: 15000 });
@@ -621,7 +623,7 @@ test.describe('Vue front-end', () => {
 
     // The editor reports success; the filter is now in the list.
     await expect(editor.locator('.v-alert')).toContainText(/filter saved/i, { timeout: 10000 });
-    await expect(page.getByText('E2E Filter')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('E2E Filter').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('toggles a boolean preference and persists it', async ({ page }) => {

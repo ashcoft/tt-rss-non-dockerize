@@ -32,6 +32,38 @@ instance):
   sort orders, read/star/publish/delete, tags with autocomplete, scoring,
   labels, and preferences.
 
+### Re-verified end to end (2026-11-25)
+
+- `pnpm run build`, `type-check`, `test:vue`, `lint:vue` and `lint:js` pass.
+- The full Playwright suite (33 tests) passes against a containerised instance
+  (PHP 8.3, PostgreSQL 16) with the preferences the harness pins:
+  `E2E_BASE_URL=… TTRSS_DB_HOST=… TTRSS_DB_PORT=… TTRSS_DB_NAME=…
+  TTRSS_DB_USER=… TTRSS_DB_PASS=… pnpm run test:e2e`.
+- Harness prerequisite worth knowing: the global setup needs `psql` plus the
+  `TTRSS_DB_*` variables. Without them it skips the re-seed *and* the
+  preference pinning, and because tt-rss defaults `COMBINED_DISPLAY_MODE` to
+  on, about ten tests then fail on a fresh database. Those failures are the
+  harness missing its prerequisites, not app defects.
+
+Fixed in this pass:
+
+- **Grid view never applied.** `.headlines-list-content` carried the theme's
+  `.cdm` class, so Feedly's `#content-wrap#content-wrap … .cdm { display:
+  flex }` (two IDs) beat the component's `.headlines-grid` rule and the list
+  stayed a flex column. The container no longer carries `cdm`; the rows still
+  do, which is what the theme expects.
+- **Image previews were never visible.** The `<img>` carried the theme's
+  `.cdm-image-preview` class, and Feedly hides that class inside expanded rows
+  (`.cdm.expanded .cdm-image-preview { display: none }`), which is where the
+  Vue component renders it. It now uses only `headline-image-preview`.
+- **Headline excerpts collapsed.** The preview is a flex item after the title
+  link, and the link keeps its content width, so on long titles the preview
+  shrank to a few pixels. It now reserves `min-width: 10ch`.
+- **Two E2E assertions were ambiguous or hover-blind.** Bulk-selection tests
+  matched any text containing "selected" and hit both the toolbar count and
+  the bulk bar; they now target `.bulk-count`. The star test clicked a control
+  the theme reveals on row hover only; it now hovers first.
+
 ### Resolved: the "list-item click" blocker was a false alarm
 
 The previous session recorded that `v-list-item` `@click` handlers never
