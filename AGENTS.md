@@ -115,3 +115,20 @@ All legacy `Pref_*` screens have Vue hosts (account, users, system, feed
 batch/sharing/maintenance and plugin settings), and the plugin toolbar/prefs
 surfaces render through `PluginSurface`. See `VITE_MIGRATION.md` for the
 remaining plugin-specific limitations.
+
+## Distribution surfaces
+
+- `.github/workflows/docker-publish.yml` builds the `Dockerfile` on every push
+  to `main` and pushes a multi-arch image to
+  `ghcr.io/ashcoft/tt-rss-non-dockerize`. The image bundles nginx, PHP-FPM and
+  the built Vue bundle, listens on 8080, and is configured only through
+  `TTRSS_*` environment variables (`config.php` is optional; see
+  `include/functions.php`). `TTRSS_UPDATE_SCHEMA=1` runs `update.php
+  --update-schema` before the server starts.
+- `docker/php-fpm.conf` sets `clear_env = no`; without it the pool strips the
+  `TTRSS_*` variables and the app falls back to defaults.
+- `docs/` is the GitHub Pages site (`pages.yml` publishes it to
+  https://ashcoft.github.io/tt-rss-non-dockerize/). Keep it in sync with the
+  Dockerfile, the compose file and the config defaults when either changes.
+- `docker-compose.yml` is the reference deployment: PostgreSQL plus the app and
+  an `updater` service running `update_daemon2.php`.

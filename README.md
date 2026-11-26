@@ -3,19 +3,40 @@ Tiny Tiny RSS (tt-rss)
 
 Tiny Tiny RSS (tt-rss) is a free, flexible, open-source, web-based news feed (RSS/Atom/other) reader and aggregator.
 
+[![Docs](https://github.com/ashcoft/tt-rss-non-dockerize/actions/workflows/pages.yml/badge.svg)](https://github.com/ashcoft/tt-rss-non-dockerize/actions/workflows/pages.yml)
+[![Container](https://github.com/ashcoft/tt-rss-non-dockerize/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ashcoft/tt-rss-non-dockerize/actions/workflows/docker-publish.yml)
+[![Release](https://img.shields.io/github/v/release/ashcoft/tt-rss-non-dockerize)](https://github.com/ashcoft/tt-rss-non-dockerize/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-tt--rss--non--dockerize-blue?logo=github)](https://github.com/ashcoft/tt-rss-non-dockerize/pkgs/container/tt-rss-non-dockerize)
+
+**Install guide:** [ashcoft.github.io/tt-rss-non-dockerize](https://ashcoft.github.io/tt-rss-non-dockerize/) ·
+**Container:** `ghcr.io/ashcoft/tt-rss-non-dockerize:latest` ·
+**Releases:** [tarballs](https://github.com/ashcoft/tt-rss-non-dockerize/releases)
+
 ## Getting started
 
-Please refer to [the installation guide](https://tt-rss.org/docs/Installation-Guide.html).
-
-### Installation
-
-After cloning this repository, install PHP dependencies:
+The [install guide](https://ashcoft.github.io/tt-rss-non-dockerize/) covers a native
+Debian/Ubuntu setup (nginx, PHP-FPM, PostgreSQL) and the container image. In short, run this
+fork straight from a host:
 
 ```bash
-composer install
+composer install --no-dev
+corepack pnpm install --frozen-lockfile
+corepack pnpm run build        # writes dist/, required by index.php
+php update.php --update-schema=force-yes
 ```
 
-This will download all required dependencies to the `vendor/` directory.
+or use the published image, which bundles nginx, PHP-FPM and the built frontend:
+
+```bash
+docker run -d --name tt-rss -p 8080:8080 \
+  -e TTRSS_DB_HOST=db -e TTRSS_DB_NAME=ttrss \
+  -e TTRSS_DB_USER=ttrss -e TTRSS_DB_PASS=secret \
+  -e TTRSS_UPDATE_SCHEMA=1 \
+  ghcr.io/ashcoft/tt-rss-non-dockerize:latest
+```
+
+`docker-compose.yml` wires the app to PostgreSQL and adds the feed updater. Configuration is
+read from `TTRSS_*` environment variables, so no `config.php` is required.
 
 ### Included Theme
 

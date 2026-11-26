@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny Tiny RSS — non-Docker install guide</title>
+<meta name="description" content="Install Tiny Tiny RSS natively on Debian/Ubuntu with nginx, PHP-FPM and PostgreSQL, or run the published container image.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128225;</text></svg>">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1c1c1e;
+    --muted: #5f6368;
+    --line: #e3e3e6;
+    --accent: #0b63ce;
+    --code-bg: #f5f6f8;
+    --note-bg: #eef4fd;
+    --warn-bg: #fdf3e7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --fg: #e8eaed;
+      --muted: #a2a8b2;
+      --line: #2b2f36;
+      --accent: #7ab4ff;
+      --code-bg: #1b1f25;
+      --note-bg: #172233;
+      --warn-bg: #2a2118;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 0 1.25rem 4rem; }
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 2.5rem 0 1.5rem;
+    margin-bottom: 2rem;
+  }
+  header h1 { margin: 0 0 .4rem; font-size: 1.9rem; letter-spacing: -.02em; }
+  header p { margin: 0; color: var(--muted); max-width: 48rem; }
+  .links { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .links a {
+    display: inline-block;
+    padding: .35rem .7rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: .875rem;
+  }
+  .links a:hover { border-color: var(--accent); color: var(--accent); }
+  h2 { margin: 2.5rem 0 .75rem; font-size: 1.35rem; letter-spacing: -.01em; }
+  h3 { margin: 1.75rem 0 .5rem; font-size: 1.05rem; }
+  p, li { max-width: 48rem; }
+  a { color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .875em;
+    background: var(--code-bg);
+    padding: .1em .35em;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .9rem 1rem;
+    overflow-x: auto;
+    font-size: .85rem;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .note, .warn {
+    border-left: 3px solid var(--accent);
+    background: var(--note-bg);
+    padding: .75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+  }
+  .warn { border-left-color: #d08b2c; background: var(--warn-bg); }
+  .note p, .warn p { margin: .25rem 0; }
+  table { border-collapse: collapse; width: 100%; margin: .75rem 0 1rem; font-size: .92rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  nav.toc { border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0 2rem; }
+  nav.toc p { margin: 0 0 .5rem; font-weight: 600; }
+  nav.toc ol { margin: 0; padding-left: 1.2rem; }
+  nav.toc li { margin: .2rem 0; }
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .875rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Tiny Tiny RSS — non-Docker install guide</h1>
+  <p>
+    This fork of tt-rss ships the Feedly theme and the Vue frontend, and is meant to be run
+    straight from a checkout or a release tarball on a normal LAMP/LEMP host. Nothing here
+    needs Docker; a container image is published as a convenience.
+  </p>
+  <div class="links">
+    <a href="https://github.com/ashcoft/tt-rss-non-dockerize">Source</a>
+    <a href="https://github.com/ashcoft/tt-rss-non-dockerize/releases">Releases</a>
+    <a href="https://github.com/ashcoft/tt-rss-non-dockerize/pkgs/container/tt-rss-non-dockerize">Container image</a>
+    <a href="https://github.com/ashcoft/tt-rss-non-dockerize/issues">Issues</a>
+  </div>
+</header>
+
+<nav class="toc">
+  <p>On this page</p>
+  <ol>
+    <li><a href="#requirements">Requirements</a></li>
+    <li><a href="#native">Native install (Debian/Ubuntu)</a></li>
+    <li><a href="#webserver">Web server</a></li>
+    <li><a href="#feeds">Fetching feeds</a></li>
+    <li><a href="#container">Container image</a></li>
+    <li><a href="#upgrade">Upgrading</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ol>
+</nav>
+
+<h2 id="requirements">Requirements</h2>
+
+<table>
+  <thead><tr><th>Component</th><th>Version / notes</th></tr></thead>
+  <tbody>
+    <tr><td>PHP</td><td>8.2 or newer (8.3 is what the image uses). Needs <code>pdo_pgsql</code>, <code>intl</code>, <code>mbstring</code>, <code>curl</code>, <code>gd</code>, <code>iconv</code>, <code>xml</code>, <code>zip</code>, <code>pcntl</code>, <code>posix</code>, <code>openssl</code>, <code>sodium</code>, <code>exif</code>, <code>fileinfo</code>.</td></tr>
+    <tr><td>Database</td><td>PostgreSQL (16 in <code>docker-compose.yml</code>); PostgreSQL is the only supported backend.</td></tr>
+    <tr><td>Web server</td><td>nginx or Apache with PHP-FPM.</td></tr>
+    <tr><td>Composer 2</td><td>Only needed if you clone the repository; release tarballs already contain <code>vendor/</code>.</td></tr>
+    <tr><td>Node.js 24 + pnpm 9</td><td>Only needed to build the Vue frontend when running from a clone. Release tarballs already contain <code>dist/</code>.</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <p><strong>Configuration is optional.</strong> tt-rss reads <code>TTRSS_*</code> environment
+  variables directly, so a <code>config.php</code> is not required. Use whichever fits your
+  host: environment variables in the FPM pool, or a <code>config.php</code> in the web root.</p>
+</div>
+
+<h2 id="native">Native install (Debian/Ubuntu)</h2>
+
+<h3>1. Packages</h3>
+<pre><code>sudo apt install nginx postgresql php8.3-fpm php8.3-pgsql php8.3-intl \
+    php8.3-mbstring php8.3-curl php8.3-gd php8.3-xml php8.3-zip \
+    php8.3-opcache composer</code></pre>
+
+<h3>2. Get the code</h3>
+<p>Either unpack a release tarball (it includes <code>vendor/</code> and the built <code>dist/</code>):</p>
+<pre><code>sudo mkdir -p /var/www/tt-rss
+curl -L -o tt-rss.tar.gz https://github.com/ashcoft/tt-rss-non-dockerize/releases/latest/download/tt-rss.tar.gz
+sudo tar -xzf tt-rss.tar.gz -C /var/www/tt-rss</code></pre>
+<p>…or clone and build the frontend yourself:</p>
+<pre><code>git clone https://github.com/ashcoft/tt-rss-non-dockerize.git /var/www/tt-rss
+cd /var/www/tt-rss
+composer install --no-dev
+corepack pnpm install --frozen-lockfile
+corepack pnpm run build          # writes dist/, required by index.php</code></pre>
+
+<h3>3. Database</h3>
+<pre><code>sudo -u postgres createuser --pwprompt ttrss
+sudo -u postgres createdb --owner=ttrss ttrss</code></pre>
+
+<h3>4. Configure</h3>
+<p>Create <code>/var/www/tt-rss/config.php</code> (it is gitignored, and the image never ships one):</p>
+<pre><code>&lt;?php
+putenv('TTRSS_DB_HOST=127.0.0.1');
+putenv('TTRSS_DB_PORT=5432');
+putenv('TTRSS_DB_NAME=ttrss');
+putenv('TTRSS_DB_USER=ttrss');
+putenv('TTRSS_DB_PASS=change-me');
+putenv('TTRSS_SELF_URL_PATH=https://reader.example.com/');
+// putenv('TTRSS_SINGLE_USER_MODE=true');   // only behind your own auth
+</code></pre>
+<p>
+  <code>SELF_URL_PATH</code> is optional: by default the URL is derived from the
+  <code>Host</code> header. Set it (and optionally
+  <code>putenv('TTRSS_FORCE_SELF_URL_PATH_USAGE=true')</code>) when a reverse proxy rewrites
+  the host.
+</p>
+
+<h3>5. Create the schema</h3>
+<pre><code>sudo -u www-data php /var/www/tt-rss/update.php --update-schema=force-yes</code></pre>
+<p>Then make the writable directories belong to the PHP user:</p>
+<pre><code>sudo chown -R www-data:www-data /var/www/tt-rss/cache \
+    /var/www/tt-rss/feed-icons /var/www/tt-rss/lock</code></pre>
+
+<div class="note">
+  <p>The first login is <code>admin</code> / <code>password</code>. Change it immediately, or
+  set <code>TTRSS_SINGLE_USER_MODE=true</code> when the whole site sits behind your own
+  authentication.</p>
+</div>
+
+<h2 id="webserver">Web server</h2>
+<p>Minimal nginx site, assuming PHP-FPM listens on the default socket:</p>
+<pre><code>server {
+    listen 443 ssl http2;
+    server_name reader.example.com;
+
+    root /var/www/tt-rss;
+    index index.php;
+
+    client_max_body_size 32m;
+
+    location ~ ^/(config\.php|\.) { deny all; }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}</code></pre>
+<p>
+  To embed tt-rss in another origin's iframe (a Nextcloud “external site”, for example), send a
+  <code>frame-ancestors</code> policy instead of <code>X-Frame-Options</code>:
+</p>
+<pre><code>add_header Content-Security-Policy "frame-ancestors 'self' https://cloud.example.com" always;</code></pre>
+<p>
+  <code>/healthz</code> is rewritten to <code>public.php?op=healthcheck</code> by the container's
+  nginx config; on your own server add
+  <code>location = /healthz { rewrite ^ /public.php?op=healthcheck last; }</code> if you want the
+  same probe.
+</p>
+
+<h2 id="feeds">Fetching feeds</h2>
+<p>Either a cron job:</p>
+<pre><code>*/30 * * * * www-data /usr/bin/php /var/www/tt-rss/update.php --feeds --quiet</code></pre>
+<p>or the daemon, which is better for many feeds (systemd unit):</p>
+<pre><code>[Unit]
+Description=tt-rss feed updater
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+ExecStart=/usr/bin/php /var/www/tt-rss/update_daemon2.php
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+<h2 id="container">Container image</h2>
+<p>
+  Every push to <code>main</code> publishes a multi-arch image to GHCR. It bundles nginx,
+  PHP-FPM and the built Vue bundle, listens on port 8080, and is configured entirely through
+  <code>TTRSS_*</code> variables:
+</p>
+<pre><code>docker run -d --name tt-rss -p 8080:8080 \
+  -e TTRSS_DB_HOST=db -e TTRSS_DB_NAME=ttrss \
+  -e TTRSS_DB_USER=ttrss -e TTRSS_DB_PASS=secret \
+  -e TTRSS_SELF_URL_PATH=http://localhost:8080 \
+  -e TTRSS_UPDATE_SCHEMA=1 \
+  -v tt-rss-cache:/var/www/html/cache \
+  -v tt-rss-icons:/var/www/html/feed-icons \
+  ghcr.io/ashcoft/tt-rss-non-dockerize:latest</code></pre>
+<p>
+  <code>TTRSS_UPDATE_SCHEMA=1</code> runs <code>update.php --update-schema</code> before the
+  server starts, which is what makes a first boot and every upgrade work unattended. The
+  repository's <code>docker-compose.yml</code> wires the app to PostgreSQL and adds an
+  <code>updater</code> service running <code>update_daemon2.php</code>.
+</p>
+<p>
+  Tags: <code>latest</code> (default branch), the branch name, <code>sha-&lt;commit&gt;</code>,
+  and <code>{{version}}</code> / <code>{{major}}.{{minor}}</code> for <code>v*</code> tags.
+</p>
+
+<h2 id="upgrade">Upgrading</h2>
+<ol>
+  <li>Back up the database (<code>pg_dump</code>) and <code>feed-icons/</code>.</li>
+  <li>Replace the application files (tarball, <code>git pull</code>, or a new image tag).</li>
+  <li>Run <code>php update.php --update-schema</code> — the container does this for you when
+  <code>TTRSS_UPDATE_SCHEMA=1</code>.</li>
+  <li>Reload PHP-FPM so opcache picks up the new code: <code>systemctl reload php8.3-fpm</code>.</li>
+</ol>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th></tr></thead>
+  <tbody>
+    <tr><td>Blank page or a “dist/ missing” error</td><td>The Vue bundle was never built. Run <code>pnpm run build</code>, or use a release tarball that already contains <code>dist/</code>.</td></tr>
+    <tr><td>“Schema version is wrong”</td><td>Run <code>php update.php --update-schema=force-yes</code>.</td></tr>
+    <tr><td>Feeds never update</td><td>No cron entry and no <code>update_daemon2.php</code> process, or the PHP user cannot write to <code>cache/</code> and <code>lock/</code>.</td></tr>
+    <tr><td>“Unable to connect to database”</td><td>Check the <code>TTRSS_DB_*</code> values reach PHP. With a hand-written FPM pool, <code>clear_env</code> must be <code>no</code>.</td></tr>
+    <tr><td>Favicon/preview images broken</td><td>PHP lacks <code>gd</code> (or <code>exif</code>), or <code>feed-icons/</code> is not writable.</td></tr>
+    <tr><td>Logins loop behind a proxy</td><td>Set <code>TTRSS_SELF_URL_PATH</code> to the public URL and enable <code>TTRSS_FORCE_SELF_URL_PATH_USAGE</code>.</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  <p>
+    Tiny Tiny RSS is free software under the GNU GPL v3. This guide documents the
+    <a href="https://github.com/ashcoft/tt-rss-non-dockerize">ashcoft/tt-rss-non-dockerize</a>
+    fork; upstream development continues at
+    <a href="https://github.com/tt-rss/tt-rss">tt-rss/tt-rss</a>.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

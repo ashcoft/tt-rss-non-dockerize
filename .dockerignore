@@ -1,0 +1,35 @@
+.git
+.github
+.gitignore
+.vscode
+
+# Installed and built inside the image
+node_modules
+dist
+vendor
+
+# Never bake local configuration or user data into the image
+config.php
+.env
+cache
+feed-icons
+lock
+version_static.txt
+tt-rss.tar.gz
+tt-rss.zip
+
+# Tests, tooling and docs are not part of the runtime
+docs
+tests
+tests_functional
+tests_integration
+test-results
+playwright-report
+.playwright
+.phpunit.cache
+.phpstan-tmp
+.rector-tmp
+tools
+
+**/.DS_Store
+**/*.log
