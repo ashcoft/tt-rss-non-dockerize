@@ -40,16 +40,16 @@ export function createKeyHandler(shortcuts: KeyboardShortcuts) {
       return;
     }
 
-    const target = e.target as HTMLElement | null;
+    const focused = e.target as HTMLElement | null;
 
-    if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+    if (focused?.tagName === 'INPUT' || focused?.tagName === 'TEXTAREA' || focused?.isContentEditable) {
       return;
     }
 
     // Only the keys the control activates are skipped: clicking a toolbar or
     // headline button leaves focus on it, and the reading shortcuts must keep
     // working. A select also owns the arrow keys that move its selection.
-    const control = typeof target?.closest === 'function' ? target.closest(INTERACTIVE_SELECTOR) : null;
+    const control = typeof focused?.closest === 'function' ? focused.closest(INTERACTIVE_SELECTOR) : null;
 
     if (control && (control.tagName === 'SELECT' || NATIVE_ACTIVATION_KEYS.has(e.key))) {
       return;
