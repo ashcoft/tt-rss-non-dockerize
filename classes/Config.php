@@ -806,7 +806,7 @@ class Config {
 		// The Vue shell does not run the legacy Dojo bundle, so a themes.local
 		// override script would only throw (App/dojo are undefined). CSS
 		// overrides still apply.
-		if ($include_js) {
+		if ($include_js === true) {
 			$local_js = get_theme_path(self::get(self::LOCAL_OVERRIDE_JS));
 			if ($local_js) $rv .= javascript_tag($local_js);
 		}

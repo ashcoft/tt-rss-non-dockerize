@@ -68,7 +68,13 @@
         </aside>
       </main>
 
-      <div v-if="sidebarOpen" class="sidebar-backdrop" @click="sidebarOpen = false" />
+      <button
+        v-if="sidebarOpen"
+        type="button"
+        class="sidebar-backdrop"
+        aria-label="Close sidebar"
+        @click="sidebarOpen = false"
+      />
 
       <footer class="app-footer">
         <span class="status">{{ statusMessage }}</span>
@@ -523,6 +529,9 @@ onUnmounted(stopPolling);
 
 .sidebar-backdrop {
   display: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 /* Narrow screens: the sidebar becomes a drawer and the article panel an overlay. */
