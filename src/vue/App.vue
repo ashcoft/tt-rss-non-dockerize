@@ -16,7 +16,12 @@
       </header>
 
       <main class="app-main">
-                <aside class="sidebar" :class="{ open: sidebarOpen }">
+        <aside
+          class="sidebar"
+          :class="{ open: sidebarOpen }"
+          :inert.prop="isNarrow && !sidebarOpen"
+          :aria-hidden="isNarrow && !sidebarOpen ? 'true' : undefined"
+        >
           <FeedTree
             :feeds="feedsStore.feeds"
             :categories="feedsStore.categories"
@@ -60,13 +65,21 @@
                     />
         </section>
 
-        <aside class="article-panel" v-if="headlinesStore.selectedArticle">
+        <aside ref="articlePanelRef" class="article-panel" tabindex="-1" v-if="headlinesStore.selectedArticle">
           <ArticleView
             :article="headlinesStore.selectedArticle"
             @close="handleArticleClose"
           />
         </aside>
       </main>
+
+      <button
+        v-if="sidebarOpen"
+        type="button"
+        class="sidebar-backdrop"
+        aria-label="Close sidebar"
+        @click="sidebarOpen = false"
+      />
 
       <footer class="app-footer">
         <span class="status">{{ statusMessage }}</span>
@@ -97,7 +110,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import api from './api/client';
 import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
@@ -123,11 +136,14 @@ const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
 const sidebarOpen = ref(false);
+const narrowQuery = window.matchMedia('(max-width: 1024px)');
+const isNarrow = ref(narrowQuery.matches);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
+const articlePanelRef = ref<HTMLElement | null>(null);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -226,6 +242,20 @@ const handleFeedAction = async (action: string, feedId: number) => {
 };
 
 // Handlers
+/**
+ * On narrow screens the article is a full-screen overlay, so a keyboard user
+ * would otherwise keep focus on the headline list behind it. Move focus into
+ * the panel when it opens; the panel is focusable via tabindex="-1".
+ */
+watch(
+  () => headlinesStore.selectedArticle?.id ?? null,
+  async (id) => {
+    if (id === null || !isNarrow.value) return;
+    await nextTick();
+    articlePanelRef.value?.focus();
+  }
+);
+
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
   feedsStore.selectFeed(feedId, isCat);
@@ -421,7 +451,13 @@ useKeyboard({
 });
 
 // Lifecycle
+const onNarrowChange = (event: MediaQueryListEvent): void => {
+  isNarrow.value = event.matches;
+};
+
 onMounted(async () => {
+  narrowQuery.addEventListener('change', onNarrowChange);
+
   // The legacy shell only serves this page to an authenticated session, so a
   // readable CSRF token means we are already logged in.
   const authenticated = await api.checkSession();
@@ -432,7 +468,10 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(stopPolling);
+onUnmounted(() => {
+  narrowQuery.removeEventListener('change', onNarrowChange);
+  stopPolling();
+});
 </script>
 
 <style scoped>
@@ -440,35 +479,50 @@ onUnmounted(stopPolling);
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--ttrss-bg, #f5f5f5);
 }
 
 .app-header {
-  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
   background: var(--ttrss-header-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  white-space: nowrap;
   color: var(--ttrss-primary, #1976d2);
 }
 
 .app-header .subtitle {
-  margin: 0.25rem 0 0;
+  margin: 0;
   font-size: 0.875rem;
   color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-main {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
 .sidebar {
+  flex: 0 0 250px;
   width: 250px;
+  min-height: 0;
   overflow-y: auto;
   background: var(--ttrss-sidebar-bg, #fff);
   border-right: 1px solid var(--ttrss-border, #ddd);
@@ -476,19 +530,28 @@ onUnmounted(stopPolling);
 
 .content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+.article-panel:focus {
+  outline: none;
+}
+
 .article-panel {
+  flex: 0 0 400px;
   width: 400px;
+  min-height: 0;
   overflow-y: auto;
   background: var(--ttrss-article-bg, #fff);
   border-left: 1px solid var(--ttrss-border, #ddd);
 }
 
 .app-footer {
+  flex: 0 0 auto;
   padding: 0.5rem 1rem;
   background: var(--ttrss-footer-bg, #f0f0f0);
   border-top: 1px solid var(--ttrss-border, #ddd);
@@ -497,5 +560,66 @@ onUnmounted(stopPolling);
 
 .status {
   color: #666;
+}
+
+.sidebar-backdrop {
+  display: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Narrow screens: the sidebar becomes a drawer and the article panel an overlay.
+   The cut-off is 1024px because a three-pane layout needs roughly 500px for the
+   headline list on top of the 250px sidebar and the 400px article panel; below
+   that the list was squeezed into a column a few characters wide. */
+@media (max-width: 1024px) {
+  .app-header .subtitle {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1100;
+    width: min(80vw, 280px);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.25);
+  }
+
+  .sidebar.open {
+    transform: none;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .article-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    width: 100%;
+    border-left: 0;
+  }
+}
+
+@media (min-width: 1025px) {
+  .nav-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header h1 {
+    display: none;
+  }
 }
 </style>

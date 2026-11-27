@@ -259,14 +259,19 @@ const handleSelect = (index: string) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
+/* Vuetify gives .v-input flex:auto, which makes the search field grow to fill
+   the sidebar and pushes the tree to the bottom. */
 .search-input {
+  flex: 0 0 auto;
   padding: 0.5rem;
 }
 
 .feed-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

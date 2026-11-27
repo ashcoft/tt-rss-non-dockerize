@@ -9,12 +9,10 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const require = createRequire(import.meta.url);
 const SRC_VUE = fileURLToPath(new URL('../../src/vue/', import.meta.url));
 
 // Minimal reactivity: enough for the store's ref/computed usage under test.

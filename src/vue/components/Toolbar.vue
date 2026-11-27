@@ -204,22 +204,33 @@ const onLanguageChange = (language: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
   padding: 0.5rem 1rem;
   background: var(--ttrss-toolbar-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
-  gap: 1rem;
+  /* Vuetify draws a filled field's label just above its border, so wrapped
+     rows need more than a 0.5rem gap or the label lands on the row above. */
+  gap: 0.75rem 1rem;
 }
 
 .toolbar-left,
 .toolbar-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .toolbar-center {
-  flex: 1;
+  flex: 1 1 100px;
+  min-width: 0;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feed-title {
@@ -227,7 +238,66 @@ const onLanguageChange = (language: string) => {
   color: var(--ttrss-primary, #1976d2);
 }
 
+/* Vuetify's .v-input is flex:auto; cap the fields so the toolbar cannot
+   overflow its pane. */
 .search-input {
+  flex: 0 1 200px;
+  min-width: 120px;
   max-width: 200px;
+}
+
+.search-language,
+.view-mode {
+  flex: 0 0 auto;
+  width: 160px;
+  min-width: 140px;
+}
+
+/* The article panel takes 400px and the sidebar 250px, so just above the
+   drawer breakpoint the pane is too narrow for a single unwrapped row. Let the
+   groups wrap instead of letting .content clip the controls. */
+@media (min-width: 1025px) {
+  .toolbar-left {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+  }
+
+  /* flex-basis auto with flex-shrink 0 kept this group at its max-content
+     width, so it overflowed the pane instead of wrapping inside it. */
+  .toolbar-right {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  .toolbar {
+    row-gap: 1rem;
+  }
+
+  .toolbar-center {
+    display: none;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    flex: 1 1 100%;
+    /* The groups wrap internally, so they need the same room for the floating
+       labels as the toolbar itself. */
+    row-gap: 1rem;
+  }
+
+  .search-input {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .search-language,
+  .view-mode {
+    width: 150px;
+    min-width: 140px;
+  }
 }
 </style>

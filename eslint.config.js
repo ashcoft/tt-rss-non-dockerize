@@ -21,6 +21,15 @@ export default [
   js.configs.recommended,
 
   {
+    // Node's globals for the unit tests: they run under `node --test` and use
+    // URL/process/console, which the browser-oriented default config rejects.
+    files: ['tests/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node }
+    }
+  },
+
+  {
     files: ['js/**/*.js', 'plugins/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,

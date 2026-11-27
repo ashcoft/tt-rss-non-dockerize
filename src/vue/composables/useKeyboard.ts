@@ -19,12 +19,40 @@ export interface KeyboardShortcuts {
   onHelp?: () => void;
 }
 
-// External handler function to avoid Codacy false positive
-function createKeyHandler(shortcuts: KeyboardShortcuts) {
+/**
+ * Controls that activate themselves. Enter and Space must reach them, or a
+ * focused button (the mobile drawer's backdrop, a header action) would be
+ * cancelled and turned into "open the cursor headline" instead of clicking.
+ */
+const INTERACTIVE_SELECTOR =
+  'button, a[href], select, summary, [role="button"], [role="link"], [contenteditable="true"]';
+
+/** Keys a focused control owns; every other key still runs the shortcuts. */
+const NATIVE_ACTIVATION_KEYS = new Set(['Enter', ' ']);
+
+/**
+ * External handler function to avoid Codacy false positive.
+ * Exported for the regression test in `tests/vue/keyboard-shortcuts.test.mjs`.
+ */
+export function createKeyHandler(shortcuts: KeyboardShortcuts) {
   return (e: KeyboardEvent): void => {
-    const target = e.target;
-    if (target instanceof HTMLElement) {
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (e.defaultPrevented) {
+      return;
+    }
+
+    const focused = e.target;
+
+    if (focused instanceof HTMLElement) {
+      if (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA' || focused.isContentEditable) {
+        return;
+      }
+
+      // Only the keys the control activates are skipped: clicking a toolbar or
+      // headline button leaves focus on it, and the reading shortcuts must keep
+      // working. A select also owns the arrow keys that move its selection.
+      const control = focused.closest(INTERACTIVE_SELECTOR);
+
+      if (control && (control.tagName === 'SELECT' || NATIVE_ACTIVATION_KEYS.has(e.key))) {
         return;
       }
     }

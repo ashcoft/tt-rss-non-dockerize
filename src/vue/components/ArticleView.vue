@@ -160,6 +160,7 @@ const sanitizedContent = computed(() => {
   border-radius: 4px;
   background: white;
   height: 100%;
+  overflow-y: auto;
 }
 
 .article-header {
