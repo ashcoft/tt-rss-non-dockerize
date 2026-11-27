@@ -2,7 +2,7 @@ name: Publish container image
 
 on:
   push:
-    branches: [main]
+    branches: [main, vite-dev]
     tags: ['v*']
   workflow_dispatch:
 
