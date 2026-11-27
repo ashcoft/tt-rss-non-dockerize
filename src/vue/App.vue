@@ -16,7 +16,12 @@
       </header>
 
       <main class="app-main">
-                <aside class="sidebar" :class="{ open: sidebarOpen }">
+        <aside
+          class="sidebar"
+          :class="{ open: sidebarOpen }"
+          :inert.prop="isNarrow && !sidebarOpen"
+          :aria-hidden="isNarrow && !sidebarOpen ? 'true' : undefined"
+        >
           <FeedTree
             :feeds="feedsStore.feeds"
             :categories="feedsStore.categories"
@@ -131,6 +136,8 @@ const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
 const sidebarOpen = ref(false);
+const narrowQuery = window.matchMedia('(max-width: 1024px)');
+const isNarrow = ref(narrowQuery.matches);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
@@ -429,7 +436,13 @@ useKeyboard({
 });
 
 // Lifecycle
+const onNarrowChange = (event: MediaQueryListEvent): void => {
+  isNarrow.value = event.matches;
+};
+
 onMounted(async () => {
+  narrowQuery.addEventListener('change', onNarrowChange);
+
   // The legacy shell only serves this page to an authenticated session, so a
   // readable CSRF token means we are already logged in.
   const authenticated = await api.checkSession();
@@ -440,7 +453,10 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(stopPolling);
+onUnmounted(() => {
+  narrowQuery.removeEventListener('change', onNarrowChange);
+  stopPolling();
+});
 </script>
 
 <style scoped>
@@ -534,8 +550,11 @@ onUnmounted(stopPolling);
   cursor: pointer;
 }
 
-/* Narrow screens: the sidebar becomes a drawer and the article panel an overlay. */
-@media (max-width: 900px) {
+/* Narrow screens: the sidebar becomes a drawer and the article panel an overlay.
+   The cut-off is 1024px because a three-pane layout needs roughly 500px for the
+   headline list on top of the 250px sidebar and the 400px article panel; below
+   that the list was squeezed into a column a few characters wide. */
+@media (max-width: 1024px) {
   .app-header .subtitle {
     display: none;
   }
@@ -573,7 +592,7 @@ onUnmounted(stopPolling);
   }
 }
 
-@media (min-width: 901px) {
+@media (min-width: 1025px) {
   .nav-toggle {
     display: none;
   }

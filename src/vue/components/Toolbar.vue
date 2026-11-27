@@ -209,7 +209,9 @@ const onLanguageChange = (language: string) => {
   padding: 0.5rem 1rem;
   background: var(--ttrss-toolbar-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
-  gap: 0.5rem 1rem;
+  /* Vuetify draws a filled field's label just above its border, so wrapped
+     rows need more than a 0.5rem gap or the label lands on the row above. */
+  gap: 0.75rem 1rem;
 }
 
 .toolbar-left,
@@ -251,19 +253,30 @@ const onLanguageChange = (language: string) => {
   min-width: 140px;
 }
 
-@media (min-width: 901px) {
+/* The article panel takes 400px and the sidebar 250px, so just above the
+   drawer breakpoint the pane is too narrow for a single unwrapped row. Let the
+   groups wrap instead of letting .content clip the controls. */
+@media (min-width: 1025px) {
   .toolbar-left {
     flex: 1 1 auto;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
 
+  /* flex-basis auto with flex-shrink 0 kept this group at its max-content
+     width, so it overflowed the pane instead of wrapping inside it. */
   .toolbar-right {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .toolbar {
+    row-gap: 1rem;
+  }
+
   .toolbar-center {
     display: none;
   }
@@ -271,6 +284,9 @@ const onLanguageChange = (language: string) => {
   .toolbar-left,
   .toolbar-right {
     flex: 1 1 100%;
+    /* The groups wrap internally, so they need the same room for the floating
+       labels as the toolbar itself. */
+    row-gap: 1rem;
   }
 
   .search-input {

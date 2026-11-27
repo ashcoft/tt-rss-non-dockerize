@@ -19,12 +19,27 @@ export interface KeyboardShortcuts {
   onHelp?: () => void;
 }
 
+/**
+ * Elements that own Enter/Space themselves. Without this, pressing Enter on a
+ * focused button (the mobile drawer's backdrop, a header action) would be
+ * cancelled and turned into "open the cursor headline" instead of clicking it.
+ */
+const INTERACTIVE_SELECTOR =
+  'button, a[href], select, summary, [role="button"], [role="link"], [contenteditable="true"]';
+
 // External handler function to avoid Codacy false positive
 function createKeyHandler(shortcuts: KeyboardShortcuts) {
   return (e: KeyboardEvent): void => {
+    if (e.defaultPrevented) {
+      return;
+    }
+
     const target = e.target;
     if (target instanceof HTMLElement) {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+      if (target.closest(INTERACTIVE_SELECTOR)) {
         return;
       }
     }
