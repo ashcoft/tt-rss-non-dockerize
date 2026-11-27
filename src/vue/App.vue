@@ -543,24 +543,12 @@ const openInitialFeed = async () => {
 // Auth flow (Phase 3)
 const onLoggedIn = async () => {
   authStore.setLoggedIn(true);
-  showMessage('Welcome back!', 'success');
 
-  // A failing secondary request (plugin hooks, update check) must not prevent
-  // the initial feed from opening.
-  await loadStartupData();
-  applyDefaultViewPrefs();
-
-  applyThemePalette();
-
-  try {
-    await openInitialFeed();
-  } catch (err) {
-    console.error('Could not open the initial feed:', err);
-    showMessage('Could not load headlines', 'error');
-  }
-
-  startPolling();
-  scheduleUpdateCheck();
+  // The shell - and with it the theme stylesheet, the user stylesheet and the
+  // plugin CSS - was rendered for an anonymous visitor. Reload once so the
+  // authenticated shell is used instead of booting the app against the login
+  // page's copy; onMounted then runs the normal startup for a logged-in user.
+  window.location.reload();
 };
 
 /** Load the plugin-provided toolbar button fragments for this session. */
