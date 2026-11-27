@@ -2,7 +2,7 @@
   <div class="toolbar">
     <div class="toolbar-left">
       <v-icon v-if="feedInfo" icon="mdi-rss" size="18" class="feed-icon" />
-      <span v-if="feedInfo" class="feed-title">{{ feedInfo.title }}</span>
+      <span v-if="feedInfo" class="toolbar-feed-title">{{ feedInfo.title }}</span>
       <span v-if="selectedCount > 0" class="selection-count">
         {{ selectedCount }} article{{ selectedCount === 1 ? '' : 's' }} selected
       </span>
@@ -456,7 +456,7 @@ const handleAction = (command: string, payload?: string | number | object) => {
   background: transparent;
 }
 
-.feed-title {
+.toolbar-feed-title {
   overflow: hidden;
   color: rgb(var(--v-theme-on-background));
   font-size: 0.95rem;
@@ -475,9 +475,22 @@ const handleAction = (command: string, payload?: string | number | object) => {
 @media (max-width: 900px) {
   .toolbar {
     flex: 1 1 auto;
+    flex-wrap: wrap;
     min-width: 0;
     gap: 2px;
     padding: 0;
+  }
+
+  /* On a phone the title and the controls do not fit on one line: the title
+     was left with ~25px and read "All". Give each group its own row. */
+  .toolbar-left,
+  .toolbar-right {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .toolbar-right {
+    justify-content: flex-end;
   }
 
   .toolbar-left {
@@ -495,7 +508,7 @@ const handleAction = (command: string, payload?: string | number | object) => {
     min-width: 0;
   }
 
-  .feed-title {
+  .toolbar-feed-title {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;

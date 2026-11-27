@@ -97,7 +97,7 @@ test.describe('Vue front-end', () => {
   test('logs in and shows the three-pane shell', async ({ page }) => {
     await login(page);
     await expect(page.locator('.feed-list')).toBeVisible();
-    await expect(page.locator('.toolbar .feed-title')).toBeVisible();
+    await expect(page.locator('.toolbar .toolbar-feed-title')).toBeVisible();
   });
 
   test('lists seeded feeds and loads headlines when a feed is selected', async ({ page }) => {
@@ -265,7 +265,7 @@ test.describe('Vue front-end', () => {
     await starred.first().hover();
     await starred.first().getByRole('button', { name: 'Unstar' }).click();
     await page.reload();
-    await page.locator('.toolbar .feed-title').waitFor({ timeout: 15000 });
+    await page.locator('.toolbar .toolbar-feed-title').waitFor({ timeout: 15000 });
     await expandCategory(page, 'Special');
     await page.locator('.feed-list').getByText('Starred articles', { exact: true }).click();
     await expect(
@@ -518,7 +518,7 @@ test.describe('Vue front-end', () => {
     await dialog.getByRole('button', { name: 'Close' }).click();
 
     await page.reload();
-    await expect(page.locator('.toolbar .feed-title')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.toolbar .toolbar-feed-title')).toBeVisible({ timeout: 15000 });
     await expandCategory(page, 'Special');
     await page.locator('.feed-list').getByText('All articles', { exact: true }).click();
 
@@ -554,7 +554,7 @@ test.describe('Vue front-end', () => {
 
   test('prefs.php serves the Vue app with the preferences dialog open', async ({ page }) => {
     await page.goto('/prefs.php');
-    await expect(page.locator('.toolbar .feed-title')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.toolbar .toolbar-feed-title')).toBeVisible({ timeout: 15000 });
 
     // The legacy Dojo preferences page is gone; the dialog opens on mount.
     const dialog = page.getByRole('dialog');

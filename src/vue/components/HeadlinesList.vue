@@ -413,16 +413,6 @@
                 >
                   <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
                 </button>
-                <span v-if="headline.tags.length > 0" class="tags hl-tags">
-                  <v-icon size="14">mdi-tag-outline</v-icon>
-                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
-                </span>
-                <a
-                  href="#"
-                  class="headline-label-add"
-                  title="Assign labels"
-                  @click.prevent.stop="emit('action', headline, 'label')"
-                >(+)</a>
                 <a
                   v-if="headline.comments_link"
                   class="comments headline-comments-link"
@@ -975,6 +965,23 @@ const sanitize = (html: string): string =>
   align-items: center;
   min-height: 32px;
   padding: 1px 8px;
+}
+
+/* The theme applies `word-break: break-all` and automatic hyphenation to the
+   row text, which splits words like "distrib-uted" in a headline. Only break
+   inside a word when the word genuinely does not fit. */
+.headlines-list-content > .cdm .hl-title-link,
+.headlines-list-content > .cdm .headline-author,
+.headlines-list-content > .cdm .hl-tags {
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+/* The title line holds the title, author and tags. On a phone the tags would
+   be squeezed next to a wrapped title, so let them fall to their own line. */
+.headlines-list-content > .cdm .hl-title {
+  flex-wrap: wrap;
 }
 
 .updated-wrap {

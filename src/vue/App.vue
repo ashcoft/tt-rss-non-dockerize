@@ -10,7 +10,12 @@
     <!-- Login gate (Phase 3) -->
     <LoginForm v-else-if="!authStore.loggedIn" @logged-in="onLoggedIn" />
 
-    <div v-else id="main" class="ttrss-app ttrss_main" :class="{ 'wide-screen': feedsStore.wideScreen }">
+    <div
+      v-else
+      id="main"
+      class="ttrss-app ttrss_main"
+      :class="{ 'wide-screen': feedsStore.wideScreen, 'combined-mode': feedsStore.combinedMode }"
+    >
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
       <aside
         id="feeds-holder"
@@ -1661,6 +1666,13 @@ onUnmounted(() => {
   flex: 0 0 auto;
 }
 
+/* The Feedly theme reserves a strip on the left of #main for the legacy
+   feeds toggle. The Vue shell puts that control in the header, so the strip is
+   dead space - and the only thing left behind when the tree is collapsed. */
+body.flat.ttrss_index #main {
+  padding-left: 0;
+}
+
 .article-panel:focus {
   outline: none;
 }
@@ -1673,14 +1685,15 @@ onUnmounted(() => {
   background: rgb(var(--v-theme-surface));
 }
 
-/* WIDESCREEN_MODE: hide the tree and let the list use the full width. The
-   header toggle still opens it as a drawer so the feed list is never lost. */
+/* WIDESCREEN_MODE and combined mode both read as a single column, so the tree
+   starts hidden and the header toggle opens it as a drawer; the feed list is
+   never lost. */
 @media (min-width: 901px) {
-  .wide-screen .sidebar:not(.open) {
+  :is(.wide-screen, .combined-mode) .sidebar:not(.open) {
     display: none;
   }
 
-  .wide-screen .sidebar.open {
+  :is(.wide-screen, .combined-mode) .sidebar.open {
     display: block;
     position: fixed;
     top: 44px;
@@ -1692,15 +1705,15 @@ onUnmounted(() => {
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
   }
 
-  .wide-screen .nav-toggle {
+  :is(.wide-screen, .combined-mode) .nav-toggle {
     display: inline-flex;
   }
 
-  .wide-screen .sidebar-splitter {
+  :is(.wide-screen, .combined-mode) .sidebar-splitter {
     display: none;
   }
 
-  .wide-screen .sidebar-scrim {
+  :is(.wide-screen, .combined-mode) .sidebar-scrim {
     display: block;
     position: fixed;
     inset: 44px 0 0 0;
