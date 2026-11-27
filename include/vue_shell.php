@@ -51,7 +51,7 @@ if ($authenticated === true) {
 	}
 	?>
 
-	<?= Config::get_override_links() ?>
+	<?= Config::get_override_links(false) ?>
 
 	<script type="text/javascript">
 		const __csrf_token = "<?= $csrf_token ?>";

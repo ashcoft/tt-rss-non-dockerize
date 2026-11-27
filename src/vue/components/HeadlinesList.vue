@@ -137,8 +137,11 @@ const formatDate = (updated: string): string => updated;
 </script>
 
 <style scoped>
+/* The toolbar above is a sibling flex item; flex:1 keeps the list inside the
+   content pane instead of overflowing by the toolbar's height. */
 .headlines-list {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

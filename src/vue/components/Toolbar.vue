@@ -204,22 +204,31 @@ const onLanguageChange = (language: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
   padding: 0.5rem 1rem;
   background: var(--ttrss-toolbar-bg, #fff);
   border-bottom: 1px solid var(--ttrss-border, #ddd);
-  gap: 1rem;
+  gap: 0.5rem 1rem;
 }
 
 .toolbar-left,
 .toolbar-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .toolbar-center {
-  flex: 1;
+  flex: 1 1 100px;
+  min-width: 0;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feed-title {
@@ -227,7 +236,52 @@ const onLanguageChange = (language: string) => {
   color: var(--ttrss-primary, #1976d2);
 }
 
+/* Vuetify's .v-input is flex:auto; cap the fields so the toolbar cannot
+   overflow its pane. */
 .search-input {
+  flex: 0 1 200px;
+  min-width: 120px;
   max-width: 200px;
+}
+
+.search-language,
+.view-mode {
+  flex: 0 0 auto;
+  width: 160px;
+  min-width: 140px;
+}
+
+@media (min-width: 901px) {
+  .toolbar-left {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+  }
+
+  .toolbar-right {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar-center {
+    display: none;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    flex: 1 1 100%;
+  }
+
+  .search-input {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .search-language,
+  .view-mode {
+    width: 150px;
+    min-width: 140px;
+  }
 }
 </style>
