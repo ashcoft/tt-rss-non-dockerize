@@ -12,7 +12,14 @@
 
     <div v-else id="main" class="ttrss-app ttrss_main" :class="{ 'wide-screen': feedsStore.wideScreen }">
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
-      <aside id="feeds-holder" class="sidebar feeds-holder" :class="{ open: sidebarOpen }" :style="sidebarStyle">
+      <aside
+        id="feeds-holder"
+        class="sidebar feeds-holder"
+        :class="{ open: sidebarOpen }"
+        :style="sidebarStyle"
+        :inert.prop="isNarrow && !sidebarOpen"
+        :aria-hidden="isNarrow && !sidebarOpen ? 'true' : undefined"
+      >
         <PluginSurface v-if="pluginFeedTreeHtml" :html="pluginFeedTreeHtml" class="plugin-feed-tree" />
         <FeedTree
           ref="feedTreeRef"
@@ -150,7 +157,9 @@
         <aside
           v-if="headlinesStore.selectedArticle && !feedsStore.combinedMode"
           id="content-insert"
+          ref="articlePanelRef"
           class="article-panel content-insert"
+          tabindex="-1"
           :style="feedsStore.wideScreen ? {} : articleStyle"
         >
           <ArticleView
@@ -257,7 +266,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import api from './api/client';
 import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
@@ -289,6 +298,13 @@ const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref<'success' | 'error' | 'info' | 'warning'>('info');
 const sidebarOpen = ref(false);
+/** Narrow layout (the drawer cut-off in the stylesheet below). */
+const narrowQuery = window.matchMedia('(max-width: 900px)');
+const isNarrow = ref(narrowQuery.matches);
+const onNarrowChange = (event: MediaQueryListEvent): void => {
+  isNarrow.value = event.matches;
+};
+const articlePanelRef = ref<HTMLElement | null>(null);
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 // prefs.php serves this shell with __open_preferences=true so the dialog opens
@@ -1476,8 +1492,20 @@ useKeyboard({
   isCombined: () => feedsStore.combinedMode,
 });
 
+// Below the drawer cut-off the article is a full-screen panel, so a keyboard
+// user would otherwise keep focus on the headline list behind it.
+watch(
+  () => (feedsStore.combinedMode ? null : headlinesStore.selectedArticle?.id ?? null),
+  async (id) => {
+    if (id === null || !isNarrow.value) return;
+    await nextTick();
+    articlePanelRef.value?.focus();
+  }
+);
+
 // Lifecycle
 onMounted(async () => {
+  narrowQuery.addEventListener('change', onNarrowChange);
   // The legacy shell only serves this page to an authenticated session, so a
   // readable CSRF token means we are already logged in.
   const authenticated = await api.checkSession().catch(() => false);
@@ -1507,6 +1535,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  narrowQuery.removeEventListener('change', onNarrowChange);
   stopPolling();
   window.removeEventListener('popstate', onOverlayPopState);
   window.removeEventListener('resize', reconcileOverlayHistory);
@@ -1630,6 +1659,10 @@ onUnmounted(() => {
 /* Status alerts must keep their height; the list below takes the rest. */
 .content > .v-alert {
   flex: 0 0 auto;
+}
+
+.article-panel:focus {
+  outline: none;
 }
 
 .article-panel {

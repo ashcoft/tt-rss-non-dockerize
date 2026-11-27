@@ -110,6 +110,14 @@ const KEY_NAMES: Record<string, string> = {
   PageDown: 'PgDn',
 };
 
+/** Keys a focused control owns; every other key still runs the shortcuts. */
+const NATIVE_ACTIVATION_KEYS = new Set(['Enter', ' ']);
+/** Controls that activate themselves with Enter/Space. */
+const ACTIVATABLE_SELECTOR = 'button, a, [role="button"]';
+/** Reading pane: with focus inside it, the arrows scroll instead of navigating. */
+const ARTICLE_PANEL_SELECTOR = '.article-panel';
+const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown']);
+
 /** Modifier prefix used by the legacy keydown notation. */
 function modifierPrefix(event: KeyboardEvent): string {
   let prefix = '';
@@ -175,13 +183,23 @@ export function useKeyboard(shortcuts: KeyboardShortcuts) {
   const keyHandler = (event: KeyboardEvent): void => {
     const target = event.target;
     if (target instanceof HTMLElement) {
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable ||
-        target.closest('button, a, [role="button"]')
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // A select owns its arrow keys.
+      if (target.tagName === 'SELECT') {
+        return;
+      }
+
+      if (ARROW_KEYS.has(event.key) && target.closest(ARTICLE_PANEL_SELECTOR)) {
+        return;
+      }
+
+      // Only the keys a control activates are skipped: clicking a toolbar or
+      // headline button leaves focus on it, and the reading shortcuts must keep
+      // working.
+      if (NATIVE_ACTIVATION_KEYS.has(event.key) && target.closest(ACTIVATABLE_SELECTOR)) {
         return;
       }
     }
