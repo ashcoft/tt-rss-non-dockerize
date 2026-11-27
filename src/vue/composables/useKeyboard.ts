@@ -40,19 +40,21 @@ export function createKeyHandler(shortcuts: KeyboardShortcuts) {
       return;
     }
 
-    const focused = e.target as HTMLElement | null;
+    const focused = e.target;
 
-    if (focused?.tagName === 'INPUT' || focused?.tagName === 'TEXTAREA' || focused?.isContentEditable) {
-      return;
-    }
+    if (focused instanceof HTMLElement) {
+      if (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA' || focused.isContentEditable) {
+        return;
+      }
 
-    // Only the keys the control activates are skipped: clicking a toolbar or
-    // headline button leaves focus on it, and the reading shortcuts must keep
-    // working. A select also owns the arrow keys that move its selection.
-    const control = typeof focused?.closest === 'function' ? focused.closest(INTERACTIVE_SELECTOR) : null;
+      // Only the keys the control activates are skipped: clicking a toolbar or
+      // headline button leaves focus on it, and the reading shortcuts must keep
+      // working. A select also owns the arrow keys that move its selection.
+      const control = focused.closest(INTERACTIVE_SELECTOR);
 
-    if (control && (control.tagName === 'SELECT' || NATIVE_ACTIVATION_KEYS.has(e.key))) {
-      return;
+      if (control && (control.tagName === 'SELECT' || NATIVE_ACTIVATION_KEYS.has(e.key))) {
+        return;
+      }
     }
 
     // Return early when modifier keys are pressed to avoid overriding browser shortcuts

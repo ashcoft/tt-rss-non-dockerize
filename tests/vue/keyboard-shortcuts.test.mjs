@@ -29,11 +29,26 @@ function loadKeyboardModule() {
   return module.exports;
 }
 
+/** Node has no DOM: stand in for the element type the handler checks against. */
+class FakeHTMLElement {
+  constructor(tagName, control = null) {
+    this.tagName = tagName;
+    this.isContentEditable = false;
+    this.control = control;
+  }
+
+  closest() {
+    return this.control;
+  }
+}
+
+globalThis.HTMLElement = FakeHTMLElement;
+
 const { createKeyHandler } = loadKeyboardModule();
 
 /** A DOM-like target whose `closest` reports the control that owns it. */
 function target(tagName, control = null) {
-  return { tagName, isContentEditable: false, closest: () => control };
+  return new FakeHTMLElement(tagName, control);
 }
 
 function keydown(key, eventTarget, overrides = {}) {
@@ -108,8 +123,11 @@ test('text fields swallow every shortcut', () => {
   const { calls, shortcuts } = spyHandler();
   const handler = createKeyHandler(shortcuts);
 
+  const editable = new FakeHTMLElement('DIV');
+  editable.isContentEditable = true;
+
   handler(keydown('j', target('INPUT')));
-  handler(keydown('j', { tagName: 'DIV', isContentEditable: true }));
+  handler(keydown('j', editable));
 
   assert.deepEqual(calls, []);
 });
