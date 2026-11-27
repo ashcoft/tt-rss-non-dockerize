@@ -31,13 +31,15 @@ function loadKeyboardModule() {
 
 /** Node has no DOM: stand in for the element type the handler checks against. */
 class FakeHTMLElement {
-  constructor(tagName, control = null) {
+  constructor(tagName, { control = null, inArticle = false } = {}) {
     this.tagName = tagName;
     this.isContentEditable = false;
     this.control = control;
+    this.inArticle = inArticle;
   }
 
-  closest() {
+  closest(selector) {
+    if (selector.includes('article-panel')) return this.inArticle ? this : null;
     return this.control;
   }
 }
@@ -47,8 +49,8 @@ globalThis.HTMLElement = FakeHTMLElement;
 const { createKeyHandler } = loadKeyboardModule();
 
 /** A DOM-like target whose `closest` reports the control that owns it. */
-function target(tagName, control = null) {
-  return new FakeHTMLElement(tagName, control);
+function target(tagName, options = {}) {
+  return new FakeHTMLElement(tagName, options);
 }
 
 function keydown(key, eventTarget, overrides = {}) {
@@ -85,7 +87,7 @@ function spyHandler() {
 test('reading shortcuts still run while a button has focus', () => {
   const { calls, shortcuts } = spyHandler();
   const handler = createKeyHandler(shortcuts);
-  const button = target('BUTTON', { tagName: 'BUTTON' });
+  const button = target('BUTTON', { control: { tagName: 'BUTTON' } });
 
   handler(keydown('j', button));
   handler(keydown('k', button));
@@ -97,7 +99,7 @@ test('reading shortcuts still run while a button has focus', () => {
 test('a focused button keeps its own activation keys', () => {
   const { calls, shortcuts } = spyHandler();
   const handler = createKeyHandler(shortcuts);
-  const button = target('BUTTON', { tagName: 'BUTTON' });
+  const button = target('BUTTON', { control: { tagName: 'BUTTON' } });
 
   const enter = keydown('Enter', button);
   handler(enter);
@@ -112,7 +114,7 @@ test('a focused button keeps its own activation keys', () => {
 test('a select keeps the arrow keys that move its selection', () => {
   const { calls, shortcuts } = spyHandler();
   const handler = createKeyHandler(shortcuts);
-  const option = target('OPTION', { tagName: 'SELECT' });
+  const option = target('OPTION', { control: { tagName: 'SELECT' } });
 
   handler(keydown('ArrowDown', option));
 
@@ -139,4 +141,32 @@ test('an event another handler consumed is ignored', () => {
   handler(keydown('j', target('DIV'), { defaultPrevented: true }));
 
   assert.deepEqual(calls, []);
+});
+
+test('arrows scroll the reading pane instead of moving the cursor', () => {
+  const { calls, shortcuts } = spyHandler();
+  const handler = createKeyHandler(shortcuts);
+  const link = target('A', { control: { tagName: 'A' }, inArticle: true });
+
+  const down = keydown('ArrowDown', link);
+  handler(down);
+  const up = keydown('ArrowUp', link);
+  handler(up);
+
+  assert.deepEqual(calls, []);
+  assert.equal(down.prevented, false);
+  assert.equal(up.prevented, false);
+
+  // j/k stay explicit reading shortcuts, even inside the pane.
+  handler(keydown('j', link));
+  assert.deepEqual(calls, ['next']);
+});
+
+test('arrows still navigate when focus is outside the reading pane', () => {
+  const { calls, shortcuts } = spyHandler();
+  const handler = createKeyHandler(shortcuts);
+
+  handler(keydown('ArrowDown', target('BODY')));
+
+  assert.deepEqual(calls, ['next']);
 });

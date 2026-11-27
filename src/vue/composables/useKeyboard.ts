@@ -30,6 +30,10 @@ const INTERACTIVE_SELECTOR =
 /** Keys a focused control owns; every other key still runs the shortcuts. */
 const NATIVE_ACTIVATION_KEYS = new Set(['Enter', ' ']);
 
+/** Reading pane: with focus inside it, the arrows scroll instead of navigating. */
+const ARTICLE_PANEL_SELECTOR = '.article-panel';
+const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown']);
+
 /**
  * External handler function to avoid Codacy false positive.
  * Exported for the regression test in `tests/vue/keyboard-shortcuts.test.mjs`.
@@ -44,6 +48,10 @@ export function createKeyHandler(shortcuts: KeyboardShortcuts) {
 
     if (focused instanceof HTMLElement) {
       if (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA' || focused.isContentEditable) {
+        return;
+      }
+
+      if (ARROW_KEYS.has(e.key) && focused.closest(ARTICLE_PANEL_SELECTOR)) {
         return;
       }
 
