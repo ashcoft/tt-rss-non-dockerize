@@ -65,7 +65,7 @@
                     />
         </section>
 
-        <aside class="article-panel" v-if="headlinesStore.selectedArticle">
+        <aside ref="articlePanelRef" class="article-panel" tabindex="-1" v-if="headlinesStore.selectedArticle">
           <ArticleView
             :article="headlinesStore.selectedArticle"
             @close="handleArticleClose"
@@ -110,7 +110,7 @@
 
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useTheme } from 'vuetify';
 import api from './api/client';
 import { useFeedsStore, useHeadlinesStore, useAuthStore, useLabelsStore, type Headline } from './stores';
@@ -143,6 +143,7 @@ const labelsDialogOpen = ref(false);
 const prefsOpen = ref(false);
 const labelArticleId = ref<number | null>(null);
 const searchLanguages = ref<string[]>([]);
+const articlePanelRef = ref<HTMLElement | null>(null);
 
 // Auto-refresh polling (Phase 5)
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -241,6 +242,20 @@ const handleFeedAction = async (action: string, feedId: number) => {
 };
 
 // Handlers
+/**
+ * On narrow screens the article is a full-screen overlay, so a keyboard user
+ * would otherwise keep focus on the headline list behind it. Move focus into
+ * the panel when it opens; the panel is focusable via tabindex="-1".
+ */
+watch(
+  () => headlinesStore.selectedArticle?.id ?? null,
+  async (id) => {
+    if (id === null || !isNarrow.value) return;
+    await nextTick();
+    articlePanelRef.value?.focus();
+  }
+);
+
 const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   sidebarOpen.value = false;
   feedsStore.selectFeed(feedId, isCat);
@@ -520,6 +535,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.article-panel:focus {
+  outline: none;
 }
 
 .article-panel {
