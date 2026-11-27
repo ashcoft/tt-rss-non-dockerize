@@ -20,28 +20,39 @@ export interface KeyboardShortcuts {
 }
 
 /**
- * Elements that own Enter/Space themselves. Without this, pressing Enter on a
+ * Controls that activate themselves. Enter and Space must reach them, or a
  * focused button (the mobile drawer's backdrop, a header action) would be
- * cancelled and turned into "open the cursor headline" instead of clicking it.
+ * cancelled and turned into "open the cursor headline" instead of clicking.
  */
 const INTERACTIVE_SELECTOR =
   'button, a[href], select, summary, [role="button"], [role="link"], [contenteditable="true"]';
 
-// External handler function to avoid Codacy false positive
-function createKeyHandler(shortcuts: KeyboardShortcuts) {
+/** Keys a focused control owns; every other key still runs the shortcuts. */
+const NATIVE_ACTIVATION_KEYS = new Set(['Enter', ' ']);
+
+/**
+ * External handler function to avoid Codacy false positive.
+ * Exported for the regression test in `tests/vue/keyboard-shortcuts.test.mjs`.
+ */
+export function createKeyHandler(shortcuts: KeyboardShortcuts) {
   return (e: KeyboardEvent): void => {
     if (e.defaultPrevented) {
       return;
     }
 
-    const target = e.target;
-    if (target instanceof HTMLElement) {
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-      if (target.closest(INTERACTIVE_SELECTOR)) {
-        return;
-      }
+    const target = e.target as HTMLElement | null;
+
+    if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+      return;
+    }
+
+    // Only the keys the control activates are skipped: clicking a toolbar or
+    // headline button leaves focus on it, and the reading shortcuts must keep
+    // working. A select also owns the arrow keys that move its selection.
+    const control = typeof target?.closest === 'function' ? target.closest(INTERACTIVE_SELECTOR) : null;
+
+    if (control && (control.tagName === 'SELECT' || NATIVE_ACTIVATION_KEYS.has(e.key))) {
+      return;
     }
 
     // Return early when modifier keys are pressed to avoid overriding browser shortcuts
