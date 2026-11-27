@@ -27,7 +27,7 @@
     "lint:vue": "eslint src/vue",
     "test:vue": "node --test tests/vue/*.test.mjs",
     "lint:css": "stylelint 'lib/flat-ttrss/**/*.css' 'plugins/**/*.css' 'themes/**/*.less'",
-    "lint:js": "eslint js src plugins",
+    "lint:js": "eslint js src plugins tests",
     "phpunit": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
     "phpunit:integration": "./tests_integration/run.sh"
   },
