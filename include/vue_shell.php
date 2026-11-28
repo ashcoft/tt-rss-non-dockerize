@@ -144,6 +144,8 @@ if ($authenticated === true) {
 		var require = window.require = window.require || function () {};
 	</script>
 
+	<?= javascript_tag('js/legacy-plugin-globals.js') ?>
+
 	<?php
 	if ($authenticated === true) {
 		UserHelper::print_user_stylesheet();

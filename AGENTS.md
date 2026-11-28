@@ -130,6 +130,22 @@ batch/sharing/maintenance and plugin settings), and the plugin toolbar/prefs
 surfaces render through `PluginSurface`. See `VITE_MIGRATION.md` for the
 remaining plugin-specific limitations.
 
+## Legacy plugin bridge
+
+Plugin JS written for the Dojo client still ships with plugins and is emitted
+by `include/vue_shell.php` for authenticated sessions. `js/legacy-plugin-globals.js`
+runs before it and provides the globals those scripts expect (`require` with a
+`ready` stub, `App`, `Headlines`, `Feeds`, `Article`, `Notify`, `xhr`,
+`dijit.Dialog`); `src/vue/utils/legacyPlugins.ts` then points them at the live
+app. `src/vue/utils/pluginHost.ts` dispatches the Dojo hooks at the same points
+the old client did (init, params, counters, feed/headline/article render), so a
+plugin's own JS (card views, favicon badges, hotkey actions) keeps working.
+
+When adding a dispatch site, mirror the argument shape from the Dojo client
+(`js/App.js`, `js/Feeds.js`, `js/Headlines.js`, `js/Article.js` on `main`):
+counters get the flat `{id, kind, counter, ...}` list, rows get the DOM node,
+feed hooks get `[feed, is_cat]`.
+
 ## Distribution surfaces
 
 - `.github/workflows/docker-publish.yml` builds the `Dockerfile` on every push

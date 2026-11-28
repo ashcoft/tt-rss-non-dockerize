@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { Article } from '@/types';
 import DOMPurify from 'dompurify';
 import { useHeadlinesStore } from '@/stores';
 import api from '@/api/client';
 import { pluginIcon } from '../utils/pluginIcons';
+import { HOOKS, runPluginHook } from '../utils/pluginHost';
 import ShareDialog from './dialogs/ShareDialog.vue';
 
 const props = defineProps<{
@@ -19,6 +20,17 @@ const emit = defineEmits<{
 }>();
 
 const headlinesStore = useHeadlinesStore();
+const rootEl = ref<HTMLElement | null>(null);
+
+// HOOK_ARTICLE_RENDERED receives the rendered `.post` node, as in the Dojo client.
+onMounted(() => runPluginHook(HOOKS.ARTICLE_RENDERED, rootEl.value));
+watch(
+  () => props.article?.id,
+  async () => {
+    await nextTick();
+    runPluginHook(HOOKS.ARTICLE_RENDERED, rootEl.value);
+  }
+);
 
 // Plugin article buttons run their handler through PluginHandler and render the
 // returned HTML fragment in a dialog. Icons are mapped to MDI in pluginIcons.
@@ -183,7 +195,7 @@ const sanitizedContent = computed(() => {
 </script>
 
 <template>
-  <div class="article-view post" :data-article-id="article.id">
+  <div ref="rootEl" class="article-view post" :data-article-id="article.id">
     <article class="article-content content">
       <header class="article-header header">
         <div class="article-header-inner">

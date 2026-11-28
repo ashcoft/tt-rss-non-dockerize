@@ -487,6 +487,7 @@ import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
 import { usePullAndSwipe } from '@/composables/usePullAndSwipe';
 import { useLongPressContextMenu } from '@/composables/useLongPressContextMenu';
 import { pluginIcon } from '../utils/pluginIcons';
+import { HOOKS, runPluginHook } from '../utils/pluginHost';
 import api from '@/api/client';
 
 const props = defineProps<{
@@ -536,6 +537,36 @@ const emit = defineEmits<{
 
 // Infinite scroll wiring (Phase 5)
 const listRef = ref<HTMLElement | null>(null);
+
+/**
+ * Fire the legacy per-row and per-list hooks after a render. Plugins use
+ * `HOOK_HEADLINE_RENDERED` for row decoration and `HOOK_ARTICLE_RENDERED_CDM`
+ * to rewrite the body of a combined row (card views do exactly that).
+ */
+const dispatchRenderHooks = async () => {
+  await nextTick();
+
+  const root = listRef.value;
+  if (!root) return;
+
+  for (const row of root.querySelectorAll<HTMLElement>('[data-article-id]')) {
+    runPluginHook(HOOKS.HEADLINE_RENDERED, row);
+
+    if (row.querySelector('.headline-content')) {
+      runPluginHook(HOOKS.ARTICLE_RENDERED_CDM, row);
+    }
+  }
+
+  runPluginHook(HOOKS.HEADLINES_RENDERED);
+};
+
+watch(
+  () => [props.headlines, props.combined, props.cdmExpanded, props.activeId] as const,
+  () => {
+    void dispatchRenderHooks();
+  },
+  { flush: 'post' }
+);
 
 // Legacy CDM_AUTO_CATCHUP: rows that have scrolled above the viewport are
 // marked read. An IntersectionObserver is more reliable than scroll math and

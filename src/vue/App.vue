@@ -288,7 +288,8 @@ import GeneratedFeedDialog from './components/dialogs/GeneratedFeedDialog.vue';
 import { useKeyboard } from './composables/useKeyboard';
 import { runDetached } from './utils/runDetached';
 import { networkDown } from './utils/networkStatus';
-import { runPluginSelectMenuAction } from './utils/pluginHost';
+import { HOOKS, runPluginHook, runPluginSelectMenuAction } from './utils/pluginHost';
+import { installLegacyPluginBridge, syncLegacyHeadlines } from './utils/legacyPlugins';
 import { FEED_ALL, FEED_FRESH } from './api/legacyEndpoints';
 
 const feedsStore = useFeedsStore();
@@ -491,7 +492,15 @@ const handlePullRefresh = async () => {
 /** Start the periodic refresh of the current feed and its counters. */
 const startPolling = () => {
   stopPolling();
+
+  // The Dojo client refreshed the counters on its own timer; plugins (favicon
+  // badges) and the feed tree depend on that, so keep it going alongside the
+  // current feed refresh.
+  runDetached(feedsStore.refreshCounters(), 'counter refresh');
+
   pollTimer = setInterval(() => {
+    runDetached(feedsStore.refreshCounters(), 'counter refresh');
+
     // currentFeedId is null when nothing is selected; 0 is the Archived feed.
     if (feedsStore.currentFeedId === null) return;
     runDetached(refreshCurrentFeed(), 'polling refresh');
@@ -707,7 +716,9 @@ const handleFeedSelect = async (feedId: number | string, isCat: boolean) => {
   pendingAutoCatchup.clear();
   feedsStore.selectFeed(feedId, isCat);
   syncFeedHash(feedId, isCat);
+  runPluginHook(HOOKS.FEED_SET_ACTIVE, [feedId, isCat]);
   await headlinesStore.loadHeadlines(feedId, isCat);
+  runPluginHook(HOOKS.FEED_LOADED, [feedsStore.currentFeed ?? { id: feedId }, isCat]);
   await loadPluginButtons(typeof feedId === 'number' ? feedId : Number(feedId), isCat);
 };
 
@@ -798,6 +809,7 @@ const handleHeadlineSelect = async (headline: Headline) => {
   // loadArticle promotes the loaded headline and persists the read state,
   // updating feed counters itself.
   await headlinesStore.loadArticle(headline.id);
+  runPluginHook(HOOKS.ARTICLE_SET_ACTIVE, headline.id);
 };
 
 const handleHeadlineAction = async (headline: Headline, action: string) => {
@@ -1473,8 +1485,18 @@ const handleHotkey = (action: string): void => {
     case 'help_dialog':
       hotkeyHelpOpen.value = true;
       break;
-    default:
+    default: {
+      // Plugins register their own hotkeys on App.hotkey_actions.
+      const pluginActions = (
+        window as unknown as { App?: { hotkey_actions?: Record<string, () => void> } }
+      ).App?.hotkey_actions;
+      const pluginAction = pluginActions?.[action];
+
+      if (typeof pluginAction === 'function') {
+        pluginAction();
+      }
       break;
+    }
   }
 };
 
@@ -1484,6 +1506,23 @@ useKeyboard({
   map: feedsStore.hotkeyMap,
   isCombined: () => feedsStore.combinedMode,
 });
+
+// Card-view plugins read the loaded rows through Headlines.headlines.
+watch(
+  () => headlinesStore.headlines,
+  (rows) => {
+    syncLegacyHeadlines(
+      rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        link: row.link,
+        content_preview: row.excerpt,
+        image_preview: row.image_preview,
+      }))
+    );
+  },
+  { immediate: true }
+);
 
 // Below the drawer cut-off the article is a full-screen panel, so a keyboard
 // user would otherwise keep focus on the headline list behind it.
@@ -1507,6 +1546,17 @@ onMounted(async () => {
   if (authenticated) {
     authStore.setLoggedIn(true);
 
+    // Install the plugin bridge before anything renders: plugin hooks fire
+    // while the first feed loads.
+    installLegacyPluginBridge({
+      isCombined: () => feedsStore.combinedMode,
+      selectArticle: (id) => {
+        const headline = headlinesStore.headlines.find((row) => row.id === Number(id));
+        if (headline) void handleHeadlineSelect(headline);
+      },
+      notify: (text, type) => showMessage(text, type === 'error' ? 'error' : 'info'),
+    });
+
     await loadStartupData();
     applyDefaultViewPrefs();
 
@@ -1521,6 +1571,7 @@ onMounted(async () => {
 
     startPolling();
     scheduleUpdateCheck();
+    runPluginHook(HOOKS.INIT_COMPLETE, null);
   }
 
   window.addEventListener('popstate', onOverlayPopState);

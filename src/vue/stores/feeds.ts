@@ -5,6 +5,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../api/client';
+import { HOOKS, runPluginHook } from '../utils/pluginHost';
+import { syncLegacyCounters, syncLegacyInitParams } from '../utils/legacyPlugins';
 
 export interface Feed {
   id: number;
@@ -201,6 +203,30 @@ export const useFeedsStore = defineStore('feeds', () => {
 
       if (response.status !== 0) return;
 
+      // The Dojo client fed plugin JS a flat list of counters before and after
+      // applying them; plugins (favicon badges, for one) still expect that.
+      const globalUnread = feeds.value.reduce((total, feed) => total + (feed.unread ?? 0), 0);
+      const legacyCounters = [
+        { id: 'global-unread', kind: '', counter: globalUnread },
+        ...feeds.value.map((feed) => ({
+          id: feed.id,
+          kind: 'feed',
+          counter: feed.unread ?? 0,
+          auxcounter: 0,
+          markedcounter: 0,
+          publishedcounter: 0,
+          error: '',
+          ts: 0,
+          updated: '',
+        })),
+        ...categories.value.map((category) => ({
+          id: category.id,
+          kind: 'cat',
+          counter: category.unread ?? 0,
+        })),
+      ];
+      runPluginHook(HOOKS.COUNTERS_RECEIVED, legacyCounters);
+
       specialCounters.value = response.content.special;
 
       for (const feed of feeds.value) {
@@ -219,6 +245,12 @@ export const useFeedsStore = defineStore('feeds', () => {
         daemonIsRunning.value = runtime.daemonIsRunning;
         daemonStampOk.value = runtime.daemonStampOk;
       }
+
+      syncLegacyCounters(
+        Object.fromEntries(feeds.value.map((feed) => [feed.id, feed.unread ?? 0])),
+        globalUnread
+      );
+      runPluginHook(HOOKS.COUNTERS_PROCESSED, legacyCounters);
     } catch (err) {
       console.error('Failed to refresh counters:', err);
     }
@@ -454,6 +486,12 @@ export const useFeedsStore = defineStore('feeds', () => {
       const response = await api.getInitParams();
       if (response.status !== 0) return;
       const params = response.content;
+
+      // Plugins read the same init-params through App.getInitParam() and the
+      // HOOK_PARAMS_LOADED hook.
+      syncLegacyInitParams(params as Record<string, unknown>);
+      runPluginHook(HOOKS.PARAMS_LOADED, params);
+
       hideReadFeeds.value = Number(params.hide_read_feeds) === 1;
       hideReadShowsSpecial.value = Number(params.hide_read_shows_special) === 1;
       combinedMode.value = Number(params.combined_display_mode) === 1;

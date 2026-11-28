@@ -43,6 +43,24 @@ function compileComponent(relativePath) {
   });
   const module = { exports: {} };
   const localRequire = (id) => {
+    // The legacy plugin bridge only matters in a browser; stub it here.
+    if (id.includes('utils/pluginHost')) {
+      return {
+        HOOKS: {},
+        runPluginHook: () => {},
+        runPluginHookUntil: () => false,
+        runPluginSelectMenuAction: () => false,
+        runPluginRuntimeInfo: () => {},
+      };
+    }
+    if (id.includes('utils/legacyPlugins')) {
+      return {
+        installLegacyPluginBridge: () => {},
+        syncLegacyHeadlines: () => {},
+        syncLegacyCounters: () => {},
+        syncLegacyInitParams: () => {},
+      };
+    }
     if (id.includes('api/client')) {
       return {
         __esModule: true,
