@@ -339,10 +339,21 @@ const SIDEBAR_WIDTH_KEY = 'ttrss.sidebarWidth';
 const ARTICLE_HEIGHT_KEY = 'ttrss.articleHeight';
 const sidebarWidth = ref(Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || 0);
 const articleHeight = ref(Number(localStorage.getItem(ARTICLE_HEIGHT_KEY)) || 0);
-const sidebarStyle = computed(() =>
-  sidebarWidth.value > 0
+const sidebarStyle = computed(() => {
+  // In widescreen/combined mode the tree is a fixed drawer, so let the drawer
+  // CSS choose its width; reusing the in-flow splitter width makes it jump
+  // when the mode is toggled.
+  if (feedsStore.wideScreen || feedsStore.combinedMode) return {};
+  return sidebarWidth.value > 0
     ? { flexBasis: `${sidebarWidth.value}px`, width: `${sidebarWidth.value}px` }
-    : {}
+    : {};
+});
+
+// Switching between the in-flow tree and the drawer must not leave the drawer
+// open behind the content.
+watch(
+  () => [feedsStore.wideScreen, feedsStore.combinedMode] as const,
+  () => { sidebarOpen.value = false; }
 );
 const articleStyle = computed(() =>
   articleHeight.value > 0 ? { flexBasis: `${articleHeight.value}px` } : {}
@@ -1270,6 +1281,9 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       debugViewFeed();
       break;
     case 'preferences':
+      // Reset the requested tab so a previous log/plugin shortcut does not
+      // open Preferences on that tab again.
+      prefsTab.value = 'general';
       prefsOpen.value = true;
       break;
     case 'pluginUpdates':

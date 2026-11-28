@@ -241,7 +241,7 @@
           </v-window-item>
 
           <v-window-item v-if="isAdmin" value="system">
-            <SystemPanel v-if="tab === 'system'" />
+            <SystemPanel v-if="tab === 'system'" :key="systemPanelKey" />
           </v-window-item>
         </v-window>
 
@@ -283,13 +283,18 @@ const props = defineProps<{ modelValue: boolean; initialTab?: string }>();
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
 
 const tab = ref(props.initialTab ?? 'general');
+// Remount SystemPanel when opening the log so it returns to the Event log tab
+// instead of keeping whichever system sub-tab was used last.
+const systemPanelKey = ref(0);
 
 // A caller (e.g. the toolbar's log alert) can ask for a specific tab; apply it
 // whenever the dialog opens, since the dialog stays mounted between uses.
 watch(
-  () => props.modelValue,
-  (open) => {
-    if (open && props.initialTab) tab.value = props.initialTab;
+  () => [props.modelValue, props.initialTab] as const,
+  ([open, initialTab]) => {
+    if (!open || !initialTab) return;
+    tab.value = initialTab;
+    if (initialTab === 'system') systemPanelKey.value++;
   }
 );
 const loadingPrefs = ref(false);

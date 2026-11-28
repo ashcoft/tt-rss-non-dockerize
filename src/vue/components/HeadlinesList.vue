@@ -191,15 +191,30 @@
                 ></span>
               </span>
 
-              <a
-                class="feed hl-feed headline-feed-label"
-                :style="{ backgroundColor: headline.feed_bg_color || undefined }"
-                :href="feedSiteUrl || '#'"
-                :target="feedSiteUrl ? '_blank' : undefined"
-                :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
-                :title="feedSiteUrl ? 'Open site' : 'Open feed'"
-                @click="onFeedPillClick($event, headline)"
-              >{{ headline.feed_title }}</a>
+              <span class="feed hl-feed headline-feed-label">
+                <a
+                  :style="{ backgroundColor: headline.feed_bg_color || undefined }"
+                  :href="feedSiteUrl || '#'"
+                  :target="feedSiteUrl ? '_blank' : undefined"
+                  :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
+                  :title="feedSiteUrl ? 'Open site' : 'Open feed'"
+                  @click="onFeedPillClick($event, headline)"
+                >
+                  <span v-if="isVfeed" class="icon-feed" aria-hidden="true">
+                    <img
+                      v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
+                      :src="feedIconUrl(headline.feed_id)"
+                      class="feed-icon"
+                      width="16"
+                      height="16"
+                      alt=""
+                      @error="iconFailed.add(headline.feed_id)"
+                    />
+                    <v-icon v-else size="16">mdi-rss</v-icon>
+                  </span>
+                  <span>{{ headline.feed_title }}</span>
+                </a>
+              </span>
 
               <span v-if="headline.updated" class="updated hl-updated headline-date">
                 {{ formatDate(headline.updated) }}
@@ -239,7 +254,12 @@
                 >
                   <v-icon size="16">mdi-arrow-right</v-icon>
                 </button>
-                <span class="icon-feed" :title="headline.feed_title" @click.stop="emit('action', headline, 'open_feed')">
+                <span
+                  v-if="!isVfeed"
+                  class="icon-feed"
+                  :title="headline.feed_title"
+                  @click.stop="emit('action', headline, 'open_feed')"
+                >
                   <img
                     v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
                     :src="feedIconUrl(headline.feed_id)"
@@ -339,7 +359,21 @@
                 :rel="feedSiteUrl ? 'noopener noreferrer' : undefined"
                 :title="feedSiteUrl ? 'Open site' : 'Open feed'"
                 @click="onFeedPillClick($event, headline)"
-              >{{ headline.feed_title }}</a>
+              >
+                <span v-if="isVfeed" class="icon-feed" aria-hidden="true">
+                  <img
+                    v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
+                    :src="feedIconUrl(headline.feed_id)"
+                    class="feed-icon"
+                    width="16"
+                    height="16"
+                    alt=""
+                    @error="iconFailed.add(headline.feed_id)"
+                  />
+                  <v-icon v-else size="16">mdi-rss</v-icon>
+                </span>
+                <span>{{ headline.feed_title }}</span>
+              </a>
             </span>
 
             <div class="updated-wrap">
@@ -364,7 +398,12 @@
               >
                 <v-icon size="16">mdi-arrow-right</v-icon>
               </button>
-              <span class="icon-feed" :title="headline.feed_title" @click.stop="emit('action', headline, 'open_feed')">
+              <span
+                v-if="!isVfeed"
+                class="icon-feed"
+                :title="headline.feed_title"
+                @click.stop="emit('action', headline, 'open_feed')"
+              >
                 <img
                   v-if="headline.feed_has_icon && !iconFailed.has(headline.feed_id)"
                   :src="feedIconUrl(headline.feed_id)"
@@ -1067,8 +1106,19 @@ const sanitize = (html: string): string =>
 }
 
 .hl-feed a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  overflow: hidden;
   color: inherit;
   text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hl-feed .icon-feed {
+  flex: 0 0 auto;
 }
 
 .hl-feed a:hover {

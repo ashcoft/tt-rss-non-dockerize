@@ -217,13 +217,44 @@ async function loadAvailable(): Promise<void> {
 async function install(name: string): Promise<void> {
   busy.value = true;
   try {
+    const previous = new Set(plugins.value.map((plugin) => plugin.name));
     const response = await api.installPlugin(name);
-    message.value =
-      response.status === 0
-        ? `Installed ${name}`
-        : response.error ?? `Failed to install ${name}`;
-    messageType.value = response.status === 0 ? 'success' : 'error';
+
+    if (response.status !== 0) {
+      message.value = response.error ?? `Failed to install ${name}`;
+      messageType.value = 'error';
+      return;
+    }
+
+    // Refresh the list first: the installer names the plugin after its PHP
+    // class, which can differ from the marketplace name we passed in.
     await load();
+    const installedName =
+      plugins.value.find((plugin) => plugin.name === name)?.name ??
+      plugins.value.find((plugin) => !previous.has(plugin.name))?.name ??
+      name;
+
+    // Newly installed plugins should be usable immediately: enable the plugin
+    // for this user instead of leaving it unticked until the next save.
+    const next = new Set(enabled.value);
+    next.add(installedName);
+    enabled.value = next;
+
+    const enableResponse = await api.setEnabledPlugins([...next]);
+    if (enableResponse.status === 0) {
+      message.value = `Installed and enabled ${installedName}. Reload the page to apply.`;
+      messageType.value = 'success';
+      await load();
+    } else {
+      message.value =
+        `Installed ${installedName}, but could not enable it: ` +
+        (enableResponse.error ?? 'unknown error');
+      messageType.value = 'error';
+    }
+  } catch (err) {
+    console.error('Failed to install plugin:', err);
+    message.value = `Failed to install ${name}`;
+    messageType.value = 'error';
   } finally {
     busy.value = false;
   }
