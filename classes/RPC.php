@@ -2,6 +2,8 @@
 class RPC extends Handler_Protected {
 
 	private const RELEASES_LATEST_URL = 'https://api.github.com/repos/ashcoft/tt-rss-non-dockerize/releases/latest';
+	private const RELEASES_URL = 'https://api.github.com/repos/ashcoft/tt-rss-non-dockerize/releases';
+	private const DEV_RELEASE_PREFIX = 'vite-dev-';
 	private const RELEASE_CHECK_TTL = 3600;
 
 	/*function csrf_ignore(string $method): bool {
@@ -346,67 +348,158 @@ class RPC extends Handler_Protected {
 	}
 
 	/**
-	 * Latest published release of this fork, cached for an hour so that several
-	 * admins polling do not run into the unauthenticated GitHub API rate limit.
+	 * Latest published release for the running channel, cached for an hour so
+	 * several admins polling do not hit the unauthenticated GitHub API limit.
+	 *
+	 * The vite-dev line deliberately stays out of GitHub's "latest" slot (the
+	 * release script keeps the stable main release there), so it is resolved
+	 * from the release list instead of /releases/latest.
 	 *
 	 * @return array{tag_name: string, html_url: string, published_at: string}|null
 	 */
 	private static function _get_latest_release(): ?array {
+		$channel = self::_version_channel((string) Config::get_version());
+		$cache_file = 'latest_release_' . $channel . '.json';
+
 		$cache = new Cache_Local();
 		$cache->set_dir('version');
 
 		$release = null;
-		$cached = $cache->get('latest_release.json');
+		$cached = $cache->get($cache_file);
 
 		if ($cached !== null) {
-			$mtime = $cache->get_mtime('latest_release.json');
+			$mtime = $cache->get_mtime($cache_file);
 
 			if ($mtime !== false && $mtime > time() - self::RELEASE_CHECK_TTL)
 				$release = json_decode($cached, true);
 		}
 
 		if (is_array($release) === false) {
-			$content = UrlHelper::fetch([
-				'url' => self::RELEASES_LATEST_URL,
-				'useragent' => Config::get_user_agent(),
-				'http_accept' => 'application/vnd.github+json',
-				'timeout' => 10,
-			]);
+			$release = $channel === 'vite-dev'
+				? self::_fetch_latest_dev_release()
+				: self::_fetch_latest_stable_release();
 
-			$release = $content !== false ? json_decode($content, true) : null;
-
-			if (is_array($release) === true && is_string($release['tag_name'] ?? null) === true)
-				$cache->put('latest_release.json', json_encode($release));
+			if (is_array($release) === true)
+				$cache->put($cache_file, json_encode($release));
 		}
 
-		if (is_array($release) === false)
+		return is_array($release) ? $release : null;
+	}
+
+	/**
+	 * @return array{tag_name: string, html_url: string, published_at: string}|null
+	 */
+	private static function _fetch_latest_stable_release(): ?array {
+		$content = UrlHelper::fetch([
+			'url' => self::RELEASES_LATEST_URL,
+			'useragent' => Config::get_user_agent(),
+			'http_accept' => 'application/vnd.github+json',
+			'timeout' => 10,
+		]);
+
+		$release = $content !== false ? json_decode($content, true) : null;
+
+		return is_array($release) ? self::_normalize_release($release) : null;
+	}
+
+	/**
+	 * @return array{tag_name: string, html_url: string, published_at: string}|null
+	 */
+	private static function _fetch_latest_dev_release(): ?array {
+		$content = UrlHelper::fetch([
+			'url' => self::RELEASES_URL . '?per_page=100',
+			'useragent' => Config::get_user_agent(),
+			'http_accept' => 'application/vnd.github+json',
+			'timeout' => 10,
+		]);
+
+		$releases = $content !== false ? json_decode($content, true) : null;
+
+		if (!is_array($releases))
 			return null;
 
-		$tag = $release['tag_name'] ?? null;
-		$html_url = $release['html_url'] ?? null;
-		$published_at = $release['published_at'] ?? null;
+		$best = null;
+		$best_version = null;
 
-		if (is_string($tag) === false || $tag === '')
+		foreach ($releases as $release) {
+			if (!is_array($release))
+				continue;
+
+			$tag = $release['tag_name'] ?? null;
+
+			if (!is_string($tag) || !str_starts_with($tag, self::DEV_RELEASE_PREFIX))
+				continue;
+
+			if (($release['draft'] ?? false) === true)
+				continue;
+
+			$version = self::_version_number($tag);
+
+			if ($version === null)
+				continue;
+
+			if ($best_version === null || version_compare($version, $best_version, '>')) {
+				$best = $release;
+				$best_version = $version;
+			}
+		}
+
+		return is_array($best) ? self::_normalize_release($best) : null;
+	}
+
+	/**
+	 * @param array<string, mixed> $release
+	 * @return array{tag_name: string, html_url: string, published_at: string}|null
+	 */
+	private static function _normalize_release(array $release): ?array {
+		$tag = $release['tag_name'] ?? null;
+
+		if (!is_string($tag) || $tag === '')
 			return null;
 
 		return [
 			'tag_name' => $tag,
-			'html_url' => is_string($html_url) === true ? $html_url : '',
-			'published_at' => is_string($published_at) === true ? $published_at : '',
+			'html_url' => is_string($release['html_url'] ?? null) ? $release['html_url'] : '',
+			'published_at' => is_string($release['published_at'] ?? null) ? $release['published_at'] : '',
 		];
 	}
 
+	/** Channel of a version string; dev builds are not comparable. */
+	private static function _version_channel(string $version): string {
+		$version = trim($version);
+
+		if (str_starts_with($version, self::DEV_RELEASE_PREFIX))
+			return 'vite-dev';
+
+		if (preg_match('/^\d+(\.\d+)*$/', ltrim($version, 'vV')) === 1)
+			return 'stable';
+
+		return 'dev';
+	}
+
+	/** Numeric part of a tag such as vite-dev-0.0.30 or v1.6.1. */
+	private static function _version_number(string $version): ?string {
+		if (preg_match('/(?:^|-)v?(\d+(?:\.\d+)*)$/i', trim($version), $matches) === 1)
+			return $matches[1];
+
+		return null;
+	}
+
 	/**
-	 * Only tagged releases are comparable; commit-based builds are not "behind".
+	 * Only releases on the same channel are comparable; a dev build is never
+	 * reported as behind a stable release (or vice versa).
 	 */
 	private static function _is_newer_release(string $latest, string $current): bool {
-		$latest = ltrim(trim($latest), 'vV');
-		$current = ltrim(trim($current), 'vV');
-
-		if (preg_match('/^\d+(\.\d+)*$/', $latest) !== 1 || preg_match('/^\d+(\.\d+)*$/', $current) !== 1)
+		if (self::_version_channel($latest) !== self::_version_channel($current))
 			return false;
 
-		return version_compare($latest, $current, '>');
+		$latest_version = self::_version_number($latest);
+		$current_version = self::_version_number($current);
+
+		if ($latest_version === null || $current_version === null)
+			return false;
+
+		return version_compare($latest_version, $current_version, '>');
 	}
 
 	/**
