@@ -15,6 +15,7 @@
       id="main"
       class="ttrss-app ttrss_main"
       :class="{ 'wide-screen': feedsStore.wideScreen, 'combined-mode': feedsStore.combinedMode }"
+      :style="appStyle"
     >
       <div v-if="sidebarOpen" class="sidebar-scrim" @click="sidebarOpen = false" />
       <aside
@@ -48,7 +49,7 @@
       <div class="sidebar-splitter" id="feeds-holder_splitter" title="Resize feed tree" @pointerdown="startSidebarResize" />
 
       <div id="content-wrap" class="app-content content-wrap">
-        <header id="toolbar-frame" class="app-header toolbar-frame">
+        <header id="toolbar-frame" ref="headerRef" class="app-header toolbar-frame">
           <v-btn icon="mdi-menu" class="nav-toggle" variant="text" @click="sidebarOpen = !sidebarOpen" title="Toggle sidebar" />
           <Toolbar
             :feed-info="feedsStore.currentFeed"
@@ -183,7 +184,7 @@
     <!-- Dialogs (Phase 3/4) -->
     <ManageFeedsDialog v-model="feedsDialogOpen" />
     <LabelsDialog v-model="labelsDialogOpen" :article-id="labelArticleId" />
-    <PreferencesDialog v-model="prefsOpen" :initial-tab="prefsTab" />
+    <PreferencesDialog v-model="prefsOpen" :initial-tab="prefsTab" @notify="showMessage" />
     <HotkeyHelpDialog v-model="hotkeyHelpOpen" />
     <GeneratedFeedDialog
       v-model="generatedFeedOpen"
@@ -312,6 +313,24 @@ const onNarrowChange = (event: MediaQueryListEvent): void => {
   isNarrow.value = event.matches;
 };
 const articlePanelRef = ref<HTMLElement | null>(null);
+// The header can wrap to two rows on phones. Keep the drawer and the article
+// panel aligned with its real height instead of a hard-coded offset.
+const headerRef = ref<HTMLElement | null>(null);
+const headerHeight = ref(0);
+const appStyle = computed<Record<string, string>>(() =>
+  headerHeight.value > 0 ? { '--app-header-height': `${headerHeight.value}px` } : {}
+);
+let headerObserver: ResizeObserver | null = null;
+watch(headerRef, (element) => {
+  headerObserver?.disconnect();
+  headerObserver = null;
+  if (!element) return;
+  headerObserver = new ResizeObserver(() => {
+    headerHeight.value = Math.round(element.getBoundingClientRect().height);
+  });
+  headerObserver.observe(element);
+  headerHeight.value = Math.round(element.getBoundingClientRect().height);
+});
 const feedsDialogOpen = ref(false);
 const labelsDialogOpen = ref(false);
 // prefs.php serves this shell with __open_preferences=true so the dialog opens
@@ -1608,6 +1627,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   narrowQuery.removeEventListener('change', onNarrowChange);
+  headerObserver?.disconnect();
   stopPolling();
   window.removeEventListener('popstate', onOverlayPopState);
   window.removeEventListener('resize', reconcileOverlayHistory);
@@ -1620,12 +1640,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   background: rgb(var(--v-theme-background));
 }
 
 .ttrss-app {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: rgb(var(--v-theme-background));
 }
@@ -1769,7 +1791,7 @@ body.flat.ttrss_index #main {
   :is(.wide-screen, .combined-mode) .sidebar.open {
     display: block;
     position: fixed;
-    top: 44px;
+    top: var(--app-header-height, 44px);
     bottom: 0;
     left: 0;
     z-index: 1000;
@@ -1789,7 +1811,7 @@ body.flat.ttrss_index #main {
   :is(.wide-screen, .combined-mode) .sidebar-scrim {
     display: block;
     position: fixed;
-    inset: 44px 0 0 0;
+    inset: var(--app-header-height, 44px) 0 0 0;
     z-index: 999;
     background: rgba(0, 0, 0, 0.35);
   }
@@ -1835,7 +1857,7 @@ body.flat.ttrss_index #main {
 
   .sidebar {
     position: fixed;
-    top: 52px;
+    top: var(--app-header-height, 52px);
     bottom: 0;
     left: 0;
     z-index: 1000;
@@ -1856,7 +1878,7 @@ body.flat.ttrss_index #main {
   .sidebar-scrim {
     display: block;
     position: fixed;
-    inset: 52px 0 0 0;
+    inset: var(--app-header-height, 52px) 0 0 0;
     z-index: 999;
     background: rgba(0, 0, 0, 0.35);
   }
@@ -1867,7 +1889,7 @@ body.flat.ttrss_index #main {
 
   .article-panel {
     position: fixed;
-    inset: 52px 0 0 0;
+    inset: var(--app-header-height, 52px) 0 0 0;
     z-index: 1001;
     width: auto;
     max-width: none;

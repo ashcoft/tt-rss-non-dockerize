@@ -170,6 +170,14 @@
                   <v-icon size="16">mdi-circle-outline</v-icon>
                 </button>
                 <span v-if="!headline.is_read" class="unread-dot" title="Unread"></span>
+                <button
+                  type="button"
+                  class="hl-icon mobile-readability"
+                  title="Toggle full article text (readability)"
+                  @click.stop="emit('action', headline, 'toggle_full_text')"
+                >
+                  <v-icon size="16">mdi-text-box-outline</v-icon>
+                </button>
               </div>
 
               <span
@@ -331,6 +339,14 @@
               >
                 <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
               </button>
+              <button
+                type="button"
+                class="hl-icon mobile-readability"
+                title="Toggle full article text (readability)"
+                @click.stop="emit('action', headline, 'toggle_full_text')"
+              >
+                <v-icon size="16">mdi-text-box-outline</v-icon>
+              </button>
             </div>
 
             <div class="title hl-title v-list-item-title headline-title" @click.stop="selectHeadline(headline)">
@@ -390,6 +406,14 @@
                 size="16"
                 :title="String(headline.score)"
               />
+              <button
+                type="button"
+                class="hl-icon"
+                title="Toggle full article text (readability)"
+                @click.stop="emit('action', headline, 'toggle_full_text')"
+              >
+                <v-icon size="16">mdi-text-box-outline</v-icon>
+              </button>
               <button
                 type="button"
                 class="hl-icon"
@@ -1177,6 +1201,12 @@ const sanitize = (html: string): string =>
   color: rgb(var(--v-theme-primary));
 }
 
+/* The desktop row has readability in the right-hand cluster; the phone hides
+   that cluster, so the action moves into the left one. */
+.hl-icon.mobile-readability {
+  display: none;
+}
+
 .hl-title {
   grid-area: title;
   display: flex;
@@ -1314,6 +1344,26 @@ const sanitize = (html: string): string =>
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The Feedly theme caps the combined header's feed pill at 25% width and the
+   small font size, which truncates longer feed names. Match its specificity so
+   the name has room; the pill still truncates rather than pushing the title
+   out entirely. */
+.headlines-list-content > .cdm > .header > .feed.hl-feed,
+.headlines-list-content > .v-list-item > .feed.hl-feed {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(40vw, 360px);
+  color: rgba(var(--v-theme-on-background), 0.82);
+  font-size: 0.8125rem;
+}
+
+/* The theme reserves 26px for an absolutely positioned icon; the Vue pill puts
+   the icon inside the link, so that offset only wastes space. */
+.headlines-list-content .hl-feed a {
+  max-width: 100% !important;
+  margin-left: 0 !important;
 }
 
 .hl-updated {
@@ -1477,13 +1527,17 @@ const sanitize = (html: string): string =>
   text-decoration: underline;
 }
 
-/* Phone layout: compact rows without the right-hand metadata strip. */
+/* Phone layout: compact rows without the right-hand metadata strip. The theme
+   sets these columns and areas with an id-qualified selector, so the phone
+   overrides need `!important` to actually collapse the row. */
 @media (max-width: 900px) {
-  .headlines-list-content > .v-list-item {
+  .headlines-list-content > .v-list-item,
+  .headlines-list-content > .cdm > .header {
     grid-template-areas:
       "left title"
-      "left tags";
-    grid-template-columns: auto minmax(0, 1fr);
+      "left tags" !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
     padding: 4px 6px;
   }
 
@@ -1491,19 +1545,38 @@ const sanitize = (html: string): string =>
     white-space: normal;
   }
 
-  .hl-feed,
-  .hl-updated,
-  .hl-right {
-    display: none;
+  .headlines-list-content > .cdm > .header > .feed,
+  .headlines-list-content > .cdm > .header > .updated,
+  .headlines-list-content > .cdm > .header > .updated-wrap,
+  .headlines-list-content > .cdm > .header > .right,
+  .headlines-list-content > .v-list-item > .feed,
+  .headlines-list-content > .v-list-item > .updated,
+  .headlines-list-content > .v-list-item > .updated-wrap,
+  .headlines-list-content > .v-list-item > .right {
+    display: none !important;
   }
 
-  .headlines-list-content > .cdm > .header {
-    grid-template-areas: "left title";
-    grid-template-columns: auto minmax(0, 1fr);
+  /* The theme parks the action cluster in its own `actions` area, which no
+     longer exists in the phone template. */
+  .headlines-list-content > .cdm > .header > .left,
+  .headlines-list-content > .v-list-item > .left {
+    grid-area: left !important;
+    align-self: center;
+  }
+
+  .headlines-list-content > .cdm > .header > .title,
+  .headlines-list-content > .v-list-item > .title {
+    grid-row-start: auto !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
   }
 
   .hl-icon {
     opacity: 1;
+  }
+
+  .hl-icon.mobile-readability {
+    display: inline-flex;
   }
 
   .cdm > .headline-content {

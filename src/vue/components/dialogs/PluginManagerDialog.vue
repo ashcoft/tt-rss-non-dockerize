@@ -114,6 +114,10 @@ import api from '../../api/client';
 import type { PluginInfo } from '../../api/client';
 import type { AvailablePlugin } from '../../api/legacyEndpoints';
 
+const emit = defineEmits<{
+  (e: 'notify', text: string, type: 'success' | 'error' | 'info'): void;
+}>();
+
 const plugins = ref<PluginInfo[]>([]);
 // The user-enabled set being edited; system plugins are excluded because
 // setplugins only manages the per-user list.
@@ -122,7 +126,15 @@ const search = ref('');
 const loading = ref(false);
 const busy = ref(false);
 const message = ref('');
-const messageType = ref<'success' | 'error'>('success');
+const messageType = ref<'success' | 'error' | 'info'>('success');
+
+/** Show the result inline and as an app-wide snackbar: the plugin list is
+ *  scrollable, so the alert at the bottom is often off-screen. */
+function notify(text: string, type: 'success' | 'error' | 'info' = 'success'): void {
+  message.value = text;
+  messageType.value = type;
+  emit('notify', text, type);
+}
 const isAdmin = ref(false);
 const installerEnabled = ref(false);
 const availablePlugins = ref<AvailablePlugin[]>([]);
@@ -159,13 +171,11 @@ async function load(): Promise<void> {
         installerEnabled.value = Boolean(params.content.enable_plugin_installer);
       }
     } else {
-      message.value = response.error ?? 'Failed to load plugins';
-      messageType.value = 'error';
+      notify(response.error ?? 'Failed to load plugins', 'error');
     }
   } catch (err) {
     console.error('Failed to load plugins:', err);
-    message.value = 'Failed to load plugins';
-    messageType.value = 'error';
+    notify('Failed to load plugins', 'error');
   } finally {
     loading.value = false;
   }
@@ -180,6 +190,10 @@ function toggle(plugin: PluginInfo, checked: boolean): void {
     next.delete(plugin.name);
   }
   enabled.value = next;
+  notify(
+    `${plugin.name} will be ${checked ? 'enabled' : 'disabled'}. Click "Enable selected" to apply.`,
+    'info'
+  );
 }
 
 async function save(): Promise<void> {
@@ -187,16 +201,13 @@ async function save(): Promise<void> {
   try {
     const response = await api.setEnabledPlugins([...enabled.value]);
     if (response.status === 0) {
-      message.value = 'Plugins updated. Reload the page to apply.';
-      messageType.value = 'success';
+      notify('Plugins updated. Reload the page to apply.', 'success');
     } else {
-      message.value = response.error ?? 'Failed to save plugins';
-      messageType.value = 'error';
+      notify(response.error ?? 'Failed to save plugins', 'error');
     }
   } catch (err) {
     console.error('Failed to save plugins:', err);
-    message.value = 'Failed to save plugins';
-    messageType.value = 'error';
+    notify('Failed to save plugins', 'error');
   } finally {
     busy.value = false;
   }
@@ -204,13 +215,17 @@ async function save(): Promise<void> {
 
 async function loadAvailable(): Promise<void> {
   if (availableLoaded.value || !installerEnabled.value) return;
-  const response = await api.getAvailablePlugins();
-  if (response.status === 0) {
-    availablePlugins.value = response.content;
-    availableLoaded.value = true;
-  } else {
-    message.value = response.error ?? 'Failed to load available plugins';
-    messageType.value = 'error';
+  try {
+    const response = await api.getAvailablePlugins();
+    if (response.status === 0) {
+      availablePlugins.value = response.content;
+      availableLoaded.value = true;
+    } else {
+      notify(response.error ?? 'Failed to load available plugins', 'error');
+    }
+  } catch (err) {
+    console.error('Failed to load available plugins:', err);
+    notify('Failed to load available plugins', 'error');
   }
 }
 
@@ -221,8 +236,7 @@ async function install(name: string): Promise<void> {
     const response = await api.installPlugin(name);
 
     if (response.status !== 0) {
-      message.value = response.error ?? `Failed to install ${name}`;
-      messageType.value = 'error';
+      notify(response.error ?? `Failed to install ${name}`, 'error');
       return;
     }
 
@@ -242,19 +256,18 @@ async function install(name: string): Promise<void> {
 
     const enableResponse = await api.setEnabledPlugins([...next]);
     if (enableResponse.status === 0) {
-      message.value = `Installed and enabled ${installedName}. Reload the page to apply.`;
-      messageType.value = 'success';
+      notify(`Installed and enabled ${installedName}. Reload the page to apply.`, 'success');
       await load();
     } else {
-      message.value =
+      notify(
         `Installed ${installedName}, but could not enable it: ` +
-        (enableResponse.error ?? 'unknown error');
-      messageType.value = 'error';
+          (enableResponse.error ?? 'unknown error'),
+        'error'
+      );
     }
   } catch (err) {
     console.error('Failed to install plugin:', err);
-    message.value = `Failed to install ${name}`;
-    messageType.value = 'error';
+    notify(`Failed to install ${name}`, 'error');
   } finally {
     busy.value = false;
   }
@@ -264,10 +277,17 @@ async function checkUpdates(): Promise<void> {
   busy.value = true;
   try {
     const response = await api.checkForPluginUpdates();
-    updateResult.value =
-      response.status === 0
-        ? `Checked ${response.content.length} plugin(s) for updates.`
-        : response.error ?? 'Failed to check for updates';
+    if (response.status === 0) {
+      updateResult.value = `Checked ${response.content.length} plugin(s) for updates.`;
+      notify(updateResult.value, 'info');
+    } else {
+      updateResult.value = response.error ?? 'Failed to check for updates';
+      notify(updateResult.value, 'error');
+    }
+  } catch (err) {
+    console.error('Failed to check for plugin updates:', err);
+    updateResult.value = 'Failed to check for updates';
+    notify(updateResult.value, 'error');
   } finally {
     busy.value = false;
   }
@@ -277,27 +297,48 @@ async function updatePlugins(): Promise<void> {
   busy.value = true;
   try {
     const response = await api.updateLocalPlugins([]);
-    updateResult.value =
-      response.status === 0
-        ? `Updated ${response.content.length} plugin(s).`
-        : response.error ?? 'Failed to update plugins';
+    if (response.status === 0) {
+      updateResult.value = `Updated ${response.content.length} plugin(s).`;
+      notify(updateResult.value, 'success');
+    } else {
+      updateResult.value = response.error ?? 'Failed to update plugins';
+      notify(updateResult.value, 'error');
+    }
     await load();
+  } catch (err) {
+    console.error('Failed to update local plugins:', err);
+    updateResult.value = 'Failed to update plugins';
+    notify(updateResult.value, 'error');
   } finally {
     busy.value = false;
   }
 }
 
 async function clearData(name: string): Promise<void> {
-  const response = await api.clearPluginData(name);
-  message.value = response.status === 0 ? `Cleared data for ${name}` : response.error ?? 'Failed to clear plugin data';
-  messageType.value = response.status === 0 ? 'success' : 'error';
+  try {
+    const response = await api.clearPluginData(name);
+    notify(
+      response.status === 0 ? `Cleared data for ${name}` : response.error ?? 'Failed to clear plugin data',
+      response.status === 0 ? 'success' : 'error'
+    );
+  } catch (err) {
+    console.error('Failed to clear plugin data:', err);
+    notify('Failed to clear plugin data', 'error');
+  }
 }
 
 async function uninstall(name: string): Promise<void> {
-  const response = await api.uninstallPlugin(name);
-  message.value = response.status === 0 ? `Uninstalled ${name}` : response.error ?? `Failed to uninstall ${name}`;
-  messageType.value = response.status === 0 ? 'success' : 'error';
-  await load();
+  try {
+    const response = await api.uninstallPlugin(name);
+    notify(
+      response.status === 0 ? `Uninstalled ${name}` : response.error ?? `Failed to uninstall ${name}`,
+      response.status === 0 ? 'success' : 'error'
+    );
+    await load();
+  } catch (err) {
+    console.error('Failed to uninstall plugin:', err);
+    notify(`Failed to uninstall ${name}`, 'error');
+  }
 }
 </script>
 

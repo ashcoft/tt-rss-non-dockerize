@@ -42,23 +42,6 @@ const articlePluginButtons = computed(() =>
   (props.article.pluginButtons ?? []).filter(button => !isReadabilityButton(button))
 );
 
-const readabilityBusy = ref(false);
-const toggleReadability = async () => {
-  readabilityBusy.value = true;
-  try {
-    await headlinesStore.toggleFullText(props.article.id);
-  } catch (err) {
-    pluginDialog.value = {
-      title: 'Readability',
-      html:
-        `<p>${err instanceof Error ? err.message : 'Could not fetch the full article text.'}</p>` +
-        '<p>Enable the <code>af_readability</code> plugin to use this feature.</p>',
-    };
-  } finally {
-    readabilityBusy.value = false;
-  }
-};
-
 // HOOK_ARTICLE_RENDERED receives the rendered `.post` node, as in the Dojo client.
 onMounted(() => runPluginHook(HOOKS.ARTICLE_RENDERED, rootEl.value));
 watch(
@@ -254,14 +237,6 @@ const sanitizedContent = computed(() => {
           >
             <v-icon>{{ pluginIcon(button.icon) }}</v-icon>
           </v-btn>
-          <v-btn
-            icon="mdi-text-box-outline"
-            variant="text"
-            size="small"
-            title="Toggle full article text (readability)"
-            :loading="readabilityBusy"
-            @click="toggleReadability"
-          />
           <v-btn icon="mdi-magnify-plus-outline" variant="text" size="small" title="Zoom article" @click="zoomOpen = true" />
           <v-btn icon="mdi-printer-outline" variant="text" size="small" title="Print article" @click="printArticle" />
         </div>

@@ -207,7 +207,7 @@
           </v-window-item>
 
           <v-window-item value="plugins">
-            <PluginManagerPanel v-if="tab === 'plugins'" />
+            <PluginManagerPanel v-if="tab === 'plugins'" @notify="forwardNotify" />
 
             <v-expansion-panels v-if="pluginTabs.length" variant="accordion" class="mt-4">
               <v-expansion-panel
@@ -280,7 +280,10 @@ import { useFeedsStore } from '../../stores';
 import type { PluginPrefsTab } from '../../api/legacyEndpoints';
 
 const props = defineProps<{ modelValue: boolean; initialTab?: string }>();
-const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>();
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void;
+  (e: 'notify', text: string, type: 'success' | 'error' | 'info'): void;
+}>();
 
 const tab = ref(props.initialTab ?? 'general');
 // Remount SystemPanel when opening the log so it returns to the Event log tab
@@ -616,6 +619,10 @@ async function deleteFilter(filter: Record<string, unknown>) {
 function notify(text: string, type: 'success' | 'error' = 'success') {
   message.value = text;
   messageType.value = type;
+}
+
+function forwardNotify(text: string, type: 'success' | 'error' | 'info'): void {
+  emit('notify', text, type);
 }
 
 // Close dialog
