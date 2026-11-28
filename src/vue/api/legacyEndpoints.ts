@@ -2282,8 +2282,12 @@ export interface UpdateInfo {
 }
 
 /** Check for a newer core release and updated local plugins (admins only). */
-export async function checkForUpdates(backend: LegacyBackend): Promise<UpdateInfo> {
-  const response = await backend.call('RPC', 'checkforupdates');
+export async function checkForUpdates(backend: LegacyBackend, force = false): Promise<UpdateInfo> {
+  const response = await backend.call(
+    'RPC',
+    'checkforupdates',
+    force ? { force: 1 } : {}
+  );
   const body = requireBody(response, 'RPC/checkforupdates');
 
   const raw = body.changeset;

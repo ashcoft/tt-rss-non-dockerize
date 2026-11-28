@@ -327,7 +327,12 @@ class RPC extends Handler_Protected {
 		];
 
 		if (Config::get(Config::CHECK_FOR_UPDATES) === true && $_SESSION["access_level"] >= UserHelper::ACCESS_LEVEL_ADMIN) {
-			$release = self::_get_latest_release();
+			// "Check again" must not be answered from the hourly cache: a
+			// release published since the last poll would otherwise stay
+			// invisible until the TTL expires.
+			$force = !empty($_REQUEST['force']);
+
+			$release = self::_get_latest_release($force);
 
 			if ($release !== null) {
 				$rv['latest_release'] = $release;
@@ -357,7 +362,7 @@ class RPC extends Handler_Protected {
 	 *
 	 * @return array{tag_name: string, html_url: string, published_at: string}|null
 	 */
-	private static function _get_latest_release(): ?array {
+	private static function _get_latest_release(bool $force = false): ?array {
 		$channel = self::_version_channel((string) Config::get_version());
 		$cache_file = 'latest_release_' . $channel . '.json';
 
@@ -365,7 +370,7 @@ class RPC extends Handler_Protected {
 		$cache->set_dir('version');
 
 		$release = null;
-		$cached = $cache->get($cache_file);
+		$cached = $force ? null : $cache->get($cache_file);
 
 		if ($cached !== null) {
 			$mtime = $cache->get_mtime($cache_file);

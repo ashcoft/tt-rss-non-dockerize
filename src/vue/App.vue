@@ -605,8 +605,8 @@ const loadPluginButtons = async (feedId?: number, isCat?: boolean) => {
 };
 
 /** Check for a newer core release and updated local plugins (admins only). */
-const loadUpdates = async (notify = false) => {
-  const response = await api.checkForUpdates();
+const loadUpdates = async (notify = false, force = false) => {
+  const response = await api.checkForUpdates(force);
   if (response.status === 0) {
     const info = response.content;
     currentVersion.value = info.current_version;
@@ -1309,7 +1309,7 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
       openPluginUpdates();
       break;
     case 'checkUpdates':
-      await loadUpdates(true);
+      await loadUpdates(true, true);
       break;
     case 'manageFeeds':
       feedsDialogOpen.value = true;

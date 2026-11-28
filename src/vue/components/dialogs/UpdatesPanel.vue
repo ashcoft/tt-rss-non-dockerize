@@ -15,7 +15,7 @@
         </div>
       </div>
       <v-spacer />
-      <v-btn size="small" variant="tonal" :loading="checking" @click="check">
+      <v-btn size="small" variant="tonal" :loading="checking" @click="check(true)">
         Check again
       </v-btn>
     </div>
@@ -93,11 +93,11 @@ const publishedLabel = computed(() => {
   return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
 });
 
-const check = async () => {
+const check = async (force = false) => {
   checking.value = true;
   message.value = '';
   try {
-    const response = await api.checkForUpdates();
+    const response = await api.checkForUpdates(force);
     if (response.status === 0) {
       info.value = response.content;
     } else {
@@ -118,7 +118,7 @@ const updatePlugins = async () => {
     if (response.status === 0) {
       message.value = 'Local plugin updates applied.';
       messageType.value = 'success';
-      await check();
+      await check(true);
     } else {
       message.value = response.error ?? 'Could not update local plugins.';
       messageType.value = 'error';

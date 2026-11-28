@@ -1785,7 +1785,7 @@ test('checkForUpdates maps the current version, release and plugin names', async
     plugins: [{ plugin: 'af_readability', rv: { need_update: true } }],
     checked_at: 1795517700,
   };
-  stubFetch([{ text: JSON.stringify(payload) }]);
+  const calls = stubFetch([{ text: JSON.stringify(payload) }]);
   const backend = new LegacyBackend();
   backend.setCsrfToken('t');
 
@@ -1796,4 +1796,20 @@ test('checkForUpdates maps the current version, release and plugin names', async
   assert.equal(info.changeset?.id, 'vite-dev-0.0.6');
   assert.deepEqual(info.plugins, ['af_readability']);
   assert.equal(info.checked_at, 1795517700);
+  assert.ok(calls[0].body.includes('method=checkforupdates'));
+  assert.ok(!calls[0].body.includes('force=1'));
+});
+
+test('checkForUpdates sends force=1 when the user asks to check again', async () => {
+  installGlobals();
+  const calls = stubFetch([
+    { text: JSON.stringify({ current_version: 'vite-dev-0.0.6', plugins: [] }) },
+  ]);
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  await endpoints.checkForUpdates(backend, true);
+
+  assert.ok(calls[0].body.includes('method=checkforupdates'));
+  assert.ok(calls[0].body.includes('force=1'));
 });
