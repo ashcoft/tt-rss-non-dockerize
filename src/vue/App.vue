@@ -1198,9 +1198,23 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
   const isCat = feedsStore.currentIsCat;
 
   switch (action) {
-    case 'refresh':
-      await Promise.all([feedsStore.loadFeeds(), headlinesStore.loadHeadlines(feedId, isCat)]);
+    case 'refresh': {
+      // ForceUpdate now fetches the feed on the server instead of only marking
+      // it stale for the daemon. Virtual feeds and categories have no RSS URL
+      // to fetch, so they still just reload the list.
+      const canFetch = typeof feedId === 'number' && feedId > 0 && !isCat;
+      await headlinesStore.loadHeadlines(feedId, isCat, canFetch);
+      await feedsStore.loadFeeds();
+      if (canFetch) {
+        showMessage(
+          headlinesStore.feedError
+            ? `Feed update failed: ${headlinesStore.feedError}`
+            : 'Feed updated',
+          headlinesStore.feedError ? 'error' : 'success'
+        );
+      }
       break;
+    }
     case 'catchup':
       // The toolbar may send a time window ('1day'/'1week'/'2week'); the
       // keyboard shortcut sends none, which means "all".

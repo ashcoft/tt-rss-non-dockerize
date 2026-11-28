@@ -264,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { runDetached } from '../../utils/runDetached';
 import api from '../../api/client';
 import FilterEditorDialog from './FilterEditorDialog.vue';
@@ -399,7 +399,7 @@ watch(
     if (!open) return;
 
     message.value = '';
-    tab.value = 'general';
+    tab.value = props.initialTab ?? 'general';
     // Both loaders report failures through `message`; the explicit void keeps
     // the watcher callback synchronous.
     runDetached(
@@ -454,6 +454,14 @@ async function loadPrefs() {
     notify('Failed to load preferences', 'error');
   } finally {
     loadingPrefs.value = false;
+
+    // The System and Users tabs only render once `isAdmin` is known. Vuetify
+    // drops a model value that points at a missing tab, so re-apply the
+    // requested tab after the admin-only tabs exist.
+    if (props.initialTab) {
+      await nextTick();
+      tab.value = props.initialTab;
+    }
   }
 }
 

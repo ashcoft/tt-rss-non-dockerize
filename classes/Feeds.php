@@ -76,11 +76,14 @@ class Feeds extends Handler_Protected {
 
 		$method_split = explode(":", $method);
 
-		if ($method == "ForceUpdate" && $feed > 0 && is_numeric($feed)) {
-            $sth = $this->pdo->prepare("UPDATE ttrss_feeds
-                            SET last_updated = '1970-01-01', last_update_started = '1970-01-01'
-                            WHERE id = ?");
-            $sth->execute([$feed]);
+		if ($method == "ForceUpdate" && $feed > 0 && is_numeric($feed) && !$cat_view) {
+			$sth = $this->pdo->prepare("SELECT id FROM ttrss_feeds
+							WHERE id = ? AND owner_uid = ?");
+			$sth->execute([$feed, $_SESSION['uid']]);
+
+			if ($sth->fetch()) {
+				RSSUtils::update_rss_feed($feed);
+			}
 		}
 
 		if ($method_split[0] == "MarkAllReadGR")  {
