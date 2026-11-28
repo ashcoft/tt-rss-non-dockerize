@@ -733,19 +733,46 @@ export async function getSearchOptions(
   };
 }
 
+/** A feed advertised by an HTML page (link rel=alternate). */
+export interface DiscoveredFeed {
+  url: string;
+  title: string;
+}
+
+export interface AddFeedResult {
+  code: number;
+  message?: string;
+  /** Present for code 4: the URL is a page offering more than one feed. */
+  feeds?: DiscoveredFeed[];
+}
+
 /**
  * Feeds::add reports success through a nested result code rather than an HTTP
- * status. Codes 0 (already subscribed) and 1 (added) are both successes.
+ * status. Codes 0 (already subscribed) and 1 (added) are successes; a single
+ * feed advertised by an HTML page is subscribed automatically by the backend.
+ * Code 4 means the page advertises several feeds, so the caller has to choose.
  */
 export async function addFeed(
   backend: LegacyBackend,
   feedUrl: string,
   categoryId = 0
-): Promise<{ code: number; message?: string }> {
+): Promise<AddFeedResult> {
   const response = await backend.call('Feeds', 'add', { feed: feedUrl, cat: categoryId });
   const body = requireBody(response, 'Feeds/add');
   const result = expectObject(body.result, 'Feeds/add.result');
   const code = asNumber(result.code, Number.NaN);
+
+  if (code === 4) {
+    const discovered = expectObject(result.feeds ?? {}, 'Feeds/add.result.feeds');
+
+    return {
+      code,
+      feeds: Object.entries(discovered).map(([url, title]) => ({
+        url,
+        title: asString(title, url) || url,
+      })),
+    };
+  }
 
   if (code !== 0 && code !== 1) {
     throw new LegacyApiError('E_FEED_SUBSCRIBE_FAILED', {

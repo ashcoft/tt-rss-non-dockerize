@@ -232,11 +232,14 @@ class ApiClient {
     });
   }
 
-  async addFeed(feedUrl: string, categoryId = 0): Promise<ApiResponse<{ code: number }>> {
+  async addFeed(
+    feedUrl: string,
+    categoryId = 0
+  ): Promise<ApiResponse<{ code: number; feeds: endpoints.DiscoveredFeed[] }>> {
     return this.wrap(async () => {
       const result = await endpoints.addFeed(legacyBackend, feedUrl, categoryId);
-      return { code: result.code };
-    }, { code: -1 });
+      return { code: result.code, feeds: result.feeds ?? [] };
+    }, { code: -1, feeds: [] });
   }
 
   async deleteFeed(feedId: number): Promise<ApiResponse<boolean>> {

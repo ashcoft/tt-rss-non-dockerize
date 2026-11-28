@@ -1116,6 +1116,33 @@ test('addFeed accepts the "already subscribed" and "added" result codes only', a
   );
 });
 
+test('addFeed returns the feeds a page advertises instead of failing', async () => {
+  installGlobals();
+  const backend = new LegacyBackend();
+  backend.setCsrfToken('t');
+
+  stubFetch([
+    {
+      text: JSON.stringify({
+        result: {
+          code: 4,
+          feeds: {
+            'https://example.com/feed.xml': 'Example',
+            'https://example.com/comments.xml': 'Example comments',
+          },
+        },
+      }),
+    },
+  ]);
+
+  const result = await endpoints.addFeed(backend, 'https://example.com/');
+  assert.equal(result.code, 4);
+  assert.deepEqual(result.feeds, [
+    { url: 'https://example.com/feed.xml', title: 'Example' },
+    { url: 'https://example.com/comments.xml', title: 'Example comments' },
+  ]);
+});
+
 test('a handler that prints nothing on success still resolves', async () => {
   installGlobals();
   stubFetch([{ text: '' }]);

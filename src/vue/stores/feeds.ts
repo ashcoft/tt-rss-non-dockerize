@@ -244,19 +244,30 @@ export const useFeedsStore = defineStore('feeds', () => {
   // Feed & category management (Phase 3)
   // ============================================
 
-  async function addFeed(feedUrl: string, categoryId?: number): Promise<boolean> {
+  /**
+   * Subscribe to a feed URL. The backend follows a page's `link rel=alternate`
+   * and subscribes by itself when exactly one feed is advertised; when several
+   * are, nothing is added and `feeds` lists them for the caller to choose from.
+   */
+  async function addFeed(
+    feedUrl: string,
+    categoryId?: number
+  ): Promise<{ ok: boolean; feeds: Array<{ url: string; title: string }> }> {
     try {
       // Feeds/add does not accept a custom title; the feed keeps its own title.
       const response = await api.addFeed(feedUrl, categoryId ?? 0);
       if (response.status === 0) {
+        if (response.content.feeds.length > 0) {
+          return { ok: false, feeds: response.content.feeds };
+        }
         await loadFeeds();
-        return true;
+        return { ok: true, feeds: [] };
       }
       error.value = response.error ?? 'Failed to add feed';
-      return false;
+      return { ok: false, feeds: [] };
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to add feed';
-      return false;
+      return { ok: false, feeds: [] };
     }
   }
 

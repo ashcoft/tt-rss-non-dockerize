@@ -2,9 +2,9 @@
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="720"
+    fullscreen
   >
-    <v-card class="d-flex flex-column" style="height: 80vh; flex: 0 0 auto">
+    <v-card class="d-flex flex-column" style="height: 100%; flex: 0 0 auto">
       <v-card-title>Preferences</v-card-title>
       <v-card-text style="overflow-y: auto; flex: 1 1 auto">
         <v-tabs v-model="tab" color="primary" class="prefs-tabs">

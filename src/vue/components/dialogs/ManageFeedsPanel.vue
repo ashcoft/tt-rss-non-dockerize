@@ -40,6 +40,31 @@
             >
               Subscribe
             </v-btn>
+
+            <!-- The page advertises more than one feed; the backend adds
+                 nothing until one is chosen. -->
+            <template v-if="discoveredFeeds.length > 1">
+              <v-alert type="info" variant="tonal" density="compact" class="mt-4">
+                That page advertises {{ discoveredFeeds.length }} feeds.
+              </v-alert>
+              <v-select
+                v-model="chosenFeedUrl"
+                :items="discoveredFeeds"
+                item-title="title"
+                item-value="url"
+                label="Feed found on that page"
+                class="mt-2"
+              />
+              <v-btn
+                color="primary"
+                :loading="busy"
+                :disabled="!chosenFeedUrl"
+                class="mt-2"
+                @click="subscribeChosen"
+              >
+                Subscribe to selected feed
+              </v-btn>
+            </template>
           </v-window-item>
 
           <!-- Edit feed -->
@@ -409,7 +434,7 @@ const feedStore = useFeedsStore();
 const tab = ref('add');
 const busy = ref(false);
 const message = ref('');
-const messageType = ref<'success' | 'error'>('success');
+const messageType = ref<'success' | 'error' | 'info'>('success');
 
 const newFeedUrl = ref('');
 const newFeedTitle = ref('');
@@ -477,22 +502,48 @@ const sanitizedOpmlResult = computed(() => DOMPurify.sanitize(opmlResult.value))
 
 const categoryOptions = computed(() => feedStore.categories);
 
-const notify = (text: string, type: 'success' | 'error' = 'success') => {
+const notify = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
   message.value = text;
   messageType.value = type;
 };
 
-const addFeed = async () => {
+const discoveredFeeds = ref<Array<{ url: string; title: string }>>([]);
+const chosenFeedUrl = ref<string | null>(null);
+
+const clearSubscribeForm = () => {
+  newFeedUrl.value = '';
+  newFeedTitle.value = '';
+  discoveredFeeds.value = [];
+  chosenFeedUrl.value = null;
+};
+
+const subscribe = async (url: string) => {
   busy.value = true;
-  const ok = await feedStore.addFeed(newFeedUrl.value, newFeedCategory.value ?? 0);
+  const result = await feedStore.addFeed(url, newFeedCategory.value ?? 0);
   busy.value = false;
-  if (ok) {
+
+  if (result.ok) {
     notify('Feed added');
-    newFeedUrl.value = '';
-    newFeedTitle.value = '';
-  } else {
-    notify(feedStore.error ?? 'Failed to add feed', 'error');
+    clearSubscribeForm();
+    return;
   }
+
+  if (result.feeds.length > 1) {
+    // The chooser below the form says what happened; a second message would
+    // just repeat it.
+    discoveredFeeds.value = result.feeds;
+    chosenFeedUrl.value = result.feeds[0]?.url ?? null;
+    message.value = '';
+    return;
+  }
+
+  notify(feedStore.error ?? 'Failed to add feed', 'error');
+};
+
+const addFeed = () => subscribe(newFeedUrl.value);
+
+const subscribeChosen = () => {
+  if (chosenFeedUrl.value) return subscribe(chosenFeedUrl.value);
 };
 
 const purge = async () => {

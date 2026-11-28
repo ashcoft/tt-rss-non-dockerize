@@ -1609,7 +1609,13 @@ onUnmounted(() => {
   max-width: 50vw;
   overflow-y: auto;
   border-right: 1px solid rgba(var(--v-theme-on-background), 0.09);
-  background: rgba(var(--v-theme-on-background), 0.03);
+}
+
+/* The Feedly theme forces the tree transparent with a doubled-id rule
+   (`#feeds-holder#feeds-holder`), which shows the list through it when the tree
+   is a drawer. Match that specificity and paint it with the surface colour. */
+#main #feeds-holder#feeds-holder {
+  background-color: rgb(var(--v-theme-surface));
 }
 
 .content {
