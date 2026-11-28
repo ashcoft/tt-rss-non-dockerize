@@ -23,6 +23,20 @@ corepack pnpm run lint:js      # eslint js src plugins
 
 Run the first six before finishing a frontend change; CI runs them on every PR.
 
+### Local demo stack
+
+`scripts/run-demo-stack.sh` brings up a seeded instance for manual checks:
+the native path (`php -S` + a local PostgreSQL) or, with `--docker`, the
+published image plus PostgreSQL in containers. It migrates the schema, reseeds
+`tests_integration/seed.sql`, makes the seeded dates recent and pins the demo
+profile (combined mode, Feedly sepia-night theme, All Articles). Set
+`TTRSS_SELF_URL_PATH` to the URL you will browse from when it is not
+`http://localhost:$PHP_PORT`, otherwise the CSRF/scheme check rejects POSTs.
+
+```bash
+TTRSS_SELF_URL_PATH=https://example.test ./scripts/run-demo-stack.sh --docker
+```
+
 ### End-to-end tests
 
 `pnpm run test:e2e` drives the built app in a real browser (Playwright +
