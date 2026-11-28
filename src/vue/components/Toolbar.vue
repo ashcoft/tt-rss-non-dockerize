@@ -328,6 +328,7 @@ const actionOptions = computed(() => [
   { title: 'Edit this feed...', value: 'edit', icon: 'mdi-pencil' },
   { title: 'Unsubscribe', value: 'delete', icon: 'mdi-delete' },
   { title: 'Mark as read', value: 'catchup', icon: 'mdi-check-all' },
+  { title: 'Toggle full text (readability)', value: 'toggle_full_text', icon: 'mdi-text-box-outline' },
   { title: '(Un)hide read feeds', value: 'toggleHideRead', icon: 'mdi-eye-off-outline' },
   { title: 'Debug feed update', value: 'debugFeedUpdate', icon: 'mdi-bug-outline' },
   { title: 'Debug viewfeed()', value: 'debugViewFeed', icon: 'mdi-code-json' },

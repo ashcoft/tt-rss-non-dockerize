@@ -89,7 +89,11 @@
               </v-list>
             </v-menu>
             <template #prepend>
-              <v-icon>{{ groupIcon('cat-' + category.id) }}</v-icon>
+              <!-- Clicking the +/- control should also select the category so
+                   its articles load, not just expand the group. -->
+              <v-icon @click.stop="handleCategoryIconClick(category.id)">
+                {{ groupIcon('cat-' + category.id) }}
+              </v-icon>
             </template>
             <template #append>
               <span v-if="category.unread > 0" class="counter">{{ category.unread }}</span>
@@ -146,7 +150,7 @@
           <template #prepend>
             <img
               v-if="feed.has_icon !== false && !iconFailed.has(feed.id)"
-              :src="feedIconUrl(feed.id)"
+              :src="feedIconUrl(feed)"
               class="feed-icon"
               width="16"
               height="16"
@@ -252,7 +256,7 @@
           <template #prepend>
             <img
               v-if="feed.has_icon !== false && !iconFailed.has(feed.id)"
-              :src="feedIconUrl(feed.id)"
+              :src="feedIconUrl(feed)"
               class="feed-icon"
               width="16"
               height="16"
@@ -389,14 +393,26 @@ const toggleCategory = (categoryId: number) => {
     : [...openedGroups.value, key];
 };
 
+/** Opening a category through its +/- control also selects it. */
+const handleCategoryIconClick = (categoryId: number) => {
+  const key = `cat-${categoryId}`;
+  const opening = !openedGroups.value.includes(key);
+  toggleCategory(categoryId);
+  if (opening) handleSelect(key);
+};
+
 defineExpose({ toggleCategory });
 // Feeds whose icon 404s fall back to the RSS glyph; tracked per feed so one
 // broken icon does not hide the rest.
 const iconFailed = ref(new Set<number>());
 
 /** URL that streams a feed's cached icon (public.php?op=feed_icon). */
-const feedIconUrl = (feedId: number): string =>
-  `${props.iconsUrl}?op=feed_icon&id=${feedId}`;
+const feedIconUrl = (feed: Feed): string => {
+  // getfeedtree already returns an absolute icon URL; use it when present so
+  // the tree keeps working when init-params' icons_url is unavailable.
+  if (feed.icon && /^(https?:)?\//.test(feed.icon)) return feed.icon;
+  return `${props.iconsUrl}?op=feed_icon&id=${feed.id}`;
+};
 
 // Special feeds (built-in). IDs mirror the Feeds::FEED_* constants in
 // classes/Feeds.php and must not be renumbered. Order and icons match the

@@ -12,6 +12,8 @@ const props = defineProps<{
   article: Article;
   /** The current feed's site URL, for the feed pill link. */
   feedSiteUrl?: string;
+  /** Base URL of public.php, which streams feed icons. */
+  iconsUrl?: string;
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +23,41 @@ const emit = defineEmits<{
 
 const headlinesStore = useHeadlinesStore();
 const rootEl = ref<HTMLElement | null>(null);
+const iconFailed = ref(false);
+const pluginDialog = ref<{ title: string; html: string } | null>(null);
+
+/** Feed favicon streamed by public.php; empty when icons are unavailable. */
+const feedIconUrl = computed(() =>
+  props.iconsUrl ? `${props.iconsUrl}?op=feed_icon&id=${props.article.feed_id}` : ''
+);
+const showFeedIcon = computed(
+  () => props.article.feed_has_icon !== false && feedIconUrl.value !== '' && !iconFailed.value
+);
+
+/** af_readability renders its own button; the app provides one consistently. */
+const isReadabilityButton = (button: { plugin: string; method: string }): boolean =>
+  button.plugin.toLowerCase() === 'af_readability' && button.method === 'embed';
+
+const articlePluginButtons = computed(() =>
+  (props.article.pluginButtons ?? []).filter(button => !isReadabilityButton(button))
+);
+
+const readabilityBusy = ref(false);
+const toggleReadability = async () => {
+  readabilityBusy.value = true;
+  try {
+    await headlinesStore.toggleFullText(props.article.id);
+  } catch (err) {
+    pluginDialog.value = {
+      title: 'Readability',
+      html:
+        `<p>${err instanceof Error ? err.message : 'Could not fetch the full article text.'}</p>` +
+        '<p>Enable the <code>af_readability</code> plugin to use this feature.</p>',
+    };
+  } finally {
+    readabilityBusy.value = false;
+  }
+};
 
 // HOOK_ARTICLE_RENDERED receives the rendered `.post` node, as in the Dojo client.
 onMounted(() => runPluginHook(HOOKS.ARTICLE_RENDERED, rootEl.value));
@@ -34,7 +71,6 @@ watch(
 
 // Plugin article buttons run their handler through PluginHandler and render the
 // returned HTML fragment in a dialog. Icons are mapped to MDI in pluginIcons.
-const pluginDialog = ref<{ title: string; html: string } | null>(null);
 const pluginBusy = ref(false);
 const shareDialogOpen = ref(false);
 const shareArticleId = ref(props.article.id);
@@ -208,7 +244,7 @@ const sanitizedContent = computed(() => {
           <!-- Plugin article buttons (HOOK_ARTICLE_BUTTON), dispatched through
                the Vue plugin registry. -->
           <v-btn
-            v-for="button in article.pluginButtons ?? []"
+            v-for="button in articlePluginButtons"
             :key="`${button.plugin}.${button.method}`"
             icon
             variant="text"
@@ -218,6 +254,14 @@ const sanitizedContent = computed(() => {
           >
             <v-icon>{{ pluginIcon(button.icon) }}</v-icon>
           </v-btn>
+          <v-btn
+            icon="mdi-text-box-outline"
+            variant="text"
+            size="small"
+            title="Toggle full article text (readability)"
+            :loading="readabilityBusy"
+            @click="toggleReadability"
+          />
           <v-btn icon="mdi-magnify-plus-outline" variant="text" size="small" title="Zoom article" @click="zoomOpen = true" />
           <v-btn icon="mdi-printer-outline" variant="text" size="small" title="Print article" @click="printArticle" />
         </div>
@@ -228,8 +272,32 @@ const sanitizedContent = computed(() => {
             :href="feedSiteUrl"
             target="_blank"
             rel="noopener noreferrer"
-          >{{ article.feed_title }}</a>
-          <span v-else class="feed">{{ article.feed_title }}</span>
+          >
+            <img
+              v-if="showFeedIcon"
+              :src="feedIconUrl"
+              class="feed-icon"
+              width="16"
+              height="16"
+              alt=""
+              @error="iconFailed = true"
+            />
+            <v-icon v-else size="14">mdi-rss</v-icon>
+            <span>{{ article.feed_title }}</span>
+          </a>
+          <span v-else class="feed">
+            <img
+              v-if="showFeedIcon"
+              :src="feedIconUrl"
+              class="feed-icon"
+              width="16"
+              height="16"
+              alt=""
+              @error="iconFailed = true"
+            />
+            <v-icon v-else size="14">mdi-rss</v-icon>
+            <span>{{ article.feed_title }}</span>
+          </span>
           <span v-if="article.author" class="author">by {{ article.author }}</span>
           <!-- The legacy header shows the long date here, not the short one. -->
           <time :datetime="article.updated">{{ article.updated_long || article.updated }}</time>
@@ -263,24 +331,8 @@ const sanitizedContent = computed(() => {
         </div>
       </div>
 
-      <!-- Tags, score and note, compacted to the legacy post footer. -->
+      <!-- Score, note and tags, compacted to the legacy post footer. -->
       <div class="article-tools">
-        <div class="article-tags-row">
-          <v-icon size="16">mdi-tag-outline</v-icon>
-          <v-combobox
-            v-model="tagDraft"
-            :items="tagSuggestions"
-            chips
-            multiple
-            closable-chips
-            density="compact"
-            variant="plain"
-            hide-details
-            class="article-tags-input"
-            @update:model-value="saveTags"
-            @update:search="onTagSearch"
-          />
-        </div>
         <div class="score-row">
           <span class="score-label">Score: {{ article.score ?? 0 }}</span>
           <v-btn size="x-small" variant="text" @click="bumpScore(-100)">-100</v-btn>
@@ -306,6 +358,22 @@ const sanitizedContent = computed(() => {
           >
             Save note
           </v-btn>
+        </div>
+        <div class="article-tags-row">
+          <v-icon size="16">mdi-tag-outline</v-icon>
+          <v-combobox
+            v-model="tagDraft"
+            :items="tagSuggestions"
+            chips
+            multiple
+            closable-chips
+            density="compact"
+            variant="plain"
+            hide-details
+            class="article-tags-input"
+            @update:model-value="saveTags"
+            @update:search="onTagSearch"
+          />
         </div>
       </div>
 
@@ -418,10 +486,19 @@ const sanitizedContent = computed(() => {
 }
 
 .article-meta .feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 0 6px;
   border: 1px solid rgba(var(--v-theme-on-background), 0.12);
   border-radius: 99px;
   color: rgb(var(--v-theme-on-background));
+}
+
+.article-meta .feed-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .article-meta .comments {

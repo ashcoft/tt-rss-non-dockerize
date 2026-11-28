@@ -256,6 +256,22 @@ test('FeedTree renders each feed icon from the public.php endpoint', async () =>
   assert.equal(icon.props.src, '/public.php?op=feed_icon&id=7');
 });
 
+test('FeedTree uses the icon URL returned by the backend', async () => {
+  const backendIcon = 'https://example.test/tt-rss/public.php?op=feed_icon&id=7';
+  const { elements } = mountFeedTree({
+    feeds: [{ id: 7, title: 'Alpha Feed', unread: 1, cat_id: null, has_icon: true, icon: backendIcon }],
+    categories: [],
+    labels: [],
+    iconsUrl: 'https://wrong.example/public.php',
+  });
+
+  await nextTick();
+
+  const icon = elements.find((e) => e.tag === 'img' && String(e.props.src ?? '').includes('feed_icon'));
+  assert.ok(icon, `expected a feed icon img, saw: ${JSON.stringify(elements.map((e) => [e.tag, e.props.src]))}`);
+  assert.equal(icon.props.src, backendIcon);
+});
+
 test('FeedTree selects a label through its synthetic negative feed id', async () => {
   const selected = [];
   const { items } = mountFeedTree({

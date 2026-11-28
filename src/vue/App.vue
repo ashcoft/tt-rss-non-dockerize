@@ -170,6 +170,7 @@
           <ArticleView
             :article="headlinesStore.selectedArticle"
             :feed-site-url="headlinesStore.feedSiteUrl"
+            :icons-url="feedsStore.iconsUrl"
             :first-id-changed="headlinesStore.firstIdChanged"
             @close="handleArticleClose"
             @mark-relative="handleMarkRelative"
@@ -1200,6 +1201,19 @@ const handleToolbarAction = async (action: string, payload?: string | number | o
     case 'delete':
       feedsDialogOpen.value = true;
       break;
+    case 'toggle_full_text': {
+      const id = headlinesStore.cursorId ?? headlinesStore.selectedArticle?.id;
+      if (!id) {
+        showMessage('Select an article first.', 'info');
+        break;
+      }
+      try {
+        await headlinesStore.toggleFullText(id);
+      } catch {
+        showMessage('Please enable af_readability first.', 'warning');
+      }
+      break;
+    }
     case 'toggleHideRead':
       await feedsStore.toggleHideRead();
       showMessage(

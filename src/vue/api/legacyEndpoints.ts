@@ -46,6 +46,8 @@ export interface AdaptedFeed {
   site_url: string;
   /** True when the backend has a cached favicon for this feed. */
   has_icon: boolean;
+  /** Absolute icon URL from getfeedtree, or "". */
+  icon: string;
   /** The feed's last update error, or "". */
   error: string;
   /** The feed's last update time as the backend formatted it. */
@@ -301,6 +303,7 @@ function adaptTreeNode(
     feed_url: '',
     site_url: '',
     has_icon: asString(node.icon) !== '',
+    icon: asString(node.icon),
     error: asString(node.error),
     updated: asString(node.updated),
   };

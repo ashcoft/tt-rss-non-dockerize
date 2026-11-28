@@ -189,16 +189,6 @@
                   class="preview headline-preview"
                   v-html="sanitize(headline.excerpt)"
                 ></span>
-                <span v-if="headline.tags.length > 0" class="tags hl-tags">
-                  <v-icon size="14">mdi-tag-outline</v-icon>
-                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
-                  <a
-                    href="#"
-                    class="headline-label-add"
-                    title="Assign labels"
-                    @click.prevent.stop="emit('action', headline, 'label')"
-                  >(+)</a>
-                </span>
               </span>
 
               <a
@@ -236,6 +226,14 @@
                 <button
                   type="button"
                   class="hl-icon"
+                  title="Toggle full article text (readability)"
+                  @click.stop="emit('action', headline, 'toggle_full_text')"
+                >
+                  <v-icon size="16">mdi-text-box-outline</v-icon>
+                </button>
+                <button
+                  type="button"
+                  class="hl-icon"
                   title="Open original"
                   @click.stop="openOriginal(headline)"
                 >
@@ -255,6 +253,14 @@
                 </span>
               </div>
             </div>
+            <img
+              v-if="showImagePreview(headline)"
+              class="headline-image-preview"
+              :src="headline.image_preview"
+              alt=""
+              loading="lazy"
+              @click.stop="openOriginal(headline)"
+            />
           </template>
 
           <template v-else>
@@ -322,16 +328,6 @@
                   class="preview headline-preview"
                   v-html="sanitize(headline.excerpt)"
                 ></span>
-                <span v-if="headline.tags.length > 0" class="tags hl-tags">
-                  <v-icon size="14">mdi-tag-outline</v-icon>
-                  <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
-                  <a
-                    href="#"
-                    class="headline-label-add"
-                    title="Assign labels"
-                    @click.prevent.stop="emit('action', headline, 'label')"
-                  >(+)</a>
-                </span>
               </span>
             </div>
 
@@ -381,6 +377,16 @@
                 <v-icon v-else size="16">mdi-rss</v-icon>
               </span>
             </div>
+            <span v-if="headline.tags.length > 0" class="tags hl-tags">
+              <v-icon size="14">mdi-tag-outline</v-icon>
+              <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
+              <a
+                href="#"
+                class="headline-label-add"
+                title="Assign labels"
+                @click.prevent.stop="emit('action', headline, 'label')"
+              >(+)</a>
+            </span>
           </template>
 
           <!-- Combined mode: full body only when the row is expanded. -->
@@ -389,20 +395,31 @@
             class="content headline-content"
             @click="onContentClick($event, headline)"
           >
-            <img
-              v-if="headline.image_preview"
-              class="headline-image-preview"
-              :src="headline.image_preview"
-              alt=""
-              loading="lazy"
-            />
             <div
               class="content-inner cdm-content-inner"
               :lang="headline.lang || 'en'"
               v-html="sanitize(headline.content)"
             ></div>
-            <div class="footer cdm-footer">
-              <div class="left">
+          </div>
+
+          <!-- Tags sit at the bottom of the row; the footer is also rendered
+               while collapsed so tags stay reachable. -->
+          <div
+            v-if="combined && (headline.tags.length > 0 || isExpanded(headline))"
+            class="footer cdm-footer"
+          >
+            <div class="left">
+              <span v-if="headline.tags.length > 0" class="tags hl-tags">
+                <v-icon size="14">mdi-tag-outline</v-icon>
+                <span v-for="tag in headline.tags" :key="tag" class="hl-tag">{{ tag }}</span>
+                <a
+                  href="#"
+                  class="headline-label-add"
+                  title="Assign labels"
+                  @click.prevent.stop="emit('action', headline, 'label')"
+                >(+)</a>
+              </span>
+              <template v-if="isExpanded(headline)">
                 <button
                   v-for="button in headline.pluginLeftButtons ?? []"
                   :key="`footer-${button.plugin}.${button.method}`"
@@ -421,10 +438,12 @@
                   rel="noopener noreferrer"
                   @click.stop
                 >({{ headline.comments_count }} {{ headline.comments_count === 1 ? 'comment' : 'comments' }})</a>
-              </div>
-              <div class="right">
+              </template>
+            </div>
+            <div class="right">
+              <template v-if="isExpanded(headline)">
                 <button
-                  v-for="button in headline.pluginButtons ?? []"
+                  v-for="button in withoutReadability(headline.pluginButtons)"
                   :key="`${button.plugin}.${button.method}`"
                   type="button"
                   class="hl-icon"
@@ -433,7 +452,7 @@
                 >
                   <v-icon size="16">{{ pluginIcon(button.icon) }}</v-icon>
                 </button>
-              </div>
+              </template>
             </div>
           </div>
         </div>
@@ -739,6 +758,12 @@ const contextMenuId = ref<number | null>(null);
 /** Feed ids whose icon failed to load, so the RSS glyph is used instead. */
 const iconFailed = ref<Set<number>>(new Set());
 
+/** The app renders its own readability button; hide the plugin's duplicate. */
+const withoutReadability = (buttons: Headline['pluginButtons']): NonNullable<Headline['pluginButtons']> =>
+  (buttons ?? []).filter(
+    button => !(button.plugin.toLowerCase() === 'af_readability' && button.method === 'embed')
+  );
+
 /** Feed icon URL, matching FeedTree's public.php?op=feed_icon form. */
 const feedIconUrl = (feedId: number): string =>
   `${props.iconsUrl ?? '/public.php'}?op=feed_icon&id=${feedId}`;
@@ -844,6 +869,20 @@ const onContentClick = (event: MouseEvent, headline: Headline) => {
 const isExpanded = (headline: Headline): boolean => {
   return Boolean(props.combined) && (Boolean(props.cdmExpanded) || headline.id === props.activeId);
 };
+
+/** True when the inline article body already renders the preview image. */
+const contentHasImage = (headline: Headline): boolean => {
+  if (!headline.image_preview) return false;
+  if (headline.content.includes(headline.image_preview)) return true;
+  // Cache rewrites can change the query string; compare the path too.
+  const path = headline.image_preview.split('?')[0];
+  return path.length > 0 && headline.content.includes(path);
+};
+
+/** Show one thumbnail per row: the preview when collapsed, or when the body
+ * does not already include it. */
+const showImagePreview = (headline: Headline): boolean =>
+  Boolean(headline.image_preview) && (!isExpanded(headline) || !contentHasImage(headline));
 
 // Legacy Article.cdmMoveToId(): when a collapsed row expands, scroll it to the
 // top if it does not already fit in the viewport.
@@ -1009,8 +1048,7 @@ const sanitize = (html: string): string =>
   hyphens: none;
 }
 
-/* The title line holds the title, author and tags. On a phone the tags would
-   be squeezed next to a wrapped title, so let them fall to their own line. */
+/* The title line holds the title and author. */
 .headlines-list-content > .cdm .hl-title {
   flex-wrap: wrap;
 }
@@ -1182,8 +1220,10 @@ const sanitize = (html: string): string =>
 .hl-tags {
   grid-area: tags;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   padding: 0 0 2px;
   color: rgba(var(--v-theme-on-background), 0.55);
   font-size: 0.75rem;
@@ -1261,20 +1301,56 @@ const sanitize = (html: string): string =>
 }
 
 .headline-image-preview {
-  display: block;
-  max-width: min(100%, 480px);
-  max-height: 280px;
-  margin-bottom: 8px;
-  object-fit: contain;
+  float: right;
+  max-width: 200px;
+  max-height: 150px;
+  width: auto;
+  height: auto;
+  margin: 8px 10px;
+  border-radius: 4px;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+/* Cards use a flex column, where floats are ignored. */
+.headlines-grid > .v-list-item .headline-image-preview {
+  float: none;
+  width: 100%;
+  max-height: 180px;
+  margin: 0 0 8px;
+  object-fit: cover;
 }
 
 .cdm-footer {
   display: flex;
+  clear: both;
   align-items: center;
   gap: 4px;
-  margin-top: 10px;
+  padding: 2px 8px 4px;
   color: rgba(var(--v-theme-on-background), 0.55);
   font-size: 0.75rem;
+}
+
+.cdm > .cdm-footer .left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Tags live in the footer, so the list-grid tag area does not apply here. */
+.cdm > .cdm-footer .hl-tags {
+  grid-area: auto;
+  padding: 0;
+}
+
+/* The theme hides the feed icon in single-feed views and absolutely positions
+   it at the row's edge; keep it visible in the row's control cluster. */
+.headlines-list-content .icon-feed {
+  position: static !important;
+  left: auto !important;
+  display: inline-flex !important;
 }
 
 .hl-tag {

@@ -65,8 +65,14 @@ export interface Headline {
   lang?: string;
   /** Localized import date shown as the row tooltip. */
   imported?: string;
+  /** Thumbnail URL shown as a preview in combined mode, if any. */
+  image_preview?: string;
+  /** The feed's background colour, used to tint its label in combined mode. */
+  feed_bg_color?: string;
   /** Plugin-provided buttons rendered on the left of the row. */
   pluginLeftButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
+  /** Plugin-provided article buttons (from HOOK_ARTICLE_BUTTON). */
+  pluginButtons?: Array<{ plugin: string; method: string; icon: string; title: string }>;
 }
 
 export interface Article {
